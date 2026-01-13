@@ -1,0 +1,91 @@
+<!-- templates/admin.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-6">
+  <div class="max-w-6xl mx-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">Admin Console</h1>
+      <div class="flex gap-3">
+        <a href="/dashboard" class="px-3 py-2 bg-blue-500 text-white rounded">Open User Dashboard</a>
+        <a href="/admin/logout" class="px-3 py-2 bg-red-500 text-white rounded">Logout</a>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div class="p-4 bg-white rounded shadow">
+        <h3 class="font-semibold mb-2">Quick Action</h3>
+        <label class="block text-sm">TX ID</label>
+        <input id="qa_txid" class="mt-1 mb-2 w-full px-3 py-2 border rounded" />
+        <label class="block text-sm">Action</label>
+        <select id="qa_action" class="mt-1 mb-3 w-full px-3 py-2 border rounded">
+          <option value="ALLOW">ALLOW</option>
+          <option value="DELAY">DELAY</option>
+          <option value="BLOCK">BLOCK</option>
+        </select>
+        <button id="qa_btn" class="px-4 py-2 bg-green-600 text-white rounded">Apply</button>
+        <div id="qa_result" class="mt-3 text-sm"></div>
+      </div>
+
+      <div class="p-4 bg-white rounded shadow">
+        <h3 class="font-semibold mb-2">System Status</h3>
+        <div id="sys_status">Loading...</div>
+      </div>
+
+      <div class="p-4 bg-white rounded shadow">
+        <h3 class="font-semibold mb-2">Recent Admin Logs</h3>
+        <div id="admin_logs" class="text-sm max-h-40 overflow-y-auto">No logs yet.</div>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow">
+      <h3 class="font-semibold mb-2">Recent Transactions (admin view)</h3>
+      <div id="admin_recent" class="text-sm"></div>
+    </div>
+  </div>
+
+  <script>
+    async function fetchRecent() {
+      try {
+        const res = await fetch('/recent-transactions?limit=20');
+        const j = await res.json();
+        const el = document.getElementById('admin_recent');
+        el.innerHTML = '';
+        (j.transactions || []).forEach(tx => {
+          const div = document.createElement('div');
+          div.className = 'p-2 border-b';
+          div.innerHTML = `<div class="flex justify-between"><div><b>${tx.tx_id}</b><div class="text-xs text-gray-600">${tx.user_id} • ₹${Number(tx.amount).toFixed(2)}</div></div><div class="text-sm">${tx.action || tx.tx_type || ''}</div></div>`;
+          el.appendChild(div);
+        });
+      } catch(e) { console.error(e); }
+    }
+
+    document.getElementById('qa_btn').addEventListener('click', async () => {
+      const txid = document.getElementById('qa_txid').value.trim();
+      const action = document.getElementById('qa_action').value;
+      const result = document.getElementById('qa_result');
+      if (!txid) { result.textContent = 'tx_id required'; return; }
+      try {
+        const r = await fetch('/admin/action', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({tx_id:txid, action}) });
+        const j = await r.json();
+        if (r.ok) {
+          result.textContent = 'OK: ' + (j.updated ? JSON.stringify(j.updated) : 'updated');
+          // notify via websocket indirectly by backend broadcast; refresh recent
+          fetchRecent();
+        } else {
+          result.textContent = 'ERR: ' + (j.detail || JSON.stringify(j));
+        }
+      } catch(e) {
+        result.textContent = 'ERR: ' + e;
+      }
+    });
+
+    fetchRecent();
+  </script>
+</body>
+</html>

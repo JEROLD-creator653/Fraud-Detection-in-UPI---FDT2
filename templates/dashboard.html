@@ -1,0 +1,309 @@
+<!-- templates/dashboard.html (compact/responsive version) -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>UPI Fraud Detection Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --card-radius: 12px; --card-padding: 14px; }
+    body { background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 50%, #fff0f6 100%); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .card { background: #fff; border-radius: var(--card-radius); padding: var(--card-padding); box-shadow: 0 6px 14px rgba(22,24,35,0.06); }
+    .accent-border { border-left-width: 5px; }
+    .small-text { font-size: 0.85rem; }
+    .stat-value { font-weight: 700; }
+    .chart-wrap { height: 220px; }
+    .table-scroll { max-height: 320px; overflow-y: auto; }
+  </style>
+</head>
+<body class="py-6">
+  <div class="max-w-6xl mx-auto px-4">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent leading-tight">
+          UPI Fraud Detection System
+        </h1>
+        <p class="text-gray-600 small-text mt-1">Real-time monitoring • Sri Sairam Engineering College</p>
+      </div>
+      <div class="flex gap-3 items-center">
+        <select id="timeRange" class="px-3 py-2 border rounded-lg bg-white small-text">
+          <option value="1h">Last Hour</option>
+          <option value="24h" selected>Last 24 Hours</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+        </select>
+
+        <button id="exportBtn" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg small-text">
+          Export
+        </button>
+
+        <!-- ADMIN LOGIN BUTTON ADDED (redirects to admin login) -->
+        <a id="adminLoginBtn" href="/admin/login" class="px-4 py-2 bg-gray-800 text-white rounded-lg small-text">Admin Login</a>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="card accent-border" style="border-color:#6366F1">
+        <p class="text-gray-600 small-text">Total Transactions</p>
+        <h2 id="totalTx" class="text-2xl stat-value text-[#6366F1]">0</h2>
+        <p class="text-xs text-gray-500">Last 24 hours</p>
+      </div>
+
+      <div class="card accent-border" style="border-color:#EF4444">
+        <p class="text-gray-600 small-text">Blocked</p>
+        <h2 id="blockedTx" class="text-2xl stat-value text-[#EF4444]">0</h2>
+        <p class="text-xs text-gray-500">Requires review</p>
+      </div>
+
+      <div class="card accent-border" style="border-color:#F59E0B">
+        <p class="text-gray-600 small-text">Delayed</p>
+        <h2 id="delayedTx" class="text-2xl stat-value text-[#F59E0B]">0</h2>
+        <p class="text-xs text-gray-500">Pending verification</p>
+      </div>
+
+      <div class="card accent-border" style="border-color:#10B981">
+        <p class="text-gray-600 small-text">Allowed</p>
+        <h2 id="allowedTx" class="text-2xl stat-value text-[#10B981]">0</h2>
+        <p class="text-xs text-gray-500">Cleared</p>
+      </div>
+    </div>
+
+    <!-- Charts + table grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div class="lg:col-span-2 card">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-bold">Transaction Activity Timeline</h3>
+          <div class="text-sm text-gray-500">Real-time</div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="timelineChart" style="height:220px;width:100%"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="text-lg font-bold mb-3">Risk Distribution</h3>
+        <div class="chart-wrap">
+          <canvas id="riskPie" style="height:220px;width:100%"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="card">
+        <h3 class="text-lg font-bold mb-3">Fraud Pattern Analysis</h3>
+        <div class="chart-wrap">
+          <canvas id="fraudBar" style="height:220px;width:100%"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="text-lg font-bold mb-3">Recent High-Risk Alerts</h3>
+        <div id="alertsList" class="space-y-2 max-h-[300px] overflow-y-auto small-text text-gray-700">
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-6">
+      <h3 class="text-lg font-bold mb-2">Recent Transactions</h3>
+      <div class="overflow-x-auto table-scroll">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-50 small-text">
+            <tr>
+              <th class="px-3 py-2 text-left">Time</th>
+              <th class="px-3 py-2 text-left">TX ID</th>
+              <th class="px-3 py-2 text-left">User</th>
+              <th class="px-3 py-2 text-left">Amount</th>
+              <th class="px-3 py-2 text-left">Type</th>
+              <th class="px-3 py-2 text-left">Channel</th>
+              <th class="px-3 py-2 text-left">DB</th>
+            </tr>
+          </thead>
+          <tbody id="txTbody" class="bg-white divide-y divide-gray-100 small-text">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl p-3 text-white flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+        <div>
+          <div class="font-bold small-text">System Status: Active</div>
+          <div class="text-xs opacity-90">Realtime websocket updates</div>
+        </div>
+      </div>
+      <div class="flex gap-4 text-xs">
+        <div>ML Accuracy: <span class="font-bold">98.7%</span></div>
+        <div>Avg RT: <span class="font-bold">12ms</span></div>
+        <div>Active Users: <span class="font-bold" id="activeUsers">0</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function fmtTS(ts) {
+      try { return new Date(ts).toLocaleString(); } catch(e){ return ts; }
+    }
+
+    const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+    const timelineChart = new Chart(timelineCtx, {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'Blocked', data: [], borderColor: '#EF4444', tension: 0.3, fill:false },
+        { label: 'Delayed', data: [], borderColor: '#F59E0B', tension: 0.3, fill:false },
+        { label: 'Allowed', data: [], borderColor: '#10B981', tension: 0.3, fill:false }
+      ]},
+      options: { responsive:true, maintainAspectRatio:true, scales:{ x:{}, y:{ beginAtZero:true } } }
+    });
+
+    const riskCtx = document.getElementById('riskPie').getContext('2d');
+    const riskPie = new Chart(riskCtx, {
+      type: 'pie',
+      data: { labels: ['Low','Medium','High','Critical'], datasets: [{
+        data: [70,20,7,3], backgroundColor: ['#6BCF7F','#FFD93D','#FF9F40','#FF6B6B']
+      }]},
+      options: { responsive:true, maintainAspectRatio:true }
+    });
+
+    const fraudCtx = document.getElementById('fraudBar').getContext('2d');
+    const fraudBar = new Chart(fraudCtx, {
+      type: 'bar',
+      data: { labels: ['Unusual Amount','Suspicious Recipient','Rapid Transactions','New Device','Location Mismatch'],
+              datasets: [{ label:'Count', data:[35,28,22,10,5], backgroundColor: ['#FF6B6B','#FF9F40','#FFD93D','#6BCF7F','#4ECDC4']}]},
+      options: { indexAxis: 'y', responsive:true, maintainAspectRatio:true }
+    });
+
+    function makeTxRow(tx) {
+      const o = Object.assign({}, tx || {});
+      const ts = o.ts || o.created_at || o.timestamp || new Date().toISOString();
+      const txid = o.tx_id || o.id || '';
+      const user = o.user_id || o.user || '';
+      const amount = (o.amount === undefined) ? 0 : Number(o.amount);
+      const type = o.action || o.tx_type || o.type || '';
+      const channel = o.channel || '';
+      const dbs = o.db_status || o.db || o.status || '';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="px-3 py-2">${fmtTS(ts)}</td>
+        <td class="px-3 py-2">${txid}</td>
+        <td class="px-3 py-2">${user}</td>
+        <td class="px-3 py-2">₹${Number(amount || 0).toFixed(2)}</td>
+        <td class="px-3 py-2">${type}</td>
+        <td class="px-3 py-2">${channel}</td>
+        <td class="px-3 py-2 text-sm text-gray-600">${dbs}</td>
+      `;
+      return tr;
+    }
+
+    async function loadRecentTransactions() {
+      try {
+        const res = await fetch('/recent-transactions?limit=50');
+        if (!res.ok) throw new Error('fetch recent failed');
+        const j = await res.json();
+        const tbody = document.getElementById('txTbody');
+        tbody.innerHTML = '';
+        (j.transactions || []).forEach(tx => tbody.appendChild(makeTxRow(tx)));
+      } catch (e) { console.error('loadRecentTransactions', e); }
+    }
+
+    async function loadDashboardData() {
+      try {
+        const res = await fetch('/dashboard-data');
+        if (!res.ok) throw new Error('fetch dashboard failed');
+        const j = await res.json();
+        const s = j.stats || {};
+
+        document.getElementById('totalTx').textContent = (s.totalTransactions || 0).toLocaleString();
+        document.getElementById('blockedTx').textContent = (s.blocked || 0).toLocaleString();
+        document.getElementById('delayedTx').textContent = (s.delayed || 0).toLocaleString();
+        document.getElementById('allowedTx').textContent = (s.allowed || 0).toLocaleString();
+
+        if (j.trend && Array.isArray(j.trend) && j.trend.length) {
+          const labels = j.trend.map(t => new Date(t.time).toLocaleTimeString());
+          timelineChart.data.labels = labels;
+          timelineChart.data.datasets[0].data = j.trend.map(t=>t.blocked||0);
+          timelineChart.data.datasets[1].data = j.trend.map(t=>t.delayed||0);
+          timelineChart.data.datasets[2].data = j.trend.map(t=>t.allowed||0);
+          timelineChart.update();
+        }
+      } catch (e) { console.error('loadDashboardData', e); }
+    }
+
+    function setupWebSocket() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const ws = new WebSocket(`${proto}://${location.host}/ws`);
+      ws.onopen = () => console.log('ws connected');
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          let txObj = null;
+          if (msg.data && typeof msg.data === 'object') txObj = msg.data;
+          else {
+            txObj = Object.assign({}, msg);
+            delete txObj.type;
+          }
+
+          const msgType = String(msg.type || '').toLowerCase();
+
+          if (msgType === 'tx_inserted' || msgType === 'new_tx' || msgType === 'tx' || msgType === 'insert') {
+            try {
+              const tbody = document.getElementById('txTbody');
+              tbody.insertBefore(makeTxRow(txObj), tbody.firstChild);
+              while (tbody.children.length > 200) tbody.removeChild(tbody.lastChild);
+
+              const safeInc = id => {
+                const el = document.getElementById(id);
+                const n = Number(el.textContent.replace(/,/g,'')) || 0;
+                el.textContent = (n + 1).toLocaleString();
+              };
+
+              safeInc('totalTx');
+
+              const actionVal = (txObj.action || txObj.tx_type || txObj.type || '').toString().toUpperCase();
+              if (actionVal === 'BLOCK') safeInc('blockedTx');
+              else if (actionVal === 'DELAY') safeInc('delayedTx');
+              else safeInc('allowedTx');
+            } catch(e) {
+              console.error('ws handling error', e);
+            }
+          } else if (msgType === 'tx_updated') {
+            // if tx_updated, refresh recent list so UI reflects admin quick actions
+            loadRecentTransactions();
+            loadDashboardData();
+          }
+        } catch(e) { console.error('ws msg parse', e); }
+      };
+      ws.onclose = () => { setTimeout(setupWebSocket, 2000); };
+      ws.onerror = () => ws.close();
+    }
+
+    // init
+    loadDashboardData();
+    loadRecentTransactions();
+    setupWebSocket();
+    setInterval(loadDashboardData, 30000);
+
+    // export CSV
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const rows = [['Time','TX ID','User','Amount','Type','Channel','DB']];
+      document.querySelectorAll('#txTbody tr').forEach(tr=>{
+        const cols = [...tr.querySelectorAll('td')].map(td => td.textContent.trim().replace(/\n/g,' '));
+        rows.push(cols);
+      });
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type: 'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `transactions_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'_')}.csv`;
+      a.click(); URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
