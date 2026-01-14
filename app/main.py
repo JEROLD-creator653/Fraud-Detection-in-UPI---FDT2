@@ -21,7 +21,7 @@ from passlib.hash import pbkdf2_sha256
 CFG_PATH = os.path.join(os.getcwd(), "config.yaml")
 DEFAULT_CFG = {
     "db_url": "postgresql://fdt:fdtpass@host.docker.internal:5432/fdt_db",
-    "thresholds": {"delay": 0.02, "block": 0.07},
+    "thresholds": {"delay": 0.03, "block": 0.06},
     # WARNING: change secret_key before production
     "secret_key": "dev-secret-change-me-please",
     # default admin credentials (password hash can be overridden in config)
@@ -44,7 +44,7 @@ if os.path.exists(CFG_PATH):
         print("Failed to load config.yaml:", e)
 
 DB_URL = cfg.get("db_url")
-THRESHOLDS = cfg.get("thresholds", {"delay": 0.02, "block": 0.07})
+THRESHOLDS = cfg.get("thresholds", {"delay": 0.0, "block": 0.07})
 SECRET_KEY = cfg.get("secret_key", DEFAULT_CFG["secret_key"])
 ADMIN_USERNAME = cfg.get("admin_username", DEFAULT_CFG["admin_username"])
 ADMIN_PASSWORD_HASH = cfg.get("admin_password_hash", DEFAULT_CFG["admin_password_hash"])
@@ -259,17 +259,22 @@ async def new_transaction(request: Request):
     body = await request.json()
     tx = dict(body)
 
-    # optional scoring module
+    # Enhanced scoring with ensemble models
     risk_score = None
     try:
-        import scoring
+        from . import scoring
         try:
-            features = scoring.extract_features(tx)
-            risk_score = scoring.score_features(features)
+            risk_score = scoring.score_transaction(tx)
         except Exception as e:
-            print("scoring failed:", e)
-            risk_score = None
-    except Exception:
+            print("Ensemble scoring failed, trying legacy:", e)
+            try:
+                features = scoring.extract_features(tx)
+                risk_score = scoring.score_features(features)
+            except Exception as e2:
+                print("Legacy scoring also failed:", e2)
+                risk_score = None
+    except Exception as e:
+        print("Could not import scoring module:", e)
         risk_score = None
 
     if risk_score is None:
