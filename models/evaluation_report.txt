@@ -1,0 +1,110 @@
+================================================================================
+UPI FRAUD DETECTION - MODEL EVALUATION REPORT
+================================================================================
+
+Training Date: 2026-01-14T18:36:13.740606
+Training Samples: 7700
+Test Samples: 3300
+Number of Features: 25
+Fraud Rate: 9.09%
+
+================================================================================
+
+
+================================================================================
+MODEL: ISOLATION FOREST
+================================================================================
+
+Classification Report:
+--------------------------------------------------------------------------------
+              precision    recall  f1-score   support
+
+      Normal       0.98      0.97      0.98      1500
+       Fraud       0.73      0.84      0.78       150
+
+    accuracy                           0.96      1650
+   macro avg       0.86      0.90      0.88      1650
+weighted avg       0.96      0.96      0.96      1650
+
+
+Confusion Matrix:
+--------------------------------------------------------------------------------
+                  Predicted Normal  Predicted Fraud
+Actual Normal             1454              46
+Actual Fraud                24             126
+
+Key Metrics:
+--------------------------------------------------------------------------------
+Accuracy:              0.9576
+Precision (Fraud):     0.7326
+Recall (Fraud):        0.8400
+F1-Score (Fraud):      0.7826
+False Positive Rate:   0.0307
+ROC-AUC Score:         0.9525
+PR-AUC Score:          0.8540
+
+
+================================================================================
+MODEL: RANDOM FOREST
+================================================================================
+
+Classification Report:
+--------------------------------------------------------------------------------
+              precision    recall  f1-score   support
+
+      Normal       0.99      0.98      0.98      1500
+       Fraud       0.84      0.86      0.85       150
+
+    accuracy                           0.97      1650
+   macro avg       0.91      0.92      0.92      1650
+weighted avg       0.97      0.97      0.97      1650
+
+
+Confusion Matrix:
+--------------------------------------------------------------------------------
+                  Predicted Normal  Predicted Fraud
+Actual Normal             1476              24
+Actual Fraud                21             129
+
+Key Metrics:
+--------------------------------------------------------------------------------
+Accuracy:              0.9727
+Precision (Fraud):     0.8431
+Recall (Fraud):        0.8600
+F1-Score (Fraud):      0.8515
+False Positive Rate:   0.0160
+ROC-AUC Score:         0.9868
+PR-AUC Score:          0.9339
+
+
+================================================================================
+MODEL: XGBOOST
+================================================================================
+
+Classification Report:
+--------------------------------------------------------------------------------
+              precision    recall  f1-score   support
+
+      Normal       0.99      0.98      0.98      1500
+       Fraud       0.80      0.91      0.85       150
+
+    accuracy                           0.97      1650
+   macro avg       0.89      0.94      0.92      1650
+weighted avg       0.97      0.97      0.97      1650
+
+
+Confusion Matrix:
+--------------------------------------------------------------------------------
+                  Predicted Normal  Predicted Fraud
+Actual Normal             1465              35
+Actual Fraud                14             136
+
+Key Metrics:
+--------------------------------------------------------------------------------
+Accuracy:              0.9703
+Precision (Fraud):     0.7953
+Recall (Fraud):        0.9067
+F1-Score (Fraud):      0.8474
+False Positive Rate:   0.0233
+ROC-AUC Score:         0.9892
+PR-AUC Score:          0.9454
