@@ -23,7 +23,9 @@ CFG_PATH = os.path.join(os.getcwd(), "config.yaml")
 DEFAULT_CFG = {
     "db_url": "postgresql://fdt:fdtpass@host.docker.internal:5432/fdt_db",
     "thresholds": {"delay": 0.02, "block": 0.07},
-    "secret_key": "dev-secret-change-me",
+    # WARNING: change secret_key before production
+    "secret_key": "dev-secret-change-me-please",
+    # default admin credentials (password hash can be overridden in config)
     "admin_username": "admin",
     "admin_password_hash": pbkdf2_sha256.hash("StrongAdmin123!")
 }
@@ -39,11 +41,11 @@ if os.path.exists(CFG_PATH):
             text = raw.decode("utf-8-sig")
         cfg.update(yaml.safe_load(text) or {})
 
-DB_URL = cfg["db_url"]
-THRESHOLDS = cfg["thresholds"]
-SECRET_KEY = cfg["secret_key"]
-ADMIN_USERNAME = cfg["admin_username"]
-ADMIN_PASSWORD_HASH = cfg["admin_password_hash"]
+DB_URL = cfg.get("db_url")
+THRESHOLDS = cfg.get("thresholds", {"delay": 0.02, "block": 0.07})
+SECRET_KEY = cfg.get("secret_key", DEFAULT_CFG["secret_key"])
+ADMIN_USERNAME = cfg.get("admin_username", DEFAULT_CFG["admin_username"])
+ADMIN_PASSWORD_HASH = cfg.get("admin_password_hash", DEFAULT_CFG["admin_password_hash"])
 
 # ---------------- APP ----------------
 
@@ -248,19 +250,35 @@ async def recent_transactions(limit: int = 20, time_range: str = "24h"):
     return {"transactions": rows}
 
 @app.post("/transactions")
-async def new_transaction(req: Request):
-    tx = await req.json()
+async def new_transaction(request: Request):
+    body = await request.json()
+    tx = dict(body)
 
-    risk = float(tx.get("risk_score", 0.0))
-    if risk >= THRESHOLDS["block"]:
-        action = "BLOCK"
-    elif risk >= THRESHOLDS["delay"]:
-        action = "DELAY"
-    else:
-        action = "ALLOW"
+    # optional scoring module
+    risk_score = None
+    try:
+        import scoring
+        try:
+            features = scoring.extract_features(tx)
+            risk_score = scoring.score_features(features)
+        except Exception as e:
+            print("scoring failed:", e)
+            risk_score = None
+    except Exception:
+        risk_score = None
 
-    tx["risk_score"] = risk
-    tx["action"] = action
+    if risk_score is None:
+        risk_score = float(tx.get("risk_score", 0.0))
+
+    tx["risk_score"] = float(risk_score)
+
+    if "action" not in tx or not tx.get("action"):
+        if tx["risk_score"] >= THRESHOLDS["block"]:
+            tx["action"] = "BLOCK"
+        elif tx["risk_score"] >= THRESHOLDS["delay"]:
+            tx["action"] = "DELAY"
+        else:
+            tx["action"] = "ALLOW"
 
     inserted = await run_in_threadpool(db_insert_transaction, tx)
 

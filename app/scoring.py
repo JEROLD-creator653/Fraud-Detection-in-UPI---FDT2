@@ -1,121 +1,302 @@
-﻿import os
-"""
-Scoring module used by app.main.
-Provides:
-  - extract_features(tx) -> dict
-  - score_features(features) -> float (0.0 - 1.0)
-It will try to use sklearn.IsolationForest if available, otherwise a rule-based fallback.
+﻿"""
+Enhanced Scoring Module - Ensemble ML Fraud Detection
+Uses multiple trained models with proper feature extraction and ensemble voting
 """
 
-from datetime import datetime, timezone, timedelta
+import os
 import math
-import random
+from datetime import datetime, timezone
+from typing import Dict, Optional
+import numpy as np
 
-# optional DB helper - main will call scoring in-threadpool, so it's fine to use synchronous DB calls if needed
-try:
-    from .db_utils import count_recent_transactions_for_user_device
-except Exception:
-    # if db_utils not present, define a no-op fallback
-    def count_recent_transactions_for_user_device(user_id=None, device_id=None, period_seconds=60):
-        return 0
+# Model loading and caching
+_MODELS_LOADED = False
+_IFOREST = None
+_RANDOM_FOREST = None
+_XGBOOST = None
+_MODEL_METADATA = None
 
-# Try to import sklearn IsolationForest
-USE_SKLEARN = False
-try:
-    from sklearn.ensemble import IsolationForest
-    import numpy as np
-    USE_SKLEARN = True
-except Exception:
-    USE_SKLEARN = False
+def load_models():
+    """Load all trained models (cached after first load)."""
+    global _MODELS_LOADED, _IFOREST, _RANDOM_FOREST, _XGBOOST, _MODEL_METADATA
+    
+    if _MODELS_LOADED:
+        return
+    
+    try:
+        import joblib
+        import json
+        
+        # Load models
+        model_dir = "models"
+        
+        try:
+            _IFOREST = joblib.load(os.path.join(model_dir, "iforest.joblib"))
+            print("✓ Loaded Isolation Forest model")
+        except Exception as e:
+            print(f"⚠ Could not load Isolation Forest: {e}")
+        
+        try:
+            _RANDOM_FOREST = joblib.load(os.path.join(model_dir, "random_forest.joblib"))
+            print("✓ Loaded Random Forest model")
+        except Exception as e:
+            print(f"⚠ Could not load Random Forest: {e}")
+        
+        try:
+            _XGBOOST = joblib.load(os.path.join(model_dir, "xgboost.joblib"))
+            print("✓ Loaded XGBoost model")
+        except Exception as e:
+            print(f"⚠ Could not load XGBoost: {e}")
+        
+        # Load metadata
+        try:
+            with open(os.path.join(model_dir, "metadata.json"), "r") as f:
+                _MODEL_METADATA = json.load(f)
+            print("✓ Loaded model metadata")
+        except Exception as e:
+            print(f"⚠ Could not load metadata: {e}")
+        
+        _MODELS_LOADED = True
+        
+        if not any([_IFOREST, _RANDOM_FOREST, _XGBOOST]):
+            print("⚠ WARNING: No models loaded! Using fallback rule-based scoring.")
+        
+    except Exception as e:
+        print(f"❌ Error loading models: {e}")
+        _MODELS_LOADED = True  # Prevent retry
 
-# simple in-memory buffer for isolation forest training samples (very small)
-_SK_SAMPLES = []
 
 def extract_features(tx: dict) -> dict:
     """
-    Build a small numeric feature vector from tx.
+    Extract features from transaction using feature_engine.
+    Falls back to simplified extraction if feature_engine is unavailable.
     """
-    f = {}
-    f["amount"] = float(tx.get("amount") or 0.0)
-    f["has_recipient"] = 1.0 if tx.get("recipient_vpa") else 0.0
-    f["is_p2m"] = 1.0 if (tx.get("tx_type") or "").upper() == "P2M" else 0.0
-    f["is_qr"] = 1.0 if (tx.get("channel") or "").lower() == "qr" else 0.0
-    # velocity features (counts in last minute)
     try:
-        u = tx.get("user_id")
-        d = tx.get("device_id")
-        f["user_recent_count"] = float(count_recent_transactions_for_user_device(user_id=u, device_id=None, period_seconds=60))
-        f["device_recent_count"] = float(count_recent_transactions_for_user_device(user_id=None, device_id=d, period_seconds=60))
-    except Exception:
-        f["user_recent_count"] = 0.0
-        f["device_recent_count"] = 0.0
-    # timestamp hour
+        # Try to use the enhanced feature_engine
+        from .feature_engine import extract_features as extract_features_enhanced
+        return extract_features_enhanced(tx)
+    except Exception as e:
+        # Fallback: simplified feature extraction
+        print(f"⚠ Using fallback feature extraction: {e}")
+        return extract_features_fallback(tx)
+
+
+def extract_features_fallback(tx: dict) -> dict:
+    """
+    Fallback feature extraction when Redis/feature_engine unavailable.
+    Returns features matching the expected feature set.
+    """
+    from .feature_engine import get_feature_names
+    
+    ts_field = tx.get("timestamp") or tx.get("ts") or tx.get("created_at")
     try:
-        ts = tx.get("ts") or tx.get("created_at") or tx.get("timestamp")
-        if ts:
-            dt = datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(timezone.utc)
-            f["hour"] = float(dt.hour)
-        else:
-            f["hour"] = 0.0
-    except Exception:
-        f["hour"] = 0.0
-    return f
+        ts = datetime.fromisoformat(str(ts_field).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except:
+        ts = datetime.now(timezone.utc)
+    
+    amount = float(tx.get("amount", 0))
+    tx_type = tx.get("tx_type", "P2P").upper()
+    channel = tx.get("channel", "app").lower()
+    recipient = tx.get("recipient_vpa", "unknown@upi")
+    merchant = recipient.split("@")[0]
+    
+    # Build feature dict matching training features
+    features = {
+        # Basic
+        "amount": amount,
+        "log_amount": math.log1p(amount),
+        "is_round_amount": 1.0 if (amount % 100 == 0 or amount % 500 == 0) else 0.0,
+        # Temporal
+        "hour_of_day": float(ts.hour),
+        "day_of_week": float(ts.weekday()),
+        "is_weekend": 1.0 if ts.weekday() >= 5 else 0.0,
+        "is_night": 1.0 if (ts.hour >= 22 or ts.hour <= 5) else 0.0,
+        "is_business_hours": 1.0 if (9 <= ts.hour <= 17) else 0.0,
+        # Velocity (set to defaults without Redis)
+        "tx_count_1h": 0.0,
+        "tx_count_6h": 0.0,
+        "tx_count_24h": 0.0,
+        "tx_count_1min": 0.0,
+        "tx_count_5min": 0.0,
+        # Behavioral
+        "is_new_recipient": 0.0,
+        "recipient_tx_count": 5.0,
+        "is_new_device": 0.0,
+        "device_count": 1.0,
+        "is_p2m": 1.0 if tx_type == "P2M" else 0.0,
+        # Statistical
+        "amount_mean": amount,
+        "amount_std": amount * 0.3,
+        "amount_max": amount * 1.5,
+        "amount_deviation": 0.5,
+        # Risk
+        "merchant_risk_score": 0.5 if merchant[0].isdigit() else 0.0,
+        "is_qr_channel": 1.0 if channel == "qr" else 0.0,
+        "is_web_channel": 1.0 if channel == "web" else 0.0,
+    }
+    
+    return features
 
-def _features_to_vector(fdict):
-    # fixed order
-    return [fdict.get(k, 0.0) for k in ("amount","has_recipient","is_p2m","is_qr","user_recent_count","device_recent_count","hour")]
 
-def score_features(features: dict) -> float:
+def features_to_vector(feature_dict: dict) -> np.ndarray:
+    """Convert feature dictionary to numpy array in correct order."""
+    try:
+        from .feature_engine import features_to_vector as ftv
+        return np.array(ftv(feature_dict))
+    except:
+        # Fallback: use fixed order matching training
+        from .feature_engine import get_feature_names
+        feature_names = get_feature_names()
+        return np.array([float(feature_dict.get(name, 0.0)) for name in feature_names])
+
+
+def score_with_ensemble(features_dict: dict) -> Dict[str, float]:
     """
-    Return a risk score in [0,1]. If sklearn is available, use IsolationForest.
-    Otherwise use a heuristic:
-      - large amounts -> higher score
-      - high velocity (user/device counts) -> higher score
-      - odd hour -> small bump
+    Score transaction using ensemble of models.
+    
+    Returns:
+        dict with scores from each model and ensemble score
     """
-    vec = _features_to_vector(features)
-
-    # if sklearn available, use IsolationForest trained online with recent samples
-    if USE_SKLEARN:
+    # Lazy load models
+    if not _MODELS_LOADED:
+        load_models()
+    
+    # Convert features to vector
+    try:
+        feature_vec = features_to_vector(features_dict)
+        feature_vec = feature_vec.reshape(1, -1)  # Shape for prediction
+    except Exception as e:
+        print(f"Error converting features: {e}")
+        return {"ensemble": fallback_rule_based_score(features_dict)}
+    
+    scores = {}
+    
+    # Isolation Forest (unsupervised)
+    if _IFOREST:
         try:
-            # keep a sliding window of samples
-            _SK_SAMPLES.append(vec)
-            if len(_SK_SAMPLES) > 500:
-                _SK_SAMPLES.pop(0)
-            # train a small model on available samples (cheap)
-            X = np.array(_SK_SAMPLES)
-            if len(X) >= 30:
-                iso = IsolationForest(n_estimators=64, contamination=0.05, random_state=42)
-                iso.fit(X)
-                score = -iso.decision_function([vec])[0]  # anomaly score (higher means more anomalous)
-                # normalize to 0..1 (rough)
-                score = 1/(1+math.exp(-score))  # logistic
-                return float(max(0.0, min(1.0, score)))
-        except Exception:
-            pass
-
-    # fallback heuristic
-    amount = float(features.get("amount") or 0.0)
-    user_cnt = float(features.get("user_recent_count") or 0.0)
-    dev_cnt = float(features.get("device_recent_count") or 0.0)
-    hour = float(features.get("hour") or 0.0)
-
-    # base from amount (use log scale)
-    base = 0.0
-    if amount <= 0:
-        base = 0.0
+            # Anomaly score: higher = more anomalous
+            anomaly_score = -_IFOREST.decision_function(feature_vec)[0]
+            # Normalize to 0-1
+            iforest_score = 1 / (1 + math.exp(-anomaly_score))
+            scores["iforest"] = float(max(0.0, min(1.0, iforest_score)))
+        except Exception as e:
+            print(f"Isolation Forest scoring error: {e}")
+    
+    # Random Forest (supervised)
+    if _RANDOM_FOREST:
+        try:
+            rf_proba = _RANDOM_FOREST.predict_proba(feature_vec)[0, 1]  # Probability of fraud
+            scores["random_forest"] = float(rf_proba)
+        except Exception as e:
+            print(f"Random Forest scoring error: {e}")
+    
+    # XGBoost (supervised)
+    if _XGBOOST:
+        try:
+            xgb_proba = _XGBOOST.predict_proba(feature_vec)[0, 1]  # Probability of fraud
+            scores["xgboost"] = float(xgb_proba)
+        except Exception as e:
+            print(f"XGBoost scoring error: {e}")
+    
+    # Ensemble: weighted average
+    if scores:
+        # Weight supervised models higher than unsupervised
+        weights = {
+            "iforest": 0.2,
+            "random_forest": 0.4,
+            "xgboost": 0.4
+        }
+        
+        weighted_sum = sum(scores.get(model, 0) * weights.get(model, 0) 
+                          for model in weights.keys())
+        total_weight = sum(weights.get(model, 0) for model in scores.keys())
+        
+        scores["ensemble"] = float(weighted_sum / total_weight) if total_weight > 0 else 0.0
     else:
-        base = math.tanh(math.log1p(amount) / 5.0)  # between 0..~1
+        # No models available, use fallback
+        scores["ensemble"] = fallback_rule_based_score(features_dict)
+    
+    return scores
 
-    # velocity boost
-    vel = math.tanh((user_cnt + dev_cnt) / 5.0)
 
-    # odd-hour bump (2am-5am)
-    hour_bump = 0.15 if (hour >= 2 and hour <= 5) else 0.0
+def fallback_rule_based_score(features: dict) -> float:
+    """
+    Fallback rule-based scoring when no models are available.
+    Uses heuristics based on amount, velocity, and temporal patterns.
+    """
+    amount = float(features.get("amount", 0))
+    is_night = float(features.get("is_night", 0))
+    is_new_device = float(features.get("is_new_device", 0))
+    is_new_recipient = float(features.get("is_new_recipient", 0))
+    merchant_risk = float(features.get("merchant_risk_score", 0))
+    tx_count_1h = float(features.get("tx_count_1h", 0))
+    is_qr = float(features.get("is_qr_channel", 0))
+    is_web = float(features.get("is_web_channel", 0))
+    
+    score = 0.0
+    
+    # Amount-based risk
+    if amount > 10000:
+        score += 0.4
+    elif amount > 5000:
+        score += 0.25
+    elif amount > 2000:
+        score += 0.15
+    
+    # Temporal risk
+    if is_night > 0:
+        score += 0.2
+    
+    # Behavioral risk
+    if is_new_device > 0:
+        score += 0.15
+    if is_new_recipient > 0:
+        score += 0.1
+    
+    # Merchant risk
+    score += merchant_risk * 0.15
+    
+    # Velocity risk
+    if tx_count_1h > 10:
+        score += 0.3
+    elif tx_count_1h > 5:
+        score += 0.15
+    
+    # Channel risk
+    if is_qr > 0 or is_web > 0:
+        score += 0.1
+    
+    return float(max(0.0, min(1.0, score)))
 
-    score = base * 0.6 + vel * 0.3 + hour_bump
-    # clamp
-    score = max(0.0, min(1.0, score))
-    # small random jitter to avoid identical scores
-    score = float(score * 0.98 + random.random() * 0.02)
-    return score
+
+def score_transaction(tx: dict) -> float:
+    """
+    Main scoring function - extracts features and returns ensemble risk score.
+    
+    Args:
+        tx: Transaction dictionary
+    
+    Returns:
+        Risk score between 0.0 (safe) and 1.0 (high risk)
+    """
+    try:
+        # Extract features
+        features = extract_features(tx)
+        
+        # Score with ensemble
+        scores = score_with_ensemble(features)
+        
+        # Return ensemble score
+        return scores.get("ensemble", 0.0)
+        
+    except Exception as e:
+        print(f"Scoring error: {e}")
+        # Emergency fallback
+        return 0.5  # Medium risk if error occurs
+
+
+# Legacy compatibility functions
+def score_features(features: dict) -> float:
+    """Legacy function for compatibility."""
+    scores = score_with_ensemble(features)
+    return scores.get("ensemble", 0.0)
