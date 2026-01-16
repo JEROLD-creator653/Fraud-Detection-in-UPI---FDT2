@@ -11,21 +11,21 @@ RANDOM FOREST - TOP 15 FEATURES
 --------------------------------------------------------------------------------
 Rank   Feature                        Importance     
 --------------------------------------------------------------------------------
-1      amount_std                     0.213958       
-2      amount_max                     0.192626       
-3      amount                         0.176269       
-4      log_amount                     0.159242       
-5      amount_mean                    0.124960       
-6      hour_of_day                    0.026145       
-7      is_new_device                  0.019796       
-8      amount_deviation               0.016653       
-9      device_count                   0.016022       
-10     recipient_tx_count             0.015266       
-11     merchant_risk_score            0.012555       
-12     is_night                       0.008597       
-13     is_qr_channel                  0.005386       
-14     is_round_amount                0.003338       
-15     is_business_hours              0.002864       
+1      amount_std                     0.209138       
+2      amount_max                     0.187512       
+3      amount                         0.187216       
+4      log_amount                     0.163750       
+5      amount_mean                    0.117453       
+6      hour_of_day                    0.026475       
+7      is_new_device                  0.020205       
+8      device_count                   0.016825       
+9      amount_deviation               0.016692       
+10     recipient_tx_count             0.015129       
+11     merchant_risk_score            0.012748       
+12     is_night                       0.009313       
+13     is_qr_channel                  0.005449       
+14     is_round_amount                0.003046       
+15     is_business_hours              0.002659       
 
 
 ================================================================================
@@ -33,21 +33,21 @@ XGBOOST - TOP 15 FEATURES
 --------------------------------------------------------------------------------
 Rank   Feature                        Importance     
 --------------------------------------------------------------------------------
-1      log_amount                     0.277917       
-2      amount                         0.222484       
-3      amount_std                     0.218810       
-4      is_round_amount                0.043206       
-5      merchant_risk_score            0.042081       
-6      amount_mean                    0.033803       
-7      is_qr_channel                  0.020034       
-8      hour_of_day                    0.017308       
-9      is_new_device                  0.016866       
-10     is_night                       0.016660       
-11     amount_deviation               0.014531       
-12     recipient_tx_count             0.013552       
-13     device_count                   0.013350       
-14     day_of_week                    0.011251       
-15     is_web_channel                 0.011226       
+1      log_amount                     0.250547       
+2      amount_std                     0.239559       
+3      amount                         0.228254       
+4      is_round_amount                0.043685       
+5      merchant_risk_score            0.041244       
+6      amount_mean                    0.032495       
+7      is_night                       0.023418       
+8      is_qr_channel                  0.019625       
+9      is_new_device                  0.015981       
+10     hour_of_day                    0.015752       
+11     amount_deviation               0.013825       
+12     device_count                   0.013556       
+13     recipient_tx_count             0.013157       
+14     day_of_week                    0.011705       
+15     is_web_channel                 0.011333       
 
 
 ================================================================================
@@ -55,28 +55,28 @@ FEATURE IMPORTANCE BY CATEGORY
 ================================================================================
 
 Basic Features:
-  Random Forest Avg:  0.112950
-  XGBoost Avg:        0.181203
+  Random Forest Avg:  0.118004
+  XGBoost Avg:        0.174162
 
 Temporal Features:
-  Random Forest Avg:  0.007974
-  XGBoost Avg:        0.010848
+  Random Forest Avg:  0.008121
+  XGBoost Avg:        0.012000
 
 Velocity Features:
   Random Forest Avg:  0.000000
   XGBoost Avg:        0.000000
 
 Behavioral Features:
-  Random Forest Avg:  0.010674
-  XGBoost Avg:        0.010868
+  Random Forest Avg:  0.010909
+  XGBoost Avg:        0.010595
 
 Statistical Features:
-  Random Forest Avg:  0.137049
-  XGBoost Avg:        0.068619
+  Random Forest Avg:  0.132699
+  XGBoost Avg:        0.073083
 
 Risk Features:
-  Random Forest Avg:  0.006571
-  XGBoost Avg:        0.024447
+  Random Forest Avg:  0.006681
+  XGBoost Avg:        0.024067
 
 
 ================================================================================
@@ -84,6 +84,6 @@ KEY INSIGHTS
 ================================================================================
 
 Top 5 Features (Random Forest): amount_std, amount_max, amount, log_amount, amount_mean
-Top 5 Features (XGBoost): log_amount, amount, amount_std, is_round_amount, merchant_risk_score
+Top 5 Features (XGBoost): log_amount, amount_std, amount, is_round_amount, merchant_risk_score
 
-Features in both top 5: log_amount, amount_std, amount
+Features in both top 5: amount_std, log_amount, amount
