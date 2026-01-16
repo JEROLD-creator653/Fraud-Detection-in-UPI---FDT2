@@ -256,21 +256,36 @@ async def new_transaction(request: Request):
 
     # optional scoring module
     risk_score = None
-    try:
-        import scoring
+    
+    # Check if this is from simulator/generator - if so, keep risk at 0
+    is_simulated = tx.pop("_simulated", False)
+    
+    if not is_simulated:
         try:
-            features = scoring.extract_features(tx)
-            risk_score = scoring.score_features(features)
+            from . import scoring
+            try:
+                features = scoring.extract_features(tx)
+                risk_score = scoring.score_features(features)
+                print(f"✓ Scoring succeeded: risk_score={risk_score}")
+            except Exception as e:
+                print(f"❌ scoring failed: {e}")
+                import traceback
+                traceback.print_exc()
+                risk_score = None
         except Exception as e:
-            print("scoring failed:", e)
+            print(f"❌ Could not import scoring: {e}")
             risk_score = None
-    except Exception:
-        risk_score = None
 
     if risk_score is None:
         risk_score = float(tx.get("risk_score", 0.0))
+        if not is_simulated:
+            print(f"⚠ Using fallback risk_score from tx: {risk_score}")
 
     tx["risk_score"] = float(risk_score)
+    if is_simulated:
+        print(f"📊 Simulated transaction - risk_score set to: {tx['risk_score']}")
+    else:
+        print(f"Final risk_score set to: {tx['risk_score']}")
 
     if "action" not in tx or not tx.get("action"):
         if tx["risk_score"] >= THRESHOLDS["block"]:
