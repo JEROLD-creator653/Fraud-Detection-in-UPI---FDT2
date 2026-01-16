@@ -1,7 +1,7 @@
-﻿db_url: "postgresql://fdt:fdtpass@host.docker.internal:5432/fdt_db"
+﻿db_url: "postgresql://fdt:fdtpass@127.0.0.1:5433/fdt_db"
 thresholds:
-  delay: 0.02
-  block: 0.07
+  delay: 0.30  # Updated for new ML models (was 0.02)
+  block: 0.60  # Updated for new ML models (was 0.07)
 secret_key: "qdqBymrlHc4wrM_E2TfifjUjnEsjxh-9NGKCQaecrQw"
-admin_username: "jerold"
+admin_username: "admin"
 admin_password_hash: "$pbkdf2-sha256$29000$Yay19v6fc26NsdYag/Beqw$Io.CbMOl.vrR.Oj/PowRYhIObd8Q643X6Wdo8zPyNXQ"
