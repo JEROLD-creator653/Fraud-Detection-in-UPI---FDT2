@@ -1,5 +1,5 @@
 {
-  "training_date": "2026-01-16T17:03:04.445864",
+  "training_date": "2026-01-16T17:08:09.058778",
   "training_samples": 7700,
   "test_samples": 3300,
   "num_features": 25,
@@ -34,41 +34,41 @@
   "model_results": {
     "iforest": {
       "model_name": "Isolation Forest",
-      "roc_auc": 0.9526122222222222,
+      "roc_auc": 0.9519277777777779,
       "confusion_matrix": [
         [
-          2927,
-          73
+          2925,
+          75
         ],
         [
-          54,
-          246
+          53,
+          247
         ]
       ]
     },
     "random_forest": {
       "model_name": "Random Forest",
-      "roc_auc": 0.9889383333333333,
-      "pr_auc": 0.9436362216461869,
+      "roc_auc": 0.9893138888888888,
+      "pr_auc": 0.944599700363906,
       "confusion_matrix": [
         [
-          2946,
-          54
+          2952,
+          48
         ],
         [
-          40,
-          260
+          41,
+          259
         ]
       ]
     },
     "xgboost": {
       "model_name": "XGBoost",
-      "roc_auc": 0.9884233333333333,
-      "pr_auc": 0.9393661014074398,
+      "roc_auc": 0.9881433333333334,
+      "pr_auc": 0.9399708048974629,
       "confusion_matrix": [
         [
-          2922,
-          78
+          2925,
+          75
         ],
         [
           35,
