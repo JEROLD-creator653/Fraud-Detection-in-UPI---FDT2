@@ -2,7 +2,7 @@
 UPI FRAUD DETECTION - MODEL EVALUATION REPORT
 ================================================================================
 
-Training Date: 2026-01-14T18:36:13.740606
+Training Date: 2026-01-16T17:08:09.058778
 Training Samples: 7700
 Test Samples: 3300
 Number of Features: 25
@@ -20,28 +20,28 @@ Classification Report:
               precision    recall  f1-score   support
 
       Normal       0.98      0.97      0.98      1500
-       Fraud       0.73      0.84      0.78       150
+       Fraud       0.74      0.85      0.79       150
 
     accuracy                           0.96      1650
-   macro avg       0.86      0.90      0.88      1650
+   macro avg       0.86      0.91      0.88      1650
 weighted avg       0.96      0.96      0.96      1650
 
 
 Confusion Matrix:
 --------------------------------------------------------------------------------
                   Predicted Normal  Predicted Fraud
-Actual Normal             1454              46
-Actual Fraud                24             126
+Actual Normal             1456              44
+Actual Fraud                23             127
 
 Key Metrics:
 --------------------------------------------------------------------------------
-Accuracy:              0.9576
-Precision (Fraud):     0.7326
-Recall (Fraud):        0.8400
-F1-Score (Fraud):      0.7826
-False Positive Rate:   0.0307
-ROC-AUC Score:         0.9525
-PR-AUC Score:          0.8540
+Accuracy:              0.9594
+Precision (Fraud):     0.7427
+Recall (Fraud):        0.8467
+F1-Score (Fraud):      0.7913
+False Positive Rate:   0.0293
+ROC-AUC Score:         0.9501
+PR-AUC Score:          0.8502
 
 
 ================================================================================
@@ -52,29 +52,29 @@ Classification Report:
 --------------------------------------------------------------------------------
               precision    recall  f1-score   support
 
-      Normal       0.99      0.98      0.98      1500
-       Fraud       0.84      0.86      0.85       150
+      Normal       0.99      0.99      0.99      1500
+       Fraud       0.86      0.85      0.86       150
 
     accuracy                           0.97      1650
-   macro avg       0.91      0.92      0.92      1650
+   macro avg       0.92      0.92      0.92      1650
 weighted avg       0.97      0.97      0.97      1650
 
 
 Confusion Matrix:
 --------------------------------------------------------------------------------
                   Predicted Normal  Predicted Fraud
-Actual Normal             1476              24
-Actual Fraud                21             129
+Actual Normal             1479              21
+Actual Fraud                22             128
 
 Key Metrics:
 --------------------------------------------------------------------------------
-Accuracy:              0.9727
-Precision (Fraud):     0.8431
-Recall (Fraud):        0.8600
-F1-Score (Fraud):      0.8515
-False Positive Rate:   0.0160
-ROC-AUC Score:         0.9868
-PR-AUC Score:          0.9339
+Accuracy:              0.9739
+Precision (Fraud):     0.8591
+Recall (Fraud):        0.8533
+F1-Score (Fraud):      0.8562
+False Positive Rate:   0.0140
+ROC-AUC Score:         0.9864
+PR-AUC Score:          0.9332
 
 
 ================================================================================
@@ -85,26 +85,26 @@ Classification Report:
 --------------------------------------------------------------------------------
               precision    recall  f1-score   support
 
-      Normal       0.99      0.98      0.98      1500
-       Fraud       0.80      0.91      0.85       150
+      Normal       0.99      0.97      0.98      1500
+       Fraud       0.78      0.91      0.84       150
 
     accuracy                           0.97      1650
-   macro avg       0.89      0.94      0.92      1650
+   macro avg       0.88      0.94      0.91      1650
 weighted avg       0.97      0.97      0.97      1650
 
 
 Confusion Matrix:
 --------------------------------------------------------------------------------
                   Predicted Normal  Predicted Fraud
-Actual Normal             1465              35
+Actual Normal             1461              39
 Actual Fraud                14             136
 
 Key Metrics:
 --------------------------------------------------------------------------------
-Accuracy:              0.9703
-Precision (Fraud):     0.7953
+Accuracy:              0.9679
+Precision (Fraud):     0.7771
 Recall (Fraud):        0.9067
-F1-Score (Fraud):      0.8474
-False Positive Rate:   0.0233
-ROC-AUC Score:         0.9892
-PR-AUC Score:          0.9454
+F1-Score (Fraud):      0.8369
+False Positive Rate:   0.0260
+ROC-AUC Score:         0.9883
+PR-AUC Score:          0.9425
