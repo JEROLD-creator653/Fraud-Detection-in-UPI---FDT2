@@ -1,4 +1,3 @@
-<!-- templates/admin.html -->
 <!doctype html>
 <html>
 <head>
@@ -7,85 +6,248 @@
   <title>Admin Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 p-6">
+
+<body class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6">
   <div class="max-w-6xl mx-auto">
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">Admin Console</h1>
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-3xl font-extrabold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+          Admin Console
+        </h1>
+        <p class="text-sm text-gray-600">Fraud control & monitoring</p>
+      </div>
       <div class="flex gap-3">
-        <a href="/dashboard" class="px-3 py-2 bg-blue-500 text-white rounded">Open User Dashboard</a>
-        <a href="/admin/logout" class="px-3 py-2 bg-red-500 text-white rounded">Logout</a>
+        <a href="/dashboard" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm">Open User Dashboard</a>
+        <a href="/admin/logout" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm">Logout</a>
       </div>
     </div>
 
+    <!-- Top panels -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-      <div class="p-4 bg-white rounded shadow">
-        <h3 class="font-semibold mb-2">Quick Action</h3>
-        <label class="block text-sm">TX ID</label>
-        <input id="qa_txid" class="mt-1 mb-2 w-full px-3 py-2 border rounded" />
-        <label class="block text-sm">Action</label>
-        <select id="qa_action" class="mt-1 mb-3 w-full px-3 py-2 border rounded">
+
+      <!-- Quick Action -->
+      <div class="bg-white rounded-xl shadow p-4">
+        <h3 class="font-semibold mb-3">Quick Action (Manual)</h3>
+        <label class="text-sm">TX ID</label>
+        <input id="qa_txid" class="w-full mt-1 mb-2 px-3 py-2 border rounded" />
+        <label class="text-sm">Action</label>
+        <select id="qa_action" class="w-full mt-1 mb-3 px-3 py-2 border rounded">
           <option value="ALLOW">ALLOW</option>
           <option value="DELAY">DELAY</option>
           <option value="BLOCK">BLOCK</option>
         </select>
-        <button id="qa_btn" class="px-4 py-2 bg-green-600 text-white rounded">Apply</button>
-        <div id="qa_result" class="mt-3 text-sm"></div>
+        <button id="qa_btn" class="w-full py-2 bg-green-600 text-white rounded">Apply</button>
+        <div id="qa_result" class="mt-2 text-xs text-gray-600"></div>
       </div>
 
-      <div class="p-4 bg-white rounded shadow">
+      <!-- System status -->
+      <div class="bg-white rounded-xl shadow p-4">
         <h3 class="font-semibold mb-2">System Status</h3>
-        <div id="sys_status">Loading...</div>
+        <div id="sys_status" class="text-sm text-green-600 font-medium">
+          ● Live – WebSocket connected
+        </div>
       </div>
 
-      <div class="p-4 bg-white rounded shadow">
+      <!-- Admin logs -->
+      <div class="bg-white rounded-xl shadow p-4">
         <h3 class="font-semibold mb-2">Recent Admin Logs</h3>
-        <div id="admin_logs" class="text-sm max-h-40 overflow-y-auto">No logs yet.</div>
+        <div id="admin_logs" class="text-sm max-h-40 overflow-y-auto space-y-2">
+        </div>
       </div>
     </div>
 
-    <div class="bg-white p-4 rounded shadow">
-      <h3 class="font-semibold mb-2">Recent Transactions (admin view)</h3>
-      <div id="admin_recent" class="text-sm"></div>
-    </div>
+    <!-- Recent transactions -->
+    <div class="bg-white rounded-xl shadow p-4">
+      <div class="bg-white p-4 rounded shadow">
+  <div class="flex justify-between items-center mb-2">
+    <h3 class="font-semibold">Recent Transactions (Admin View)</h3>
+
+    <!-- ✅ STEP 3 DROPDOWN GOES HERE -->
+    <select id="adminFilter"
+      class="px-3 py-1 border rounded text-sm bg-white">
+      <option value="ALL">All</option>
+      <option value="ALLOW">Allowed</option>
+      <option value="DELAY">Delayed</option>
+      <option value="BLOCK">Blocked</option>
+    </select>
   </div>
 
-  <script>
-    async function fetchRecent() {
-      try {
-        const res = await fetch('/recent-transactions?limit=20');
-        const j = await res.json();
-        const el = document.getElementById('admin_recent');
-        el.innerHTML = '';
-        (j.transactions || []).forEach(tx => {
-          const div = document.createElement('div');
-          div.className = 'p-2 border-b';
-          div.innerHTML = `<div class="flex justify-between"><div><b>${tx.tx_id}</b><div class="text-xs text-gray-600">${tx.user_id} • ₹${Number(tx.amount).toFixed(2)}</div></div><div class="text-sm">${tx.action || tx.tx_type || ''}</div></div>`;
-          el.appendChild(div);
-        });
-      } catch(e) { console.error(e); }
+  <div
+  id="admin_recent"
+  class="text-sm max-h-80 overflow-y-auto border rounded"
+></div>
+</div>
+  </div>
+
+<script>
+let adminTxCache = [];
+
+/* ---------- render transaction row ---------- */
+function renderAdminTx(tx) {
+  const div = document.createElement('div');
+  div.className =
+    'group p-3 rounded-lg border flex justify-between items-center hover:bg-gray-50 transition';
+
+  div.innerHTML = `
+    <div>
+      <div class="font-mono text-xs">${tx.tx_id}</div>
+      <div class="text-xs text-gray-600">
+        ${tx.user_id || ''} • ₹${Number(tx.amount || 0).toFixed(2)}
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <span class="text-xs font-semibold ${
+        tx.action === 'BLOCK' ? 'text-red-600' :
+        tx.action === 'DELAY' ? 'text-yellow-600' : 'text-green-600'
+      }">
+        ${tx.action || 'ALLOW'}
+      </span>
+
+      <!-- Hover quick actions -->
+      <div class="hidden group-hover:flex gap-1">
+        <button onclick="quickAction('${tx.tx_id}','ALLOW')" class="px-2 py-1 text-xs bg-green-500 text-white rounded">A</button>
+        <button onclick="quickAction('${tx.tx_id}','DELAY')" class="px-2 py-1 text-xs bg-yellow-500 text-white rounded">D</button>
+        <button onclick="quickAction('${tx.tx_id}','BLOCK')" class="px-2 py-1 text-xs bg-red-500 text-white rounded">B</button>
+      </div>
+    </div>
+  `;
+  return div;
+}
+
+/* ---------- load recent ---------- */
+async function fetchRecent() {
+  const res = await fetch('/recent-transactions?limit=2000');
+  const j = await res.json();
+  adminTxCache = Array.isArray(j.transactions) ? j.transactions : [];
+  redrawAdminRecent();
+}
+
+function redrawAdminRecent() {
+  const el = document.getElementById('admin_recent');
+  const filter = document.getElementById('adminFilter')?.value || 'ALL';
+
+  el.innerHTML = '';
+
+  adminTxCache
+    .filter(tx => filter === 'ALL' || tx.action === filter)
+    .forEach(tx => el.appendChild(renderAdminTx(tx)));
+}
+
+/* ---------- quick action ---------- */
+async function quickAction(tx_id, action) {
+  await fetch('/admin/action', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ tx_id, action })
+  });
+
+  const logs = document.getElementById('admin_logs');
+  const log = document.createElement('div');
+log.className = 'flex justify-between items-center bg-gray-50 border rounded px-2 py-1';
+
+log.innerHTML = `
+  <div class="text-xs font-mono">${tx_id}</div>
+  <div class="flex items-center gap-2">
+    <span class="text-[10px] text-gray-500">${new Date().toLocaleTimeString()}</span>
+    <span class="px-2 py-0.5 rounded text-white text-[10px]
+      ${action === 'BLOCK' ? 'bg-red-500' :
+        action === 'DELAY' ? 'bg-yellow-500' : 'bg-green-500'}">
+      ${action}
+    </span>
+  </div>
+`;
+
+logs.prepend(log);
+}
+
+/* ---------- manual quick action ---------- */
+document.getElementById('qa_btn').onclick = async () => {
+  const tx_id = qa_txid.value.trim();
+  const action = qa_action.value;
+  if (!tx_id) return;
+
+  try {
+  const result = await quickAction(tx_id, action);
+
+  qa_result.textContent = 'Action applied';
+
+  // ✅ STEP 2: Add to Recent Admin Logs
+  addAdminLog({
+    tx_id: tx_id,
+    user_id: result.user_id || 'unknown',
+    action: action,
+    time: new Date().toISOString()
+  });
+
+} catch (e) {
+  qa_result.textContent = e.message;
+}
+};
+
+/* ---------- websocket live updates ---------- */
+function setupWS() {
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss':'ws'}://${location.host}/ws`);
+
+  ws.onmessage = ev => {
+    const msg = JSON.parse(ev.data);
+    if (!msg.data) return;
+
+    if (msg.type === 'tx_inserted') {
+      adminTxCache.unshift(msg.data);
+      adminTxCache = adminTxCache.slice(0, 30);
+      redrawAdminRecent();
     }
 
-    document.getElementById('qa_btn').addEventListener('click', async () => {
-      const txid = document.getElementById('qa_txid').value.trim();
-      const action = document.getElementById('qa_action').value;
-      const result = document.getElementById('qa_result');
-      if (!txid) { result.textContent = 'tx_id required'; return; }
-      try {
-        const r = await fetch('/admin/action', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({tx_id:txid, action}) });
-        const j = await r.json();
-        if (r.ok) {
-          result.textContent = 'OK: ' + (j.updated ? JSON.stringify(j.updated) : 'updated');
-          // notify via websocket indirectly by backend broadcast; refresh recent
-          fetchRecent();
-        } else {
-          result.textContent = 'ERR: ' + (j.detail || JSON.stringify(j));
-        }
-      } catch(e) {
-        result.textContent = 'ERR: ' + e;
+    if (msg.type === 'tx_updated') {
+      const idx = adminTxCache.findIndex(t => t.tx_id === msg.data.tx_id);
+      if (idx !== -1) {
+        adminTxCache[idx] = msg.data;
+        redrawAdminRecent();
       }
-    });
+    }
+  };
 
-    fetchRecent();
-  </script>
+  ws.onclose = () => setTimeout(setupWS, 2000);
+}
+
+  function addAdminLog(log) {
+    const el = document.getElementById('admin_logs');
+    if (!el) return;
+
+    const div = document.createElement('div');
+    div.className =
+      'p-3 mb-2 bg-gray-50 border rounded flex justify-between items-center';
+
+    div.innerHTML = `
+      <div>
+        <div class="font-mono text-sm text-gray-800">${log.tx_id}</div>
+        <div class="text-xs text-gray-500">
+          User: <span class="font-semibold">${log.user_id || 'unknown'}</span>
+          • ${new Date(log.time).toLocaleTimeString()}
+        </div>
+      </div>
+      <span class="
+        px-3 py-1 text-xs rounded-full font-semibold
+        ${log.action === 'BLOCK' ? 'bg-red-100 text-red-700' :
+          log.action === 'DELAY' ? 'bg-yellow-100 text-yellow-700' :
+          'bg-green-100 text-green-700'}
+      ">
+        ${log.action}
+      </span>
+    `;
+
+    el.prepend(div);
+  }
+
+
+fetchRecent();
+setupWS();
+
+document.getElementById('adminFilter')
+  ?.addEventListener('change', redrawAdminRecent);
+</script>
 </body>
 </html>

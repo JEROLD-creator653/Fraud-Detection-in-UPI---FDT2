@@ -109,7 +109,18 @@
     </div>
 
     <div class="card mb-6">
-      <h3 class="text-lg font-bold mb-2">Recent Transactions</h3>
+  <div class="flex items-center justify-between mb-2">
+    <h3 class="text-lg font-bold">Recent Transactions</h3>
+
+    <!-- 🔽 ADDED: Action filter dropdown -->
+    <select id="txFilter"
+      class="px-3 py-1 border rounded-md text-sm bg-white">
+      <option value="ALL">All</option>
+      <option value="ALLOW">Allowed</option>
+      <option value="BLOCK">Blocked</option>
+      <option value="DELAY">Delayed</option>
+    </select>
+  </div>
       <div class="overflow-x-auto table-scroll">
         <table class="min-w-full text-sm">
           <thead class="bg-gray-50 small-text">
@@ -120,7 +131,7 @@
               <th class="px-3 py-2 text-left">Amount</th>
               <th class="px-3 py-2 text-left">Type</th>
               <th class="px-3 py-2 text-left">Channel</th>
-              <th class="px-3 py-2 text-left">DB</th>
+              <th class="px-3 py-2 text-left">Risk Score</th>
             </tr>
           </thead>
           <tbody id="txTbody" class="bg-white divide-y divide-gray-100 small-text">
@@ -147,9 +158,21 @@
   </div>
 
   <script>
+    let currentTimeRange = '24h';
+    let txCache = [];
     function fmtTS(ts) {
       try { return new Date(ts).toLocaleString(); } catch(e){ return ts; }
     }
+    function incCounter(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  // Remove commas and non-numeric characters
+  const raw = el.textContent.replace(/[^0-9.-]/g, '');
+  const current = Number(raw);
+
+  el.textContent = Number.isFinite(current) ? current + 1 : 1;
+}
 
     const timelineCtx = document.getElementById('timelineChart').getContext('2d');
     const timelineChart = new Chart(timelineCtx, {
@@ -187,7 +210,7 @@
       const amount = (o.amount === undefined) ? 0 : Number(o.amount);
       const type = o.action || o.tx_type || o.type || '';
       const channel = o.channel || '';
-      const dbs = o.db_status || o.db || o.status || '';
+      const risk = Number(o.risk_score ?? o.risk ?? 0).toFixed(2);
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -197,92 +220,298 @@
         <td class="px-3 py-2">₹${Number(amount || 0).toFixed(2)}</td>
         <td class="px-3 py-2">${type}</td>
         <td class="px-3 py-2">${channel}</td>
-        <td class="px-3 py-2 text-sm text-gray-600">${dbs}</td>
+        <td class="px-3 py-2 font-medium text-gray-700">${risk}</td>
       `;
       return tr;
     }
 
-    async function loadRecentTransactions() {
-      try {
-        const res = await fetch('/recent-transactions?limit=50');
-        if (!res.ok) throw new Error('fetch recent failed');
-        const j = await res.json();
-        const tbody = document.getElementById('txTbody');
-        tbody.innerHTML = '';
-        (j.transactions || []).forEach(tx => tbody.appendChild(makeTxRow(tx)));
-      } catch (e) { console.error('loadRecentTransactions', e); }
+  async function loadDashboardData() {
+  try {
+    const timeRange = document.getElementById('timeRange')?.value || '24h';
+
+    const res = await fetch(`/dashboard-data?time_range=${currentTimeRange}`);
+    if (!res.ok) throw new Error('fetch dashboard failed');
+
+    const j = await res.json();
+    const s = j.stats || {};
+
+    // 🔥 SAFELY SET COUNTERS (no NaN)
+    document.getElementById('totalTx').textContent =
+      Number(s.totalTransactions || 0).toLocaleString();
+
+    document.getElementById('blockedTx').textContent =
+      Number(s.blocked || 0).toLocaleString();
+
+    document.getElementById('delayedTx').textContent =
+      Number(s.delayed || 0).toLocaleString();
+
+    document.getElementById('allowedTx').textContent =
+      Number(s.allowed || 0).toLocaleString();
+
+    // 🔥 Update label text under Total Transactions
+    const labelMap = {
+      '1h': 'Last 1 hour',
+      '24h': 'Last 24 hours',
+      '7d': 'Last 7 days',
+      '30d': 'Last 30 days'
+    };
+
+    const labelEl = document.querySelector('#totalTx')?.nextElementSibling;
+    if (labelEl) {
+      labelEl.textContent = labelMap[timeRange] || 'Last 24 hours';
     }
 
-    async function loadDashboardData() {
-      try {
-        const res = await fetch('/dashboard-data');
-        if (!res.ok) throw new Error('fetch dashboard failed');
-        const j = await res.json();
-        const s = j.stats || {};
+    // 🔥 Update timeline chart (filtered)
+    /*if (Array.isArray(j.trend)) {
+      timelineChart.data.labels =
+        j.trend.map(t => new Date(t.time).toLocaleTimeString());
 
-        document.getElementById('totalTx').textContent = (s.totalTransactions || 0).toLocaleString();
-        document.getElementById('blockedTx').textContent = (s.blocked || 0).toLocaleString();
-        document.getElementById('delayedTx').textContent = (s.delayed || 0).toLocaleString();
-        document.getElementById('allowedTx').textContent = (s.allowed || 0).toLocaleString();
+      timelineChart.data.datasets[0].data =
+        j.trend.map(t => t.blocked || 0);
 
-        if (j.trend && Array.isArray(j.trend) && j.trend.length) {
-          const labels = j.trend.map(t => new Date(t.time).toLocaleTimeString());
-          timelineChart.data.labels = labels;
-          timelineChart.data.datasets[0].data = j.trend.map(t=>t.blocked||0);
-          timelineChart.data.datasets[1].data = j.trend.map(t=>t.delayed||0);
-          timelineChart.data.datasets[2].data = j.trend.map(t=>t.allowed||0);
-          timelineChart.update();
-        }
-      } catch (e) { console.error('loadDashboardData', e); }
+      timelineChart.data.datasets[1].data =
+        j.trend.map(t => t.delayed || 0);
+
+      timelineChart.data.datasets[2].data =
+        j.trend.map(t => t.allowed || 0);
+
+      timelineChart.update();
+    }*/
+
+  } catch (e) {
+    console.error('loadDashboardData error', e);
+  }
+}
+
+    
+
+  async function loadRecentTransactions() {
+  try {
+    const res = await fetch(
+      `/recent-transactions?limit=2000&time_range=${currentTimeRange}`
+    );
+    if (!res.ok) throw new Error('fetch recent failed');
+
+    const j = await res.json();
+    txCache = Array.isArray(j.transactions) ? j.transactions : [];
+
+    const tbody = document.getElementById('txTbody');
+    tbody.innerHTML = '';
+    txCache.forEach(tx => tbody.appendChild(makeTxRow(tx)));
+
+    updateHighRiskAlerts(txCache);
+    updateFraudPatternAnalysisFromCache();
+    updateTimelineFromCache();
+    updateRiskDistributionFromCache();
+
+  } catch (e) {
+    console.error('loadRecentTransactions error', e);
+  }
+}
+
+  function updateFraudPatternAnalysisFromCache() {
+  if (!window.txCache || txCache.length === 0) return;
+
+  let unusualAmount = 0;
+  let suspiciousRecipient = 0;
+  let rapidTransactions = 0;
+  let newDevice = 0;
+  let locationMismatch = 0;
+
+  // basic heuristics (you can refine later)
+  txCache.forEach(tx => {
+    if ((tx.amount || 0) > 1000) unusualAmount++;
+    if ((tx.recipient_vpa || '').includes('merchant')) suspiciousRecipient++;
+    if ((tx.risk_score || 0) > 0.6) rapidTransactions++;
+    if ((tx.device_id || '').length > 0) newDevice++;
+    if ((tx.risk_score || 0) > 0.8) locationMismatch++;
+  });
+
+  fraudBar.data.datasets[0].data = [
+    unusualAmount,
+    suspiciousRecipient,
+    rapidTransactions,
+    newDevice,
+    locationMismatch
+  ];
+
+  fraudBar.update();
+}
+    function updateFraudPatternAnalysisFromCache() {
+  if (!Array.isArray(txCache) || txCache.length === 0) return;
+
+  let unusualAmount = 0;
+  let suspiciousRecipient = 0;
+  let rapidTx = 0;
+  let newDevice = 0;
+  let locationMismatch = 0;
+
+  const userCount = {};
+  const recipientCount = {};
+  const deviceSeen = new Set();
+
+  txCache.forEach(tx => {
+    const amt = Number(tx.amount || 0);
+    const user = tx.user_id;
+    const recipient = tx.recipient_vpa;
+    const device = tx.device_id;
+
+    // 1. Unusual amount
+    if (amt > 5000) unusualAmount++;
+
+    // 2. Suspicious recipient (frequency-based)
+    if (recipient) {
+      recipientCount[recipient] = (recipientCount[recipient] || 0) + 1;
+      if (recipientCount[recipient] === 3) suspiciousRecipient++;
     }
 
-    function setupWebSocket() {
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${proto}://${location.host}/ws`);
-      ws.onopen = () => console.log('ws connected');
-      ws.onmessage = (ev) => {
-        try {
-          const msg = JSON.parse(ev.data);
-          let txObj = null;
-          if (msg.data && typeof msg.data === 'object') txObj = msg.data;
-          else {
-            txObj = Object.assign({}, msg);
-            delete txObj.type;
-          }
-
-          const msgType = String(msg.type || '').toLowerCase();
-
-          if (msgType === 'tx_inserted' || msgType === 'new_tx' || msgType === 'tx' || msgType === 'insert') {
-            try {
-              const tbody = document.getElementById('txTbody');
-              tbody.insertBefore(makeTxRow(txObj), tbody.firstChild);
-              while (tbody.children.length > 200) tbody.removeChild(tbody.lastChild);
-
-              const safeInc = id => {
-                const el = document.getElementById(id);
-                const n = Number(el.textContent.replace(/,/g,'')) || 0;
-                el.textContent = (n + 1).toLocaleString();
-              };
-
-              safeInc('totalTx');
-
-              const actionVal = (txObj.action || txObj.tx_type || txObj.type || '').toString().toUpperCase();
-              if (actionVal === 'BLOCK') safeInc('blockedTx');
-              else if (actionVal === 'DELAY') safeInc('delayedTx');
-              else safeInc('allowedTx');
-            } catch(e) {
-              console.error('ws handling error', e);
-            }
-          } else if (msgType === 'tx_updated') {
-            // if tx_updated, refresh recent list so UI reflects admin quick actions
-            loadRecentTransactions();
-            loadDashboardData();
-          }
-        } catch(e) { console.error('ws msg parse', e); }
-      };
-      ws.onclose = () => { setTimeout(setupWebSocket, 2000); };
-      ws.onerror = () => ws.close();
+    // 3. Rapid transactions per user
+    if (user) {
+      userCount[user] = (userCount[user] || 0) + 1;
+      if (userCount[user] === 5) rapidTx++;
     }
+
+    // 4. New device detection
+    if (device && !deviceSeen.has(device)) {
+      deviceSeen.add(device);
+      newDevice++;
+    }
+
+    // 5. Location mismatch (placeholder, non-destructive)
+    if (tx.location_mismatch === true) locationMismatch++;
+  });
+
+  fraudBar.data.datasets[0].data = [
+    unusualAmount,
+    suspiciousRecipient,
+    rapidTx,
+    newDevice,
+    locationMismatch
+  ];
+  fraudBar.update();
+}
+
+function updateRiskDistributionFromCache() {
+  if (!Array.isArray(txCache) || txCache.length === 0) return;
+
+  let low = 0, medium = 0, high = 0, critical = 0;
+
+  txCache.forEach(tx => {
+    const r = Number(tx.risk_score ?? 0);
+
+    if (r < 0.3) low++;
+    else if (r < 0.6) medium++;
+    else if (r < 0.8) high++;
+    else critical++;
+  });
+
+  // 🔥 IMPORTANT: replace array, don't mutate
+  riskPie.data.labels = ['Low', 'Medium', 'High', 'Critical'];
+  riskPie.data.datasets[0].data = [low, medium, high, critical];
+
+  // 🔥 Force redraw
+  riskPie.update('none');
+
+  console.log('Risk pie updated:', low, medium, high, critical);
+}
+
+function updateTimelineFromCache() {
+  if (!Array.isArray(txCache) || txCache.length === 0) return;
+
+  const buckets = {};
+
+  txCache.forEach(tx => {
+    const ts = new Date(tx.ts || tx.created_at || tx.timestamp);
+    if (isNaN(ts)) return;
+
+    const key = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (!buckets[key]) {
+      buckets[key] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
+    }
+
+    const action = (tx.action || '').toUpperCase();
+    if (buckets[key][action] !== undefined) {
+      buckets[key][action]++;
+    }
+  });
+
+  const labels = Object.keys(buckets).slice(-10);
+
+  timelineChart.data.labels = labels;
+  timelineChart.data.datasets[0].data = labels.map(l => buckets[l].BLOCK);
+  timelineChart.data.datasets[1].data = labels.map(l => buckets[l].DELAY);
+  timelineChart.data.datasets[2].data = labels.map(l => buckets[l].ALLOW);
+
+  timelineChart.update();
+}
+
+function getRangeLabel(range) {
+  switch (range) {
+    case '1h': return 'Last 1 hour';
+    case '24h': return 'Last 24 hours';
+    case '7d': return 'Last 7 days';
+    case '30d': return 'Last 30 days';
+    default: return 'Custom range';
+  }
+}
+
+function safeNumber(el) {
+  if (!el) return 0;
+  const v = el.textContent.replace(/,/g, '').trim();
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+
+function setupWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onopen = () => console.log('ws connected');
+
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (!msg || !msg.data) return;
+
+      const txObj = msg.data;
+      const msgType = String(msg.type || '').toLowerCase();
+
+      if (msgType === 'tx_inserted') {
+
+  txCache.unshift(txObj);
+  if (txCache.length > 200) txCache.pop();
+
+  const tbody = document.getElementById('txTbody');
+  tbody.insertBefore(makeTxRow(txObj), tbody.firstChild);
+
+  
+
+  updateHighRiskAlerts(txCache);
+  updateFraudPatternAnalysisFromCache();
+  updateTimelineFromCache();
+  updateRiskDistributionFromCache();
+
+        // 🔥 authoritative refresh (NO math here)
+        loadDashboardData();
+      }
+
+      if (msgType === 'tx_updated') {
+        loadRecentTransactions();
+        loadDashboardData();
+      }
+
+    } catch (e) {
+      console.error('WebSocket error:', e);
+    }
+  };
+
+  ws.onclose = () => setTimeout(setupWebSocket, 2000);
+  ws.onerror = () => ws.close();
+}
+
+  
 
     // init
     loadDashboardData();
@@ -292,7 +521,7 @@
 
     // export CSV
     document.getElementById('exportBtn').addEventListener('click', () => {
-      const rows = [['Time','TX ID','User','Amount','Type','Channel','DB']];
+      const rows = [['Time','TX ID','User','Amount','Type','Channel','Risk Score']];
       document.querySelectorAll('#txTbody tr').forEach(tr=>{
         const cols = [...tr.querySelectorAll('td')].map(td => td.textContent.trim().replace(/\n/g,' '));
         rows.push(cols);
@@ -304,6 +533,105 @@
       a.download = `transactions_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'_')}.csv`;
       a.click(); URL.revokeObjectURL(url);
     });
-  </script>
+  
+  // 🔽 ADDED: Transaction table filter (NO side effects)
+  const txFilter = document.getElementById('txFilter');
+
+  function applyTxFilter() {
+    const filter = txFilter.value;
+    const rows = document.querySelectorAll('#txTbody tr');
+
+    rows.forEach(row => {
+      const typeCell = row.children[4]; // "Type" column
+      if (!typeCell) return;
+
+      const type = typeCell.textContent.trim().toUpperCase();
+
+      if (filter === 'ALL' || type === filter) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+
+  // Apply filter when dropdown changes
+  txFilter.addEventListener('change', applyTxFilter);
+
+  // Re-apply filter whenever new rows are added (websocket / reload)
+  const originalLoadRecentTransactions = loadRecentTransactions;
+  loadRecentTransactions = async function () {
+    await originalLoadRecentTransactions();
+    applyTxFilter();
+  };
+  
+  function addHighRiskAlert(tx) {
+    const risk = Number(tx.risk_score || 0);
+    if (risk <= 0.8) return;
+
+    const alerts = document.getElementById('alertsList');
+    if (!alerts) return;
+
+    const div = document.createElement('div');
+    div.className = "p-2 rounded bg-red-50 border border-red-200";
+
+    div.innerHTML = `
+      <div class="font-semibold text-red-700">⚠ High Risk (${risk.toFixed(2)})</div>
+      <div class="text-xs text-gray-700">
+        TX: ${tx.tx_id}<br/>
+        User: ${tx.user_id}<br/>
+        Amount: ₹${Number(tx.amount).toFixed(2)}<br/>
+        Action: ${tx.action}
+      </div>
+    `;
+
+    alerts.prepend(div);
+
+    // keep only latest 10 alerts
+    while (alerts.children.length > 10) {
+      alerts.removeChild(alerts.lastChild);
+    }
+  }
+  
+  // ===== FIX: High Risk Alerts (risk_score > 0.8) =====
+  function updateHighRiskAlerts(transactions) {
+    const container = document.getElementById('alertsList');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    transactions
+      .filter(tx => Number(tx.risk_score || 0) >= 0.8)
+      .slice(0, 10)
+      .forEach(tx => {
+        const div = document.createElement('div');
+        div.className = 'p-2 border rounded bg-red-50 text-red-800';
+
+        div.innerHTML = `
+          <div class="font-semibold">${tx.tx_id}</div>
+          <div>User: ${tx.user_id}</div>
+          <div>Amount: ₹${Number(tx.amount).toFixed(2)}</div>
+          <div>Risk Score: <b>${Number(tx.risk_score).toFixed(2)}</b></div>
+          <div>Action: ${tx.action}</div>
+        `;
+        container.appendChild(div);
+      });
+
+    if (!container.children.length) {
+      container.innerHTML =
+        '<div class="text-gray-500">No high-risk transactions</div>';
+    }
+  }
+  document.getElementById('timeRange').addEventListener('change', (e) => {
+  currentTimeRange = e.target.value;
+
+  loadDashboardData();
+  loadRecentTransactions();
+});
+document.getElementById('timeRange').addEventListener('change', () => {
+  loadDashboardData();
+});
+
+</script>
 </body>
 </html>
