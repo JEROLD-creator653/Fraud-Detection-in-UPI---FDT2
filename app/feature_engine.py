@@ -5,7 +5,12 @@ import math
 import statistics
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://host.docker.internal:6379/0")
-r = redis.from_url(REDIS_URL, decode_responses=True)
+try:
+    r = redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
+    r.ping()
+except Exception as e:
+    print(f"⚠ Redis unavailable: {e}. Using fallback without Redis.")
+    r = None
 
 # ---------------------------------------------
 # HELPER FUNCTIONS
@@ -19,14 +24,24 @@ def safe_ts(timestamp_str):
 
 def zcount_last_seconds(key, now_ts, seconds):
     """Count events in a ZSET in the last X seconds."""
-    start = now_ts - seconds
-    return r.zcount(key, start, now_ts)
+    if r is None:
+        return 0
+    try:
+        start = now_ts - seconds
+        return r.zcount(key, start, now_ts)
+    except:
+        return 0
 
 def zsum_last_seconds(key, now_ts, seconds):
     """Sum values in a ZSET in the last X seconds."""
-    start = now_ts - seconds
-    vals = r.zrangebyscore(key, start, now_ts)
-    return sum(map(float, vals))
+    if r is None:
+        return 0
+    try:
+        start = now_ts - seconds
+        vals = r.zrangebyscore(key, start, now_ts)
+        return sum(map(float, vals))
+    except:
+        return 0
 
 # ---------------------------------------------
 # MAIN FEATURE EXTRACTOR (v3 - Enhanced)
