@@ -7,17 +7,9 @@
   <title>UPI Fraud Detection Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root { --card-radius: 12px; --card-padding: 14px; }
-    body { background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 50%, #fff0f6 100%); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
-    .card { background: #fff; border-radius: var(--card-radius); padding: var(--card-padding); box-shadow: 0 6px 14px rgba(22,24,35,0.06); }
-    .accent-border { border-left-width: 5px; }
-    .small-text { font-size: 0.85rem; }
-    .stat-value { font-weight: 700; }
-    .chart-wrap { height: 220px; }
-    .table-scroll { max-height: 320px; overflow-y: auto; }
-  </style>
+  <link rel="stylesheet" href="/static/dashboard.css">
 </head>
+
 <body class="py-6">
   <div class="max-w-6xl mx-auto px-4">
 
@@ -36,6 +28,10 @@
           <option value="7d">Last 7 Days</option>
           <option value="30d">Last 30 Days</option>
         </select>
+
+        <button id="infoBtn" class="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg small-text hover:shadow-lg transition-all" title="Risk Score Info">
+          ℹ️ Risk Score
+        </button>
 
         <button id="exportBtn" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg small-text">
           Export
@@ -109,7 +105,18 @@
     </div>
 
     <div class="card mb-6">
-      <h3 class="text-lg font-bold mb-2">Recent Transactions</h3>
+  <div class="flex items-center justify-between mb-2">
+    <h3 class="text-lg font-bold">Recent Transactions</h3>
+
+    <!-- 🔽 ADDED: Action filter dropdown -->
+    <select id="txFilter"
+      class="px-3 py-1 border rounded-md text-sm bg-white">
+      <option value="ALL">All</option>
+      <option value="ALLOW">Allowed</option>
+      <option value="BLOCK">Blocked</option>
+      <option value="DELAY">Delayed</option>
+    </select>
+  </div>
       <div class="overflow-x-auto table-scroll">
         <table class="min-w-full text-sm">
           <thead class="bg-gray-50 small-text">
@@ -120,7 +127,7 @@
               <th class="px-3 py-2 text-left">Amount</th>
               <th class="px-3 py-2 text-left">Type</th>
               <th class="px-3 py-2 text-left">Channel</th>
-              <th class="px-3 py-2 text-left">DB</th>
+              <th class="px-3 py-2 text-left">Risk Score</th>
             </tr>
           </thead>
           <tbody id="txTbody" class="bg-white divide-y divide-gray-100 small-text">
@@ -146,164 +153,168 @@
 
   </div>
 
-  <script>
-    function fmtTS(ts) {
-      try { return new Date(ts).toLocaleString(); } catch(e){ return ts; }
-    }
+  <!-- Risk Score Info Modal -->
+  <div class="modal-overlay" id="riskScoreModal">
+    <div class="info-modal">
+      <div class="info-modal-header">
+        <h2>📊 Understanding Risk Scores</h2>
+        <button class="close-btn" id="closeModal" title="Close">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="info-modal-content">
+        <div class="info-section">
+          <h3>💡 What is a Risk Score?</h3>
+          <p>
+            A <strong>Risk Score</strong> is a numerical value ranging from <strong>0 to 1</strong> that represents 
+            the probability of a transaction being fraudulent. Our advanced fraud detection system analyzes multiple 
+            factors to calculate this score in real-time.
+          </p>
+        </div>
 
-    const timelineCtx = document.getElementById('timelineChart').getContext('2d');
-    const timelineChart = new Chart(timelineCtx, {
-      type: 'line',
-      data: { labels: [], datasets: [
-        { label: 'Blocked', data: [], borderColor: '#EF4444', tension: 0.3, fill:false },
-        { label: 'Delayed', data: [], borderColor: '#F59E0B', tension: 0.3, fill:false },
-        { label: 'Allowed', data: [], borderColor: '#10B981', tension: 0.3, fill:false }
-      ]},
-      options: { responsive:true, maintainAspectRatio:true, scales:{ x:{}, y:{ beginAtZero:true } } }
-    });
+        <div class="info-section">
+          <h3>🔍 Factors That Influence Risk Score</h3>
+          <div class="risk-factors">
+            <ul>
+              <li><strong>Transaction Amount</strong> – Unusually large or unusual transaction amounts trigger higher risk</li>
+              <li><strong>User History</strong> – Frequency patterns, transaction history, and account behavior</li>
+              <li><strong>Device ID</strong> – New devices, location mismatches, and suspicious device activity</li>
+              <li><strong>Transaction Type</strong> – Person-to-person, bill payments, fund transfers, etc.</li>
+              <li><strong>Channel</strong> – Mobile app, web, SMS, USSD, and other channels</li>
+              <li><strong>Recipient VPA Patterns</strong> – Patterns and history of the recipient's Virtual Payment Address</li>
+            </ul>
+          </div>
+        </div>
 
-    const riskCtx = document.getElementById('riskPie').getContext('2d');
-    const riskPie = new Chart(riskCtx, {
-      type: 'pie',
-      data: { labels: ['Low','Medium','High','Critical'], datasets: [{
-        data: [70,20,7,3], backgroundColor: ['#6BCF7F','#FFD93D','#FF9F40','#FF6B6B']
-      }]},
-      options: { responsive:true, maintainAspectRatio:true }
-    });
+        <div class="info-section">
+          <h3>⚖️ Risk Score Thresholds</h3>
+          <div class="risk-threshold">
+            <div class="threshold-card low-risk">
+              <div class="emoji">✅</div>
+              <div class="label">LOW RISK</div>
+              <div class="value">0.0 - 0.29</div>
+              <div class="desc">Transaction ALLOWED automatically</div>
+            </div>
+            <div class="threshold-card medium-risk">
+              <div class="emoji">⚠️</div>
+              <div class="label">MEDIUM RISK</div>
+              <div class="value">0.30 - 0.59</div>
+              <div class="desc">Transaction DELAYED for verification</div>
+            </div>
+            <div class="threshold-card high-risk">
+              <div class="emoji">🚫</div>
+              <div class="label">HIGH RISK</div>
+              <div class="value">0.60 - 1.0</div>
+              <div class="desc">Transaction BLOCKED immediately</div>
+            </div>
+          </div>
+        </div>
 
-    const fraudCtx = document.getElementById('fraudBar').getContext('2d');
-    const fraudBar = new Chart(fraudCtx, {
-      type: 'bar',
-      data: { labels: ['Unusual Amount','Suspicious Recipient','Rapid Transactions','New Device','Location Mismatch'],
-              datasets: [{ label:'Count', data:[35,28,22,10,5], backgroundColor: ['#FF6B6B','#FF9F40','#FFD93D','#6BCF7F','#4ECDC4']}]},
-      options: { indexAxis: 'y', responsive:true, maintainAspectRatio:true }
-    });
+        <div class="info-section">
+          <h3>📈 How It Works</h3>
+          <p>
+            When a transaction is initiated, our machine learning models instantly:
+          </p>
+          <div class="risk-factors">
+            <ul>
+              <li>Analyze the transaction details and user profile</li>
+              <li>Compare against historical patterns and known fraud indicators</li>
+              <li>Generate a risk score based on weighted factors</li>
+              <li>Make an automatic decision (Allow/Delay/Block)</li>
+              <li>Log the transaction for audit and continuous improvement</li>
+            </ul>
+          </div>
+        </div>
 
-    function makeTxRow(tx) {
-      const o = Object.assign({}, tx || {});
-      const ts = o.ts || o.created_at || o.timestamp || new Date().toISOString();
-      const txid = o.tx_id || o.id || '';
-      const user = o.user_id || o.user || '';
-      const amount = (o.amount === undefined) ? 0 : Number(o.amount);
-      const type = o.action || o.tx_type || o.type || '';
-      const channel = o.channel || '';
-      const dbs = o.db_status || o.db || o.status || '';
+        <div class="info-section">
+          <div class="info-highlight">
+            🎯 <strong>Current System Performance:</strong> Our system analyzes transactions in milliseconds, 
+            achieving high accuracy while maintaining seamless user experience.
+          </div>
+        </div>
 
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="px-3 py-2">${fmtTS(ts)}</td>
-        <td class="px-3 py-2">${txid}</td>
-        <td class="px-3 py-2">${user}</td>
-        <td class="px-3 py-2">₹${Number(amount || 0).toFixed(2)}</td>
-        <td class="px-3 py-2">${type}</td>
-        <td class="px-3 py-2">${channel}</td>
-        <td class="px-3 py-2 text-sm text-gray-600">${dbs}</td>
-      `;
-      return tr;
-    }
+        <div class="info-section">
+          <div class="info-tip">
+            💡 <strong>Tip:</strong> Use the AI Assistant chatbot to ask about specific transactions, 
+            analyze risk patterns, and get detailed fraud detection insights. Click the 💬 button at the bottom-right!
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    async function loadRecentTransactions() {
-      try {
-        const res = await fetch('/recent-transactions?limit=50');
-        if (!res.ok) throw new Error('fetch recent failed');
-        const j = await res.json();
-        const tbody = document.getElementById('txTbody');
-        tbody.innerHTML = '';
-        (j.transactions || []).forEach(tx => tbody.appendChild(makeTxRow(tx)));
-      } catch (e) { console.error('loadRecentTransactions', e); }
-    }
+  <!-- AI Chatbot Widget - Premium Design -->
+  <div class="chatbot-container">
+    <button class="chatbot-button" id="chatbotToggle" aria-label="Toggle Chatbot" title="AI Assistant">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C6.48 2 2 6.48 2 12C2 13.93 2.65 15.71 3.75 17.13L2.05 21.95L7.13 20.25C8.56 21.35 10.22 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z" fill="white" opacity="0.9"/>
+        <circle cx="8" cy="12" r="1.5" fill="white"/>
+        <circle cx="12" cy="12" r="1.5" fill="white"/>
+        <circle cx="16" cy="12" r="1.5" fill="white"/>
+      </svg>
+    </button>
+    
+    <div class="chatbot-window" id="chatbotWindow">
+      <div class="chatbot-header">
+        <div>
+          <div class="font-bold">💬 AI Assistant</div>
+          <div class="text-xs">Fraud Detection Analytics</div>
+        </div>
+        <button id="chatbotClose" class="text-white hover:opacity-70 transition-opacity" title="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="chatbot-messages" id="chatbotMessages">
+        <div class="chatbot-message bot">
+          <div class="chatbot-message-content">
+            <strong style="font-size: 16px; color: #667eea;">👋 Welcome!</strong>
 
-    async function loadDashboardData() {
-      try {
-        const res = await fetch('/dashboard-data');
-        if (!res.ok) throw new Error('fetch dashboard failed');
-        const j = await res.json();
-        const s = j.stats || {};
+I'm your AI assistant for the UPI Fraud Detection System. I analyze transactions and provide real-time fraud detection insights.
 
-        document.getElementById('totalTx').textContent = (s.totalTransactions || 0).toLocaleString();
-        document.getElementById('blockedTx').textContent = (s.blocked || 0).toLocaleString();
-        document.getElementById('delayedTx').textContent = (s.delayed || 0).toLocaleString();
-        document.getElementById('allowedTx').textContent = (s.allowed || 0).toLocaleString();
+<strong>What I Can Help You With:</strong>
 
-        if (j.trend && Array.isArray(j.trend) && j.trend.length) {
-          const labels = j.trend.map(t => new Date(t.time).toLocaleTimeString());
-          timelineChart.data.labels = labels;
-          timelineChart.data.datasets[0].data = j.trend.map(t=>t.blocked||0);
-          timelineChart.data.datasets[1].data = j.trend.map(t=>t.delayed||0);
-          timelineChart.data.datasets[2].data = j.trend.map(t=>t.allowed||0);
-          timelineChart.update();
-        }
-      } catch (e) { console.error('loadDashboardData', e); }
-    }
+• 📊 Analytics & statistics
+• 🔍 Individual transaction details
+• 📈 Fraud patterns & trends
+• 💡 Risk score analysis
 
-    function setupWebSocket() {
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${proto}://${location.host}/ws`);
-      ws.onopen = () => console.log('ws connected');
-      ws.onmessage = (ev) => {
-        try {
-          const msg = JSON.parse(ev.data);
-          let txObj = null;
-          if (msg.data && typeof msg.data === 'object') txObj = msg.data;
-          else {
-            txObj = Object.assign({}, msg);
-            delete txObj.type;
-          }
+<strong>Try asking:</strong>
 
-          const msgType = String(msg.type || '').toLowerCase();
+• "Analyse last 5 transactions"
+• "Show me high-risk transactions"
+• "What's the total fraud rate?"
+• "Explain transaction X" (with ID)
 
-          if (msgType === 'tx_inserted' || msgType === 'new_tx' || msgType === 'tx' || msgType === 'insert') {
-            try {
-              const tbody = document.getElementById('txTbody');
-              tbody.insertBefore(makeTxRow(txObj), tbody.firstChild);
-              while (tbody.children.length > 200) tbody.removeChild(tbody.lastChild);
+What would you like to know?
+          </div>
+        </div>
+      </div>
+      
+      <div class="chatbot-input-area">
+        <div class="chatbot-input-wrapper">
+          <input 
+            type="text" 
+            class="chatbot-input" 
+            id="chatbotInput" 
+            placeholder="Ask anything... (e.g., 'analyse last 5 transactions')"
+            autocomplete="off"
+          />
+          <button class="chatbot-send-btn" id="chatbotSend" title="Send message">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16640469 C3.34915502,0.9 2.40734225,1.00636533 1.77946707,1.4776575 C0.994623095,2.10604706 0.837654326,3.0486314 1.15159189,3.99 L3.03521743,10.4309931 C3.03521743,10.5880905 3.19218622,10.7451879 3.50612381,10.7451879 L16.6915026,11.5306748 C16.6915026,11.5306748 17.1624089,11.5306748 17.1624089,12.0019669 C17.1624089,12.4732591 16.6915026,12.4744748 16.6915026,12.4744748 Z" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-              const safeInc = id => {
-                const el = document.getElementById(id);
-                const n = Number(el.textContent.replace(/,/g,'')) || 0;
-                el.textContent = (n + 1).toLocaleString();
-              };
-
-              safeInc('totalTx');
-
-              const actionVal = (txObj.action || txObj.tx_type || txObj.type || '').toString().toUpperCase();
-              if (actionVal === 'BLOCK') safeInc('blockedTx');
-              else if (actionVal === 'DELAY') safeInc('delayedTx');
-              else safeInc('allowedTx');
-            } catch(e) {
-              console.error('ws handling error', e);
-            }
-          } else if (msgType === 'tx_updated') {
-            // if tx_updated, refresh recent list so UI reflects admin quick actions
-            loadRecentTransactions();
-            loadDashboardData();
-          }
-        } catch(e) { console.error('ws msg parse', e); }
-      };
-      ws.onclose = () => { setTimeout(setupWebSocket, 2000); };
-      ws.onerror = () => ws.close();
-    }
-
-    // init
-    loadDashboardData();
-    loadRecentTransactions();
-    setupWebSocket();
-    setInterval(loadDashboardData, 30000);
-
-    // export CSV
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      const rows = [['Time','TX ID','User','Amount','Type','Channel','DB']];
-      document.querySelectorAll('#txTbody tr').forEach(tr=>{
-        const cols = [...tr.querySelectorAll('td')].map(td => td.textContent.trim().replace(/\n/g,' '));
-        rows.push(cols);
-      });
-      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], {type: 'text/csv'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url;
-      a.download = `transactions_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'_')}.csv`;
-      a.click(); URL.revokeObjectURL(url);
-    });
-  </script>
+  <script src="/static/dashboard.js"></script>
 </body>
 </html>

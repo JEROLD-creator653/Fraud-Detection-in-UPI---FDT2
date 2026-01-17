@@ -87,3 +87,25 @@ Write-Host "`nTo view the dashboard, open:" -ForegroundColor White
 Write-Host "  http://localhost:8000/dashboard" -ForegroundColor Cyan
 
 Write-Host "`n✓ All ML improvements are ready!" -ForegroundColor Green
+
+# Step 8: Auto-launch services
+Write-Host "`n[8/8] Starting services..." -ForegroundColor Yellow
+
+# Start API server in background
+Write-Host "Starting API server..." -ForegroundColor White
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$pwd'; uvicorn app.main:app --reload --port 8000"
+Start-Sleep -Seconds 3
+
+# Start simulator/generator in background
+Write-Host "Starting simulator generator..." -ForegroundColor White
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$pwd'; python simulator/generator.py"
+Start-Sleep -Seconds 2
+
+# Open dashboard in browser
+Write-Host "Opening dashboard..." -ForegroundColor White
+Start-Process "http://localhost:8000/dashboard"
+
+Write-Host "`n✓ Services launched! Dashboard opened in browser." -ForegroundColor Green
+Write-Host "  - API Server: http://localhost:8000" -ForegroundColor Cyan
+Write-Host "  - Dashboard: http://localhost:8000/dashboard" -ForegroundColor Cyan
+Write-Host "  - Generator: Running in background" -ForegroundColor Cyan
