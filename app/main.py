@@ -3,7 +3,7 @@ import os
 import yaml
 import json
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any
 
 from fastapi import FastAPI, Request, Form, status, WebSocket, WebSocketDisconnect
@@ -17,11 +17,26 @@ import psycopg2
 import psycopg2.extras
 from passlib.hash import pbkdf2_sha256
 
+# --- time range helper ---
+def parse_time_range(time_range: str):
+    now = datetime.now(timezone.utc)
+
+    if time_range == "1h":
+        return now - timedelta(hours=1)
+    elif time_range == "24h":
+        return now - timedelta(hours=24)
+    elif time_range == "7d":
+        return now - timedelta(days=7)
+    elif time_range == "30d":
+        return now - timedelta(days=30)
+    else:
+        return None
+
 # --- config loader with defaults ---
 CFG_PATH = os.path.join(os.getcwd(), "config.yaml")
 DEFAULT_CFG = {
     "db_url": "postgresql://fdt:fdtpass@host.docker.internal:5432/fdt_db",
-    "thresholds": {"delay": 0.02, "block": 0.07},
+    "thresholds": {"delay": 0.03, "block": 0.06},
     # WARNING: change secret_key before production
     "secret_key": "dev-secret-change-me-please",
     # default admin credentials (password hash can be overridden in config)
@@ -44,7 +59,7 @@ if os.path.exists(CFG_PATH):
         print("Failed to load config.yaml:", e)
 
 DB_URL = cfg.get("db_url")
-THRESHOLDS = cfg.get("thresholds", {"delay": 0.02, "block": 0.07})
+THRESHOLDS = cfg.get("thresholds", {"delay": 0.0, "block": 0.07})
 SECRET_KEY = cfg.get("secret_key", DEFAULT_CFG["secret_key"])
 ADMIN_USERNAME = cfg.get("admin_username", DEFAULT_CFG["admin_username"])
 ADMIN_PASSWORD_HASH = cfg.get("admin_password_hash", DEFAULT_CFG["admin_password_hash"])
@@ -163,24 +178,32 @@ def db_recent_transactions(limit=50, range_clause=None):
     finally:
         conn.close()
 
-def db_dashboard_stats():
+def db_dashboard_stats(time_range: str):
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute(
-            """
+
+        interval_map = {
+            "1h": "1 hour",
+            "24h": "24 hours",
+            "7d": "7 days",
+            "30d": "30 days",
+        }
+
+        interval = interval_map.get(time_range, "24 hours")
+
+        cur.execute(f"""
             SELECT
-              COUNT(*) as total,
-              COUNT(*) FILTER (WHERE action='BLOCK') as block,
-              COUNT(*) FILTER (WHERE action='DELAY') as delay,
-              COUNT(*) FILTER (WHERE action='ALLOW') as allow,
-              COALESCE(AVG(risk_score),0) as mean_risk
-            FROM public.transactions;
-            """
-        )
-        row = cur.fetchone()
-        cur.close()
-        return row
+              COUNT(*) AS total,
+              COUNT(*) FILTER (WHERE action = 'BLOCK') AS block,
+              COUNT(*) FILTER (WHERE action = 'DELAY') AS delay,
+              COUNT(*) FILTER (WHERE action = 'ALLOW') AS allow,
+              COALESCE(AVG(risk_score), 0) AS mean_risk
+            FROM transactions
+            WHERE created_at >= NOW() - INTERVAL '{interval}';
+        """)
+
+        return cur.fetchone()
     finally:
         conn.close()
 
@@ -228,48 +251,63 @@ def dashboard(request: Request):
 
 @app.get("/dashboard-data")
 async def dashboard_data(time_range: str = "24h"):
-    stats = await run_in_threadpool(db_dashboard_stats)
-
-    # placeholder trend: 6 time buckets (improve later)
-    trend = []
-    now = datetime.now(timezone.utc)
-    for i in range(6, 0, -1):
-        # simple identical buckets for now; backend analytics can be added.
-        trend.append({
-            "time": (now).isoformat(),
-            "blocked": 0,
-            "delayed": 0,
-            "allowed": 0,
-        })
-    return {"stats": {
-                "totalTransactions": int(stats["total"] or 0),
-                "blocked": int(stats["block"] or 0),
-                "delayed": int(stats["delay"] or 0),
-                "allowed": int(stats["allow"] or 0),
-                "mean_risk": float(stats["mean_risk"] or 0.0)
-            }, "trend": trend, "thresholds": THRESHOLDS}
+    stats = await run_in_threadpool(db_dashboard_stats, time_range)
+    return {
+        "stats": {
+            "totalTransactions": stats["total"],
+            "blocked": stats["block"],
+            "delayed": stats["delay"],
+            "allowed": stats["allow"],
+        }
+    }
 
 @app.get("/recent-transactions")
 async def recent_transactions(limit: int = 50, time_range: str = "24h"):
-    rows = await run_in_threadpool(db_recent_transactions, limit, None)
-    return {"transactions": rows}
+    since = parse_time_range(time_range)
+
+    def query():
+        conn = get_conn()
+        cur = conn.cursor()
+        if since:
+            cur.execute("""
+                SELECT * FROM public.transactions
+                WHERE created_at >= %s
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, (since, limit))
+        else:
+            cur.execute("""
+                SELECT * FROM public.transactions
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, (limit,))
+        rows = cur.fetchall()
+        conn.close()
+        return rows
+
+    return {"transactions": await run_in_threadpool(query)}
 
 @app.post("/transactions")
 async def new_transaction(request: Request):
     body = await request.json()
     tx = dict(body)
 
-    # optional scoring module
+    # Enhanced scoring with ensemble models
     risk_score = None
     try:
-        import scoring
+        from . import scoring
         try:
-            features = scoring.extract_features(tx)
-            risk_score = scoring.score_features(features)
+            risk_score = scoring.score_transaction(tx)
         except Exception as e:
-            print("scoring failed:", e)
-            risk_score = None
-    except Exception:
+            print("Ensemble scoring failed, trying legacy:", e)
+            try:
+                features = scoring.extract_features(tx)
+                risk_score = scoring.score_features(features)
+            except Exception as e2:
+                print("Legacy scoring also failed:", e2)
+                risk_score = None
+    except Exception as e:
+        print("Could not import scoring module:", e)
         risk_score = None
 
     if risk_score is None:
