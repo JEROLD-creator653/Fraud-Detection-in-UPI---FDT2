@@ -17,6 +17,10 @@ import psycopg2
 import psycopg2.extras
 from passlib.hash import pbkdf2_sha256
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 # --- time range helper ---
 def parse_time_range(time_range: str):
     now = datetime.now(timezone.utc)
@@ -390,3 +394,40 @@ async def websocket_endpoint(ws: WebSocket):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+# --- chatbot endpoint ---
+@app.post("/api/chatbot")
+async def chatbot_endpoint(request: Request):
+    """AI Chatbot endpoint for fraud detection analytics"""
+    try:
+        body = await request.json()
+        message = body.get("message", "").strip()
+        time_range = body.get("time_range", "24h")
+        conversation_history = body.get("history", [])
+        
+        if not message:
+            return JSONResponse({"error": "Message is required"}, status_code=400)
+        
+        # Import and initialize chatbot
+        from .chatbot import FraudDetectionChatbot
+        chatbot = FraudDetectionChatbot(
+            db_url=DB_URL,
+            groq_api_key=os.getenv("GROQ_API_KEY")
+        )
+        
+        # Get response
+        result = await run_in_threadpool(
+            chatbot.chat,
+            message,
+            time_range,
+            conversation_history
+        )
+        
+        return result
+        
+    except Exception as e:
+        print(f"Chatbot error: {e}")
+        return JSONResponse(
+            {"error": f"Chatbot error: {str(e)}"}, 
+            status_code=500
+        )
