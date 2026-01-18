@@ -266,7 +266,7 @@ async def dashboard_data(time_range: str = "24h"):
     }
 
 @app.get("/recent-transactions")
-async def recent_transactions(limit: int = 50, time_range: str = "24h"):
+async def recent_transactions(limit: int = 10, time_range: str = "24h"):
     since = parse_time_range(time_range)
 
     def query():

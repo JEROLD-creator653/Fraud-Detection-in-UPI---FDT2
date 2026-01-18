@@ -92,7 +92,7 @@ async function loadDashboardData() {
 
 async function loadRecentTransactions() {
   try {
-    const res = await fetch(`/recent-transactions?limit=2000&time_range=${currentTimeRange}`);
+    const res = await fetch(`/recent-transactions?limit=10&time_range=${currentTimeRange}`);
     if (!res.ok) throw new Error('fetch recent failed');
 
     const j = await res.json();
@@ -102,6 +102,7 @@ async function loadRecentTransactions() {
     tbody.innerHTML = '';
     txCache.forEach(tx => tbody.appendChild(makeTxRow(tx)));
 
+    // Clear and update all charts with fresh data
     updateHighRiskAlerts(txCache);
     updateFraudPatternAnalysisFromCache();
     updateTimelineFromCache();
@@ -137,7 +138,12 @@ function makeTxRow(tx) {
 
 // Chart update functions
 function updateFraudPatternAnalysisFromCache() {
-  if (!Array.isArray(txCache) || txCache.length === 0) return;
+  if (!Array.isArray(txCache) || txCache.length === 0) {
+    // Clear chart if no data
+    fraudBar.data.datasets[0].data = [0, 0, 0, 0, 0];
+    fraudBar.update();
+    return;
+  }
 
   let unusualAmount = 0;
   let suspiciousRecipient = 0;
@@ -179,7 +185,12 @@ function updateFraudPatternAnalysisFromCache() {
 }
 
 function updateRiskDistributionFromCache() {
-  if (!Array.isArray(txCache) || txCache.length === 0) return;
+  if (!Array.isArray(txCache) || txCache.length === 0) {
+    // Clear chart if no data
+    riskPie.data.datasets[0].data = [0, 0, 0, 0];
+    riskPie.update('none');
+    return;
+  }
 
   let low = 0, medium = 0, high = 0, critical = 0;
 
@@ -197,32 +208,98 @@ function updateRiskDistributionFromCache() {
 }
 
 function updateTimelineFromCache() {
-  if (!Array.isArray(txCache) || txCache.length === 0) return;
+  if (!Array.isArray(txCache)) return;
 
   const buckets = {};
+  let labels = [];
+  let labelFormat;
 
-  txCache.forEach(tx => {
-    const ts = new Date(tx.ts || tx.created_at || tx.timestamp);
-    if (isNaN(ts)) return;
+  // Determine label format based on time range
+  if (currentTimeRange === '1h') {
+    labelFormat = 'time'; // HH:MM format
+  } else if (currentTimeRange === '24h') {
+    labelFormat = 'time_1h'; // 1-hour interval format for better granularity
+  } else if (currentTimeRange === '7d') {
+    labelFormat = 'date'; // MMM DD format - generate all 7 days
+  } else if (currentTimeRange === '30d') {
+    labelFormat = 'date'; // MMM DD format - generate all 30 days
+  }
 
-    const key = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    if (!buckets[key]) {
-      buckets[key] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
+  // Generate labels for date-based views first
+  if (currentTimeRange === '7d') {
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const label = d.toLocaleDateString([], { month: 'short', day: '2-digit' });
+      labels.push(label);
+      buckets[label] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
     }
-
-    const action = (tx.action || '').toUpperCase();
-    if (buckets[key][action] !== undefined) {
-      buckets[key][action]++;
+  } else if (currentTimeRange === '30d') {
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const label = d.toLocaleDateString([], { month: 'short', day: '2-digit' });
+      labels.push(label);
+      buckets[label] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
     }
-  });
+  } else if (currentTimeRange === '24h') {
+    // Generate 24 hourly labels (newest on left, oldest on right)
+    const now = new Date();
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(now);
+      d.setHours(d.getHours() - i);
+      d.setMinutes(0, 0, 0);
+      const hour = String(d.getHours()).padStart(2, '0');
+      const label = `${hour}:00`;
+      labels.push(label);
+      buckets[label] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
+    }
+  }
 
-  const labels = Object.keys(buckets).slice(-10);
+  // Process transactions if data exists
+  if (Array.isArray(txCache) && txCache.length > 0) {
+    txCache.forEach(tx => {
+      const ts = new Date(tx.ts || tx.created_at || tx.timestamp);
+      if (isNaN(ts)) return;
+
+      let key;
+      if (labelFormat === 'time') {
+        // For 1h: Show exact time (HH:MM)
+        key = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (!buckets[key]) {
+          buckets[key] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
+        }
+      } else if (labelFormat === 'time_1h') {
+        // For 24h: Group into hourly buckets
+        const hour = ts.getHours();
+        const label = String(hour).padStart(2, '0') + ':00';
+        key = label;
+        if (!buckets[key]) {
+          buckets[key] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
+        }
+      } else if (labelFormat === 'date') {
+        // For 7d and 30d: Show date (MMM DD)
+        key = ts.toLocaleDateString([], { month: 'short', day: '2-digit' });
+      }
+
+      const action = (tx.action || '').toUpperCase();
+      if (buckets[key] && buckets[key][action] !== undefined) {
+        buckets[key][action]++;
+      }
+    });
+  }
+
+  // For 1h time-based labels, get last 10 in reverse chronological order
+  if (labelFormat === 'time') {
+    labels = Object.keys(buckets).sort().slice(-10).reverse();
+  }
 
   timelineChart.data.labels = labels;
-  timelineChart.data.datasets[0].data = labels.map(l => buckets[l].BLOCK);
-  timelineChart.data.datasets[1].data = labels.map(l => buckets[l].DELAY);
-  timelineChart.data.datasets[2].data = labels.map(l => buckets[l].ALLOW);
+  timelineChart.data.datasets[0].data = labels.map(l => buckets[l]?.BLOCK || 0);
+  timelineChart.data.datasets[1].data = labels.map(l => buckets[l]?.DELAY || 0);
+  timelineChart.data.datasets[2].data = labels.map(l => buckets[l]?.ALLOW || 0);
 
   timelineChart.update();
 }
@@ -400,6 +477,13 @@ async function sendChatMessage() {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize dark mode from localStorage
+  const darkMode = localStorage.getItem('darkMode') === 'true';
+  if (darkMode) {
+    document.body.classList.add('dark-mode');
+    updateDarkModeButton(true);
+  }
+
   // Initialize
   loadDashboardData();
   loadRecentTransactions();
@@ -476,4 +560,25 @@ document.addEventListener('DOMContentLoaded', () => {
       sendChatMessage();
     }
   });
+
+  // Dark mode toggle
+  document.getElementById('darkModeToggle').addEventListener('click', () => {
+    const isDarkMode = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('darkMode', isDarkMode);
+    updateDarkModeButton(isDarkMode);
+  });
 });
+
+// Dark mode button text updater
+function updateDarkModeButton(isDarkMode) {
+  const btn = document.getElementById('darkModeToggle');
+  if (isDarkMode) {
+    btn.textContent = '☀️ Light';
+    btn.style.backgroundColor = '#374151';
+    btn.style.color = '#fbbf24';
+  } else {
+    btn.textContent = '🌙 Dark';
+    btn.style.backgroundColor = '#e5e7eb';
+    btn.style.color = '#1f2937';
+  }
+}
