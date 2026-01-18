@@ -74,11 +74,12 @@ def gen_tx():
         "recipient_vpa": recipient_vpa,
         "tx_type": tx_type,
         "channel": channel,
+        "_simulated": True,  # Mark as simulated transaction
         # Metadata for display (not sent to API)
         "_pattern": pattern,
         "_is_new_device": is_new_device,
         "_is_new_recipient": is_new_recipient
-        # Let the API calculate risk_score and action based on ML models
+        # Let the API keep risk at 0 for simulated transactions
     }
 
 if __name__ == "__main__":
