@@ -27,8 +27,10 @@ def load_models():
         import joblib
         import json
         
-        # Load models
-        model_dir = "models"
+        # Load models - use absolute path based on script location
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        model_dir = os.path.join(script_dir, "models")
+        print(f"📂 Looking for models in: {model_dir}")
         
         try:
             _IFOREST = joblib.load(os.path.join(model_dir, "iforest.joblib"))
