@@ -1,5 +1,76 @@
 /* UPI Fraud Detection Dashboard Styles */
 
+/* Sort arrows styling */
+.sort-arrows {
+  display: inline-flex;
+  flex-direction: column;
+  margin-left: 4px;
+  gap: 0px;
+  line-height: 0.5;
+}
+
+.sort-arrow {
+  font-size: 7px;
+  color: #9ca3af;
+  opacity: 0.4;
+  transition: all 0.2s ease;
+  display: block;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.sort-arrow:hover {
+  opacity: 0.7;
+  transform: scale(1.2);
+}
+
+/* Ascending sort: up arrow is darker, down arrow is lighter */
+.sort-arrow.sort-up.active-asc {
+  color: #667eea;
+  opacity: 1;
+  font-weight: bold;
+}
+
+.sort-arrow.sort-down.active-asc {
+  color: #9ca3af;
+  opacity: 0.3;
+}
+
+/* Descending sort: down arrow is darker, up arrow is lighter */
+.sort-arrow.sort-down.active-desc {
+  color: #667eea;
+  opacity: 1;
+  font-weight: bold;
+}
+
+.sort-arrow.sort-up.active-desc {
+  color: #9ca3af;
+  opacity: 0.3;
+}
+
+body.dark-mode .sort-arrow {
+  color: #d1d5db;
+}
+
+body.dark-mode .sort-arrow.sort-up.active-asc,
+body.dark-mode .sort-arrow.sort-down.active-desc {
+  color: #818cf8;
+  opacity: 1;
+}
+
+body.dark-mode .sort-arrow.sort-down.active-asc,
+body.dark-mode .sort-arrow.sort-up.active-desc {
+  color: #6b7280;
+  opacity: 0.3;
+}
+
+/* Prevent text selection on header clicks */
+th[onclick] {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
 :root {
   --card-radius: 12px;
   --card-padding: 14px;
@@ -664,29 +735,340 @@ body.dark-mode .table-scroll tbody td {
 
 .table-scroll tbody tr {
   border-bottom: 1px solid #e5e7eb;
-  transition: background-color 0.1s ease;
-  background-color: #ffffff;
+  transition: all 0.2s ease;
+  background-color: #ffffff !important;
+  position: relative;
+  z-index: 0;
 }
 
 .table-scroll tbody td {
   padding: 12px;
   color: #1f2937;
-  background-color: #ffffff;
+  background-color: #ffffff !important;
 }
 
 .table-scroll tbody tr:hover {
-  background-color: #f9fafb;
+  background-color: #f0f4f8 !important;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+  z-index: 1;
 }
 
 body.dark-mode .table-scroll tbody tr {
-  background-color: #1f2937;
+  background-color: #1f2937 !important;
   border-color: #374151;
 }
 
 body.dark-mode .table-scroll tbody td {
-  background-color: #1f2937;
+  background-color: #1f2937 !important;
 }
 
 body.dark-mode .table-scroll tbody tr:hover {
-  background-color: #2d3748;
+  background-color: #2d3748 !important;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  z-index: 1;
+}
+
+/* ================================
+   FIX: General hover effects in dark mode
+   ================================ */
+body.dark-mode .group:hover {
+  background-color: #2d3748 !important;
+  opacity: 1 !important;
+}
+
+body.dark-mode .group {
+  background-color: transparent;
+  opacity: 1 !important;
+}
+
+/* Fix input, select, textarea in dark mode */
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+  background-color: #374151 !important;
+  color: #e5e7eb !important;
+  border-color: #4b5563 !important;
+  opacity: 1 !important;
+}
+
+body.dark-mode input:focus,
+body.dark-mode select:focus,
+body.dark-mode textarea:focus {
+  background-color: #4b5563 !important;
+  border-color: #667eea !important;
+  opacity: 1 !important;
+}
+
+body.dark-mode input::placeholder {
+  color: #9ca3af;
+  opacity: 1 !important;
+}
+
+/* ================================
+   FIX: Dashboard cards and panels stay solid
+   ================================ */
+body.dark-mode .card {
+  opacity: 1 !important;
+}
+
+body.dark-mode button {
+  opacity: 1 !important;
+}
+
+body.dark-mode label {
+  opacity: 1 !important;
+}
+
+/* Ensure all interactive elements have proper hover states */
+body.dark-mode a:hover,
+body.dark-mode button:hover {
+  opacity: 1 !important;
+}
+
+/* ================================
+   FIX: Dashboard transaction rows hover effect (like admin)
+   ================================ */
+.table-scroll tbody tr {
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.table-scroll tbody tr:hover {
+  background-color: #f0f4f8 !important;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+body.dark-mode .table-scroll tbody tr:hover {
+  background-color: #2d3748 !important;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* ================================
+   PROFESSIONAL BUTTON HOVER GLOW EFFECTS
+   ================================ */
+
+/* Base button styles with smooth transitions */
+button,
+a.px-4,
+a.px-3,
+input[type="submit"],
+input[type="button"] {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Primary buttons (blue gradient) - Enhanced glow */
+button.bg-gradient-to-r,
+a.bg-gradient-to-r {
+  transition: all 0.3s ease, box-shadow 0.3s ease;
+}
+
+button.bg-gradient-to-r:hover,
+a.bg-gradient-to-r:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4), 0 0 20px rgba(102, 126, 234, 0.3);
+  filter: brightness(1.1);
+}
+
+button.bg-gradient-to-r:active,
+a.bg-gradient-to-r:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Blue buttons - Glow effect */
+button.bg-blue-600:not(:disabled),
+a.bg-blue-600 {
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+  transition: all 0.3s ease;
+}
+
+button.bg-blue-600:not(:disabled):hover,
+a.bg-blue-600:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4), 0 0 16px rgba(37, 99, 235, 0.3);
+  background-color: #2563eb;
+}
+
+button.bg-blue-600:not(:disabled):active,
+a.bg-blue-600:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+/* Green buttons - Success glow */
+button.bg-green-600:not(:disabled),
+a.bg-green-600 {
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.2);
+  transition: all 0.3s ease;
+}
+
+button.bg-green-600:not(:disabled):hover,
+a.bg-green-600:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(22, 163, 74, 0.4), 0 0 16px rgba(22, 163, 74, 0.3);
+  background-color: #16a34a;
+}
+
+button.bg-green-600:not(:disabled):active,
+a.bg-green-600:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+}
+
+/* Red buttons - Danger glow */
+button.bg-red-600:not(:disabled),
+a.bg-red-600 {
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
+  transition: all 0.3s ease;
+}
+
+button.bg-red-600:not(:disabled):hover,
+a.bg-red-600:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4), 0 0 16px rgba(220, 38, 38, 0.3);
+  background-color: #dc2626;
+}
+
+button.bg-red-600:not(:disabled):active,
+a.bg-red-600:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* Orange buttons - Warning glow */
+button.bg-orange-600:not(:disabled),
+a.bg-orange-600 {
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.2);
+  transition: all 0.3s ease;
+}
+
+button.bg-orange-600:not(:disabled):hover,
+a.bg-orange-600:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(234, 88, 12, 0.4), 0 0 16px rgba(234, 88, 12, 0.3);
+  background-color: #ea580c;
+}
+
+button.bg-orange-600:not(:disabled):active,
+a.bg-orange-600:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+}
+
+/* Yellow buttons - Delay glow */
+button.bg-yellow-500:not(:disabled),
+a.bg-yellow-500 {
+  box-shadow: 0 2px 8px rgba(234, 179, 8, 0.2);
+  transition: all 0.3s ease;
+}
+
+button.bg-yellow-500:not(:disabled):hover,
+a.bg-yellow-500:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(234, 179, 8, 0.4), 0 0 16px rgba(234, 179, 8, 0.3);
+  background-color: #eab308;
+}
+
+button.bg-yellow-500:not(:disabled):active,
+a.bg-yellow-500:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.3);
+}
+
+/* Purple/Indigo buttons - Premium glow */
+button.bg-purple-600:not(:disabled),
+button.bg-indigo-600:not(:disabled),
+a.bg-purple-600,
+a.bg-indigo-600 {
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
+  transition: all 0.3s ease;
+}
+
+button.bg-purple-600:not(:disabled):hover,
+button.bg-indigo-600:not(:disabled):hover,
+a.bg-purple-600:hover,
+a.bg-indigo-600:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.4), 0 0 16px rgba(124, 58, 237, 0.3);
+  background-color: #7c3aed;
+}
+
+button.bg-purple-600:not(:disabled):active,
+button.bg-indigo-600:not(:disabled):active,
+a.bg-purple-600:active,
+a.bg-indigo-600:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+/* Gray/Neutral buttons - Subtle glow */
+button.bg-gray-200:not(:disabled),
+button.bg-gray-600:not(:disabled),
+a.bg-gray-200,
+a.bg-gray-600 {
+  box-shadow: 0 2px 8px rgba(75, 85, 99, 0.15);
+  transition: all 0.3s ease;
+}
+
+button.bg-gray-200:not(:disabled):hover,
+button.bg-gray-600:not(:disabled):hover,
+a.bg-gray-200:hover,
+a.bg-gray-600:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(75, 85, 99, 0.25), 0 0 12px rgba(75, 85, 99, 0.2);
+  filter: brightness(0.95);
+}
+
+button.bg-gray-200:not(:disabled):active,
+button.bg-gray-600:not(:disabled):active,
+a.bg-gray-200:active,
+a.bg-gray-600:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 10px rgba(75, 85, 99, 0.2);
+}
+
+/* Disabled button state - no glow */
+button:disabled,
+button.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* Dark mode adjustments for button glows */
+body.dark-mode button.bg-blue-600:not(:disabled):hover,
+body.dark-mode a.bg-blue-600:hover {
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.5), 0 0 20px rgba(59, 130, 246, 0.4);
+}
+
+body.dark-mode button.bg-green-600:not(:disabled):hover,
+body.dark-mode a.bg-green-600:hover {
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.5), 0 0 20px rgba(34, 197, 94, 0.4);
+}
+
+body.dark-mode button.bg-red-600:not(:disabled):hover,
+body.dark-mode a.bg-red-600:hover {
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.5), 0 0 20px rgba(239, 68, 68, 0.4);
+}
+
+body.dark-mode button.bg-orange-600:not(:disabled):hover,
+body.dark-mode a.bg-orange-600:hover {
+  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.5), 0 0 20px rgba(249, 115, 22, 0.4);
+}
+
+body.dark-mode button.bg-yellow-500:not(:disabled):hover,
+body.dark-mode a.bg-yellow-500:hover {
+  box-shadow: 0 8px 24px rgba(234, 179, 8, 0.5), 0 0 20px rgba(234, 179, 8, 0.4);
+}
+
+body.dark-mode button.bg-gradient-to-r:hover,
+body.dark-mode a.bg-gradient-to-r:hover {
+  box-shadow: 0 8px 28px rgba(102, 126, 234, 0.5), 0 0 24px rgba(102, 126, 234, 0.4);
+}
+
+body.dark-mode button.bg-gray-200:not(:disabled):hover {
+  box-shadow: 0 8px 20px rgba(156, 163, 175, 0.3), 0 0 16px rgba(156, 163, 175, 0.25);
 }

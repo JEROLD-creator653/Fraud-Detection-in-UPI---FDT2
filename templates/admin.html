@@ -5,6 +5,289 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <style>
+    /* Dark-mode adjustments for admin containers */
+    body.dark-mode .bg-white { background-color: #1f2937 !important; color: #e5e7eb; }
+    body.dark-mode .text-gray-600 { color: #d1d5db !important; }
+    body.dark-mode .border { border-color: #374151 !important; }
+    body.dark-mode a { color: #bfdbfe; }
+    
+    /* Fix hover translucency on transaction rows */
+    body.dark-mode .group:hover { background-color: #2d3748 !important; }
+    body.dark-mode .group { background-color: #1f2937 !important; }
+    
+    /* Fix admin log backgrounds in dark mode */
+    body.dark-mode .bg-gray-50 { background-color: #2d3748 !important; color: #e5e7eb !important; }
+    body.dark-mode .text-gray-600 { color: #d1d5db !important; }
+    body.dark-mode .text-xs.text-gray-500 { color: #9ca3af !important; }    
+    /* Fix form inputs in dark mode - no translucency */
+    body.dark-mode input[type="text"],
+    body.dark-mode input[type="email"],
+    body.dark-mode input[type="password"],
+    body.dark-mode select,
+    body.dark-mode textarea {
+      background-color: #374151 !important;
+      color: #e5e7eb !important;
+      border-color: #4b5563 !important;
+      opacity: 1 !important;
+    }
+    
+    body.dark-mode input:focus,
+    body.dark-mode select:focus,
+    body.dark-mode textarea:focus {
+      background-color: #4b5563 !important;
+      border-color: #667eea !important;
+      opacity: 1 !important;
+    }
+    
+    body.dark-mode input::placeholder {
+      color: #9ca3af;
+      opacity: 1 !important;
+    }
+    
+    /* Keep Quick Action panel white/visible in BOTH modes */
+    .bg-white {
+      opacity: 1 !important;
+    }
+    
+    body.dark-mode .bg-white {
+      background-color: #1f2937 !important;
+      color: #e5e7eb !important;
+      opacity: 1 !important;
+    }
+    
+    body.dark-mode h3 {
+      color: #e5e7eb !important;
+      opacity: 1 !important;
+    }
+    
+    body.dark-mode label {
+      color: #e5e7eb !important;
+      opacity: 1 !important;
+    }
+    
+    body.dark-mode button {
+      opacity: 1 !important;
+    }
+    
+    body.dark-mode .text-xs {
+      opacity: 1 !important;
+    }
+    
+    /* Confirmation Modal styling */
+    #confirmModal {
+      animation: fadeIn 0.2s ease-in;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    body.dark-mode #confirmModal .bg-white {
+      background-color: #1f2937 !important;
+      color: #e5e7eb;
+    }
+    
+    body.dark-mode #confirmModal .bg-gray-50 {
+      background-color: #374151 !important;
+    }
+    
+    body.dark-mode #confirmModal .text-gray-600,
+    body.dark-mode #confirmModal .text-gray-800 {
+      color: #e5e7eb !important;
+    }
+    
+    /* Toast notifications styling */
+    .toast {
+      animation: slideInRight 0.3s ease-out, fadeOut 0.3s ease-in 2.7s;
+      min-width: 300px;
+      max-width: 400px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      opacity: 1;
+    }
+    
+    @keyframes slideInRight {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
+    
+    .toast-success {
+      background-color: #10b981;
+      color: white;
+    }
+    
+    .toast-error {
+      background-color: #ef4444;
+      color: white;
+    }
+    
+    .toast-info {
+      background-color: #3b82f6;
+      color: white;
+    }
+    
+    body.dark-mode .toast {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    /* ================================
+       QUICK ACTION HOVER GLOW BUTTONS (A/D/B/View)
+       ================================ */
+    .hover-glow-button {
+      transition: all 0.3s ease;
+      position: relative;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .hover-glow-button:hover {
+      transform: translateY(-2px) scale(1.05);
+      filter: brightness(1.15);
+    }
+
+    /* Blue buttons - View */
+    .hover-glow-button.bg-blue-500:hover {
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5), 0 0 12px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Green buttons - Allow */
+    .hover-glow-button.bg-green-500:hover {
+      box-shadow: 0 6px 16px rgba(34, 197, 94, 0.5), 0 0 12px rgba(34, 197, 94, 0.4);
+    }
+
+    /* Yellow buttons - Delay */
+    .hover-glow-button.bg-yellow-500:hover {
+      box-shadow: 0 6px 16px rgba(234, 179, 8, 0.5), 0 0 12px rgba(234, 179, 8, 0.4);
+    }
+
+    /* Red buttons - Block */
+    .hover-glow-button.bg-red-500:hover {
+      box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5), 0 0 12px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Active state */
+    .hover-glow-button:active {
+      transform: translateY(0) scale(0.98);
+    }
+
+    body.dark-mode .hover-glow-button.bg-blue-500:hover {
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6), 0 0 16px rgba(59, 130, 246, 0.5);
+    }
+
+    body.dark-mode .hover-glow-button.bg-green-500:hover {
+      box-shadow: 0 6px 20px rgba(34, 197, 94, 0.6), 0 0 16px rgba(34, 197, 94, 0.5);
+    }
+
+    body.dark-mode .hover-glow-button.bg-yellow-500:hover {
+      box-shadow: 0 6px 20px rgba(234, 179, 8, 0.6), 0 0 16px rgba(234, 179, 8, 0.5);
+    }
+
+    body.dark-mode .hover-glow-button.bg-red-500:hover {
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6), 0 0 16px rgba(239, 68, 68, 0.5);
+    }
+
+    /* Explainability Modal: enforce light in light-mode, dark in dark-mode */
+    #explainModal .bg-white { background-color: #ffffff !important; color: #1f2937 !important; }
+    #explainModal .bg-gray-50 { background-color: #f9fafb !important; color: #1f2937 !important; }
+    #explainModal .text-gray-800 { color: #1f2937 !important; }
+    #explainModal .text-gray-600 { color: #4b5563 !important; }
+    #explainModal .text-gray-500 { color: #6b7280 !important; }
+    #explainModal .text-blue-700 { color: #1d4ed8 !important; }
+
+    body.dark-mode #explainModal .bg-white { background-color: #1f2937 !important; color: #e5e7eb !important; }
+    body.dark-mode #explainModal .bg-gray-50 { background-color: #374151 !important; color: #e5e7eb !important; }
+    body.dark-mode #explainModal .text-gray-800 { color: #e5e7eb !important; }
+    body.dark-mode #explainModal .text-gray-600 { color: #d1d5db !important; }
+    body.dark-mode #explainModal .text-gray-900 { color: #e5e7eb !important; }
+    body.dark-mode #explainModal .text-gray-500 { color: #9ca3af !important; }
+    body.dark-mode #explainModal .text-blue-700 { color: #60a5fa !important; }
+
+    /* Model Scores labels: solid visibility */
+    #expl_models > div > span { font-weight: 700; }
+    
+    /* Admin logs action badges: remove translucency */
+    #admin_logs .action-badge { opacity: 1 !important; filter: none !important; mix-blend-mode: normal !important; color: #ffffff !important; }
+    #admin_logs .badge-block { background-color: #ef4444 !important; }
+    #admin_logs .badge-delay { background-color: #f59e0b !important; }
+    #admin_logs .badge-allow { background-color: #22c55e !important; }
+    body.dark-mode #admin_logs .action-badge { opacity: 1 !important; filter: none !important; mix-blend-mode: normal !important; color: #ffffff !important; }
+
+    /* Admin logs action badge opacity fix for dark mode */
+    body.dark-mode #admin_logs .px-2.py-0.5.rounded.text-white {
+      opacity: 1 !important;
+    }
+    
+    #admin_logs .px-2.py-0.5.rounded.text-white {
+      opacity: 1 !important;
+    }
+
+    /* Fix Admin Logs visibility in dark mode */
+    #admin_logs {
+      transition: background-color 0.1s ease, color 0.1s ease;
+      background-color: transparent;
+      color: #1f2937;
+    }
+    
+    body.dark-mode #admin_logs {
+      background-color: transparent !important;
+      color: #e5e7eb !important;
+    }
+    
+    body.dark-mode #admin_logs .bg-gray-50 {
+      background-color: #374151 !important;
+      color: #e5e7eb !important;
+      border-color: #4b5563 !important;
+    }
+    
+    body.dark-mode #admin_logs .text-gray-500 {
+      color: #9ca3af !important;
+    }
+    
+    body.dark-mode #admin_logs .text-xs {
+      color: #d1d5db !important;
+    }
+    
+    body.dark-mode #admin_logs .text-sm.font-mono {
+      color: #d1d5db !important;
+    }
+    
+    /* Light mode admin logs styling */
+    #admin_logs .bg-gray-50 {
+      background-color: #f9fafb !important;
+      color: #1f2937 !important;
+      border-color: #e5e7eb !important;
+    }
+    
+    #admin_logs .text-xs {
+      color: #6b7280 !important;
+    }
+    
+    #admin_logs .text-sm.font-mono {
+      color: #1f2937 !important;
+    }
+  </style>
 </head>
 
 <body class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6">
@@ -18,7 +301,8 @@
         </h1>
         <p class="text-sm text-gray-600">Fraud control & monitoring</p>
       </div>
-      <div class="flex gap-3">
+      <div class="flex gap-3 items-center">
+        <button id="darkModeToggleAdmin" class="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-sm" title="Toggle Dark Mode">🌙 Dark</button>
         <a href="/dashboard" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm">Open User Dashboard</a>
         <a href="/admin/logout" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm">Logout</a>
       </div>
@@ -32,13 +316,24 @@
         <h3 class="font-semibold mb-3">Quick Action (Manual)</h3>
         <label class="text-sm">TX ID</label>
         <input id="qa_txid" class="w-full mt-1 mb-2 px-3 py-2 border rounded" />
+        <button id="qa_fetch_btn" class="w-full py-2 bg-blue-600 text-white rounded mb-3">Get Details</button>
+        
+        <!-- Transaction Details (hidden initially) -->
+        <div id="qa_details" class="hidden mb-3 p-2 bg-gray-50 rounded border text-xs space-y-1">
+          <div><strong>User:</strong> <span id="qa_detail_user">-</span></div>
+          <div><strong>Amount:</strong> <span id="qa_detail_amount">-</span></div>
+          <div><strong>Current Action:</strong> <span id="qa_detail_action">-</span></div>
+          <div><strong>Risk Score:</strong> <span id="qa_detail_risk">-</span></div>
+          <div><strong>Reason:</strong> <span id="qa_detail_reason">-</span></div>
+        </div>
+        
         <label class="text-sm">Action</label>
         <select id="qa_action" class="w-full mt-1 mb-3 px-3 py-2 border rounded">
           <option value="ALLOW">ALLOW</option>
           <option value="DELAY">DELAY</option>
           <option value="BLOCK">BLOCK</option>
         </select>
-        <button id="qa_btn" class="w-full py-2 bg-green-600 text-white rounded">Apply</button>
+        <button id="qa_btn" class="w-full py-2 bg-green-600 text-white rounded disabled:opacity-50" disabled>Apply Action</button>
         <div id="qa_result" class="mt-2 text-xs text-gray-600"></div>
       </div>
 
@@ -53,48 +348,265 @@
       <!-- Admin logs -->
       <div class="bg-white rounded-xl shadow p-4">
         <h3 class="font-semibold mb-2">Recent Admin Logs</h3>
-        <div id="admin_logs" class="text-sm max-h-40 overflow-y-auto space-y-2">
+        <div id="admin_logs" class="text-sm overflow-y-auto space-y-2" style="max-height: 70vh;">
         </div>
       </div>
     </div>
 
-    <!-- Recent transactions -->
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full mx-4">
+        <h3 class="text-lg font-bold mb-4 text-gray-800">Confirm Action</h3>
+        
+        <div class="bg-gray-50 p-3 rounded-lg mb-4 space-y-2 text-sm">
+          <div><strong>TX ID:</strong> <span id="confirm_tx_id" class="font-mono text-blue-600">-</span></div>
+          <div><strong>Action:</strong> <span id="confirm_action" class="font-bold">-</span></div>
+        </div>
+        
+        <p class="text-sm text-gray-600 mb-4">Confirm this action. A 5-second grace window lets you undo it immediately after applying.</p>
+        
+        <div class="flex gap-2">
+          <button id="confirm_cancel" class="flex-1 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 transition">Cancel</button>
+          <button id="confirm_submit" class="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Explainability Modal -->
+    <div id="explainModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-2xl p-6 max-w-xl w-full mx-4">
+        <div class="flex justify-between items-start mb-3">
+          <div>
+            <h3 class="text-lg font-bold text-gray-800">Explainability</h3>
+            <div class="text-xs text-gray-500">Why the system decided • Suspicious patterns</div>
+          </div>
+          <button id="explainClose" class="text-gray-500 hover:text-gray-800">✕</button>
+        </div>
+
+        <div class="border rounded p-3 bg-gray-50 mb-3">
+          <div class="text-xs text-gray-500 dark:text-gray-400">TX ID</div>
+          <div id="expl_tx_id" class="font-mono text-sm text-blue-700">-</div>
+          <div class="text-xs text-gray-500 mt-1">Action / Risk</div>
+          <div class="text-sm text-gray-800"><span id="expl_action" class="font-semibold"></span> • <span id="expl_risk"></span></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="border rounded p-3 bg-white">
+            <div class="text-xs font-semibold text-gray-600 mb-2">Reasons</div>
+            <ul id="expl_reasons" class="text-sm space-y-1 list-disc list-inside text-gray-800"></ul>
+          </div>
+          <div class="border rounded p-3 bg-white">
+            <div class="text-xs font-semibold text-gray-600 mb-2">Model Scores</div>
+            <div id="expl_models" class="text-sm space-y-1 text-gray-800"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transactions -->
     <div class="bg-white rounded-xl shadow p-4">
-      <div class="bg-white p-4 rounded shadow">
-  <div class="flex justify-between items-center mb-2">
-    <h3 class="font-semibold">Recent Transactions (Admin View)</h3>
-
-    <!-- ✅ STEP 3 DROPDOWN GOES HERE -->
-    <select id="adminFilter"
-      class="px-3 py-1 border rounded text-sm bg-white">
-      <option value="ALL">All</option>
-      <option value="ALLOW">Allowed</option>
-      <option value="DELAY">Delayed</option>
-      <option value="BLOCK">Blocked</option>
-    </select>
+      <div class="flex justify-between items-center mb-2">
+        <h3 class="font-semibold">Transactions (Admin View)</h3>
+        <div class="flex gap-2">
+          <select id="timeFilter" class="px-3 py-1 pr-8 border rounded text-sm bg-white">
+            <option value="1h">Last 1 Hour</option>
+            <option value="24h" selected>Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+          </select>
+          <select id="adminFilter" class="px-3 py-1 pr-8 border rounded text-sm bg-white">
+            <option value="ALL">All</option>
+            <option value="ALLOW">Allowed</option>
+            <option value="DELAY">Delayed</option>
+            <option value="BLOCK">Blocked</option>
+          </select>
+        </div>
+      </div>
+      <div id="admin_recent" class="text-sm max-h-80 overflow-y-auto border rounded"></div>
+    </div>
   </div>
 
-  <div
-  id="admin_recent"
-  class="text-sm max-h-80 overflow-y-auto border rounded"
-></div>
-</div>
-  </div>
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
 <script>
 let adminTxCache = [];
+let undoTimer = null;
+
+/* ---------- Helpers ---------- */
+function getPrevAction(tx_id) {
+  const fromCache = adminTxCache.find(t => t.tx_id === tx_id);
+  if (fromCache?.action) return fromCache.action;
+  const detail = document.getElementById('qa_detail_action')?.textContent?.trim();
+  if (detail) return detail;
+  return null;
+}
+
+function confidenceBadge(level) {
+  const lvl = (level || 'HIGH').toUpperCase();
+  const style = lvl === 'LOW'
+    ? 'bg-red-50 text-red-700 border border-red-100'
+    : lvl === 'MEDIUM'
+      ? 'bg-yellow-50 text-yellow-700 border border-yellow-100'
+      : 'bg-green-50 text-green-700 border border-green-100';
+  return `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${style}">${lvl}</span>`;
+}
+
+/* ---------- Toast Notification System ---------- */
+
+function showToast(type, message) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  
+  const icons = {
+    success: '✅',
+    error: '❌',
+    info: 'ℹ️'
+  };
+  
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    <span style="font-size: 20px;">${icons[type] || 'ℹ️'}</span>
+    <span>${message}</span>
+  `;
+  
+  container.appendChild(toast);
+  
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    toast.remove();
+  }, 3000);
+}
+
+// Undo toast with countdown and button
+function showUndoToast(tx_id, newAction, prevAction) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-info';
+
+  let seconds = 5;
+  toast.innerHTML = `
+    <span style="font-size: 20px;">⏳</span>
+    <div class="flex-1">
+      <div class="font-semibold">${newAction} applied to ${tx_id.slice(0, 8)}...</div>
+      <div class="text-sm">Undo available (${seconds}s)</div>
+    </div>
+    <button id="undoBtn" class="px-2 py-1 text-xs bg-white/20 border border-white/30 rounded">Undo</button>
+  `;
+
+  container.appendChild(toast);
+
+  const countdownEl = toast.querySelector('div.text-sm');
+  const undoBtn = toast.querySelector('#undoBtn');
+
+  const clearAll = () => {
+    if (undoTimer) clearInterval(undoTimer);
+    toast.remove();
+  };
+
+  undoTimer = setInterval(async () => {
+    seconds -= 1;
+    if (countdownEl) countdownEl.textContent = `Undo available (${seconds}s)`;
+    if (seconds <= 0) {
+      clearAll();
+    }
+  }, 1000);
+
+  undoBtn.onclick = async (e) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch('/admin/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx_id, action: prevAction })
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        showToast('error', result.detail || 'Undo failed');
+      } else {
+        showToast('success', `Reverted to ${prevAction} for ${tx_id.slice(0, 8)}...`);
+        addAdminLog({
+          tx_id,
+          user_id: (result && result.updated && result.updated.user_id) ? result.updated.user_id : 'unknown',
+          action: prevAction,
+          time: new Date().toISOString()
+        });
+        fetchRecent();
+      }
+    } catch (err) {
+      showToast('error', err.message || 'Undo failed');
+    } finally {
+      clearAll();
+    }
+  };
+}
+
+/* ---------- Dark Mode Toggle (Admin) ---------- */
+function updateDarkModeButtonAdmin(isDark) {
+  const btn = document.getElementById('darkModeToggleAdmin');
+  if (!btn) return;
+  if (isDark) {
+    btn.textContent = '☀️ Light';
+    btn.className = 'px-4 py-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm';
+  } else {
+    btn.textContent = '🌙 Dark';
+    btn.className = 'px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-sm';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const isDark = localStorage.getItem('darkMode') === 'true';
+  if (isDark) document.body.classList.add('dark-mode');
+  updateDarkModeButtonAdmin(isDark);
+  document.getElementById('darkModeToggleAdmin').addEventListener('click', () => {
+    const nowDark = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('darkMode', nowDark);
+    updateDarkModeButtonAdmin(nowDark);
+  });
+  
+  // Setup modal buttons
+  setupModalButtons();
+  setupModalCloseBtn();
+  
+  // Setup Apply Action button
+  const qaBtn = document.getElementById('qa_btn');
+  if (qaBtn) {
+    qaBtn.onclick = (e) => {
+      e.preventDefault();
+      const tx_id = document.getElementById('qa_txid').value.trim();
+      const action = document.getElementById('qa_action').value;
+      
+      if (!tx_id) {
+        document.getElementById('qa_result').textContent = 'Please enter TX ID first';
+        return;
+      }
+      
+      // Change button to loading state immediately
+      qaBtn.textContent = 'Applying action...';
+      qaBtn.disabled = true;
+      
+      showConfirmation(tx_id, action);
+    };
+  }
+});
 
 /* ---------- render transaction row ---------- */
 function renderAdminTx(tx) {
   const div = document.createElement('div');
   div.className =
-    'group p-3 rounded-lg border flex justify-between items-center hover:bg-gray-50 transition';
+    'group p-3 rounded-lg border flex justify-between items-center hover:bg-gray-50 transition cursor-pointer';
+
+  const risk = Number(tx.risk_score ?? 0);
+  const riskColor = risk >= 0.8 ? 'text-red-600' : risk >= 0.6 ? 'text-orange-600' : 'text-green-600';
 
   div.innerHTML = `
-    <div>
+    <div class="flex-1">
       <div class="font-mono text-xs">${tx.tx_id}</div>
       <div class="text-xs text-gray-600">
-        ${tx.user_id || ''} • ₹${Number(tx.amount || 0).toFixed(2)}
+        ${tx.user_id || ''} • ₹${Number(tx.amount || 0).toFixed(2)} • Risk: <span class="${riskColor} font-semibold">${risk.toFixed(2)}</span>
+      </div>
+      <div class="text-xs text-gray-500 mt-1">
+        Channel: ${tx.channel || 'N/A'} • Type: ${tx.tx_type || 'N/A'}
       </div>
     </div>
 
@@ -105,21 +617,33 @@ function renderAdminTx(tx) {
       }">
         ${tx.action || 'ALLOW'}
       </span>
+      <span>${confidenceBadge(tx.confidence_level)}</span>
 
       <!-- Hover quick actions -->
       <div class="hidden group-hover:flex gap-1">
-        <button onclick="quickAction('${tx.tx_id}','ALLOW')" class="px-2 py-1 text-xs bg-green-500 text-white rounded">A</button>
-        <button onclick="quickAction('${tx.tx_id}','DELAY')" class="px-2 py-1 text-xs bg-yellow-500 text-white rounded">D</button>
-        <button onclick="quickAction('${tx.tx_id}','BLOCK')" class="px-2 py-1 text-xs bg-red-500 text-white rounded">B</button>
+        <button onclick="showExplain('${tx.tx_id}')" class="px-2 py-1 text-xs bg-indigo-500 text-white rounded hover-glow-button" title="Explainability">Exp</button>
+        <button onclick="fillAndFetchTx('${tx.tx_id}')" class="px-2 py-1 text-xs bg-blue-500 text-white rounded hover-glow-button">View</button>
+        <button onclick="showConfirmation('${tx.tx_id}','ALLOW')" class="px-2 py-1 text-xs bg-green-500 text-white rounded hover-glow-button">A</button>
+        <button onclick="showConfirmation('${tx.tx_id}','DELAY')" class="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover-glow-button">D</button>
+        <button onclick="showConfirmation('${tx.tx_id}','BLOCK')" class="px-2 py-1 text-xs bg-red-500 text-white rounded hover-glow-button">B</button>
       </div>
     </div>
   `;
+
+  // Click on row to fill TX ID only (no fetch)
+  div.onclick = (e) => {
+    if (!e.target.closest('button')) {
+      fillTxIdOnly(tx.tx_id);
+    }
+  };
+
   return div;
 }
 
 /* ---------- load recent ---------- */
 async function fetchRecent() {
-  const res = await fetch('/recent-transactions?limit=2000');
+  const timeRange = document.getElementById('timeFilter')?.value || '24h';
+  const res = await fetch(`/recent-transactions?limit=2000&time_range=${timeRange}`);
   const j = await res.json();
   adminTxCache = Array.isArray(j.transactions) ? j.transactions : [];
   redrawAdminRecent();
@@ -136,56 +660,372 @@ function redrawAdminRecent() {
     .forEach(tx => el.appendChild(renderAdminTx(tx)));
 }
 
+/* ---------- explainability modal ---------- */
+function hideExplain() {
+  document.getElementById('explainModal')?.classList.add('hidden');
+}
+
+function showExplain(tx_id) {
+  const modal = document.getElementById('explainModal');
+  if (!modal) return;
+
+  const tx = adminTxCache.find(t => t.tx_id === tx_id);
+  if (!tx) {
+    showToast('error', 'Transaction not found');
+    return;
+  }
+
+  console.log('showExplain - Full transaction data:', tx);
+  console.log('showExplain - Explainability field:', tx.explainability);
+
+  // Try multiple ways to get explainability data
+  let expl = {};
+  if (tx.explainability) {
+    // If it's a string (JSON), parse it
+    if (typeof tx.explainability === 'string') {
+      try {
+        expl = JSON.parse(tx.explainability);
+      } catch (e) {
+        console.error('Failed to parse explainability JSON:', e);
+        expl = {};
+      }
+    } else {
+      expl = tx.explainability;
+    }
+  }
+  
+  const reasonsRaw = expl.reasons || tx.reasons || tx.fraud_reasons || [];
+  const modelScores = expl.model_scores || tx.model_scores || {};
+  
+  console.log('Extracted reasons:', reasonsRaw);
+  console.log('Extracted model scores:', modelScores);
+
+  document.getElementById('expl_tx_id').textContent = tx.tx_id || '-';
+
+  const actionEl = document.getElementById('expl_action');
+  const action = tx.action || 'N/A';
+  actionEl.textContent = action;
+  actionEl.className = 'font-semibold ' + (
+    action === 'BLOCK' ? 'text-red-600' :
+    action === 'DELAY' ? 'text-yellow-600' : 'text-green-600'
+  );
+
+  document.getElementById('expl_risk').textContent = `Risk ${Number(tx.risk_score ?? 0).toFixed(2)}`;
+
+  const reasonsEl = document.getElementById('expl_reasons');
+  reasonsEl.innerHTML = '';
+  const reasonItems = Array.isArray(reasonsRaw) ? reasonsRaw : [];
+  if (reasonItems.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'text-gray-500 italic';
+    li.textContent = 'No explainability data available. This may be an older transaction or the explainability column is not yet created.';
+    reasonsEl.appendChild(li);
+  } else {
+    reasonItems.forEach(r => {
+      const text = typeof r === 'string' ? r : (r.reason || JSON.stringify(r));
+      const li = document.createElement('li');
+      li.textContent = text;
+      reasonsEl.appendChild(li);
+    });
+  }
+
+  const modelsEl = document.getElementById('expl_models');
+  modelsEl.innerHTML = '';
+  // Filter out meta fields and enforce display order
+  const filtered = { ...(modelScores || {}) };
+  ['confidence','model_disagreement','confidence_level','disagreement','final_risk_score'].forEach(k => { if (k in filtered) delete filtered[k]; });
+  const order = ['iforest','random_forest','xgboost','ensemble'];
+  const orderedEntries = [];
+  order.forEach(k => { if (k in filtered) orderedEntries.push([k, filtered[k]]); });
+  // Append any other scores not in the order
+  Object.entries(filtered).forEach(([k,v]) => { if (!order.includes(k)) orderedEntries.push([k,v]); });
+
+  if (orderedEntries.length === 0) {
+    const div = document.createElement('div');
+    div.className = 'text-gray-500 italic';
+    div.textContent = 'No model scores available. Run the migration to add the explainability column.';
+    modelsEl.appendChild(div);
+  } else {
+    orderedEntries.forEach(([k, v]) => {
+      const div = document.createElement('div');
+      div.innerHTML = `<span class="font-semibold text-gray-900">${k.replace('_',' ')}:</span> <span class="font-semibold text-gray-800">${Number(v ?? 0).toFixed(3)}</span>`;
+      div.className = 'mb-1';
+      modelsEl.appendChild(div);
+    });
+  }
+
+  modal.classList.remove('hidden');
+}
+
 /* ---------- quick action ---------- */
 async function quickAction(tx_id, action) {
-  await fetch('/admin/action', {
+  const res = await fetch('/admin/action', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ tx_id, action })
   });
+  
+  const result = await res.json();
 
   const logs = document.getElementById('admin_logs');
   const log = document.createElement('div');
-log.className = 'flex justify-between items-center bg-gray-50 border rounded px-2 py-1';
+  log.className = 'flex justify-between items-center bg-gray-50 border rounded px-2 py-1';
 
-log.innerHTML = `
-  <div class="text-xs font-mono">${tx_id}</div>
-  <div class="flex items-center gap-2">
-    <span class="text-[10px] text-gray-500">${new Date().toLocaleTimeString()}</span>
-    <span class="px-2 py-0.5 rounded text-white text-[10px]
-      ${action === 'BLOCK' ? 'bg-red-500' :
-        action === 'DELAY' ? 'bg-yellow-500' : 'bg-green-500'}">
-      ${action}
-    </span>
-  </div>
-`;
+  const badgeClass = action === 'BLOCK' ? 'badge-block' : (action === 'DELAY' ? 'badge-delay' : 'badge-allow');
+  log.innerHTML = `
+    <div class="text-xs font-mono">${tx_id}</div>
+    <div class="flex items-center gap-2">
+      <span class="text-[10px] text-gray-500">${new Date().toLocaleTimeString()}</span>
+      <span class="px-2 py-0.5 rounded text-[10px] font-semibold action-badge ${badgeClass}">${action}</span>
+    </div>
+  `;
 
-logs.prepend(log);
+  logs.prepend(log);
+  return result;
 }
 
-/* ---------- manual quick action ---------- */
-document.getElementById('qa_btn').onclick = async () => {
-  const tx_id = qa_txid.value.trim();
-  const action = qa_action.value;
-  if (!tx_id) return;
+/* ---------- clear details when TX ID input changes ---------- */
+document.getElementById('qa_txid').addEventListener('input', () => {
+  document.getElementById('qa_details').classList.add('hidden');
+  document.getElementById('qa_btn').disabled = true;
+  document.getElementById('qa_result').textContent = '';
+});
+
+/* ---------- fetch transaction details ---------- */
+document.getElementById('qa_fetch_btn').onclick = async () => {
+  const btn = document.getElementById('qa_fetch_btn');
+  const tx_id = document.getElementById('qa_txid').value.trim();
+  
+  if (!tx_id) {
+    document.getElementById('qa_result').textContent = 'Please enter TX ID';
+    return;
+  }
+
+  // Show loading state
+  const originalText = btn.textContent;
+  btn.textContent = 'Getting details...';
+  btn.disabled = true;
 
   try {
-  const result = await quickAction(tx_id, action);
+    const res = await fetch(`/recent-transactions?limit=1000`);
+    const j = await res.json();
+    const tx = (j.transactions || []).find(t => t.tx_id === tx_id);
 
-  qa_result.textContent = 'Action applied';
+    if (!tx) {
+      showToast('error', 'Transaction not found');
+      document.getElementById('qa_result').textContent = 'Transaction not found';
+      return;
+    }
 
-  // ✅ STEP 2: Add to Recent Admin Logs
-  addAdminLog({
-    tx_id: tx_id,
-    user_id: result.user_id || 'unknown',
-    action: action,
-    time: new Date().toISOString()
-  });
-
-} catch (e) {
-  qa_result.textContent = e.message;
-}
+    // Display transaction details
+    document.getElementById('qa_detail_user').textContent = tx.user_id || 'N/A';
+    document.getElementById('qa_detail_amount').textContent = `₹${Number(tx.amount || 0).toFixed(2)}`;
+    document.getElementById('qa_detail_action').textContent = tx.action || 'PENDING';
+    document.getElementById('qa_detail_risk').textContent = Number(tx.risk_score || 0).toFixed(2);
+    
+    // Show explainability reasons if present
+    const reasons = tx.explainability?.reasons;
+    if (Array.isArray(reasons) && reasons.length) {
+      document.getElementById('qa_detail_reason').textContent = reasons.join('; ');
+    } else {
+      let reason = 'N/A';
+      if (tx.block_reason) {
+        reason = tx.block_reason;
+      } else if (tx.action === 'BLOCK') {
+        reason = `High risk score (${Number(tx.risk_score || 0).toFixed(2)})`;
+      } else if (tx.action === 'DELAY') {
+        reason = 'Verification pending';
+      } else if (tx.action === 'ALLOW') {
+        reason = 'Cleared';
+      }
+      document.getElementById('qa_detail_reason').textContent = reason;
+    }
+    
+    document.getElementById('qa_details').classList.remove('hidden');
+    document.getElementById('qa_btn').disabled = false;
+    document.getElementById('qa_result').textContent = 'Details loaded. Choose action below.';
+  } catch (e) {
+    document.getElementById('qa_result').textContent = 'Error: ' + e.message;
+  } finally {
+    // Restore button state
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
 };
+
+/* ---------- fill TX ID from transaction row (no auto-fetch) ---------- */
+function fillTxIdOnly(tx_id) {
+  const input = document.getElementById('qa_txid');
+  input.value = tx_id;
+  // Clear details panel
+  document.getElementById('qa_details').classList.add('hidden');
+  document.getElementById('qa_btn').disabled = true;
+  document.getElementById('qa_result').textContent = '';
+}
+
+/* ---------- fill TX ID and fetch details (View button) ---------- */
+function fillAndFetchTx(tx_id) {
+  // Fill TX ID
+  fillTxIdOnly(tx_id);
+  // Auto-fetch details
+  document.getElementById('qa_fetch_btn').click();
+}
+
+
+/* ---------- confirmation modal logic ---------- */
+let pendingAction = null;
+
+function showConfirmation(tx_id, action) {
+  console.log('showConfirmation called:', tx_id, action);
+  pendingAction = { tx_id, action };
+  document.getElementById('confirm_tx_id').textContent = tx_id;
+  document.getElementById('confirm_action').textContent = action;
+  
+  // Color code the action
+  const actionEl = document.getElementById('confirm_action');
+  actionEl.className = 'font-bold ' + (
+    action === 'BLOCK' ? 'text-red-600' :
+    action === 'DELAY' ? 'text-yellow-600' : 'text-green-600'
+  );
+  
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+
+function hideConfirmation() {
+  document.getElementById('confirmModal').classList.add('hidden');
+  pendingAction = null;
+  
+  // Restore Apply Action button state
+  const applyBtn = document.getElementById('qa_btn');
+  if (applyBtn) {
+    applyBtn.textContent = 'Apply Action';
+    applyBtn.disabled = false;
+  }
+}
+
+// Setup modal buttons in DOMContentLoaded
+function setupModalButtons() {
+  const cancelBtn = document.getElementById('confirm_cancel');
+  const submitBtn = document.getElementById('confirm_submit');
+  const explainClose = document.getElementById('explainClose');
+  const explainModal = document.getElementById('explainModal');
+  
+  if (cancelBtn) {
+    cancelBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      hideConfirmation();
+    };
+  }
+  
+  if (submitBtn) {
+    submitBtn.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (!pendingAction) {
+        alert('No action pending');
+        return;
+      }
+      
+      const tx_id = pendingAction.tx_id;
+      const action = pendingAction.action;
+      const prevAction = getPrevAction(tx_id) || 'ALLOW';
+      
+      // Show loading state on modal button
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Applying action...';
+      submitBtn.disabled = true;
+      
+      // Apply Action button is already in loading state, no need to change it again
+      
+      hideConfirmation();
+      
+      try {
+        console.log('Submitting action:', tx_id, action);
+        
+        const response = await fetch('/admin/action', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ tx_id, action })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          showToast('error', result.detail || 'Action failed');
+          document.getElementById('qa_result').textContent = 'Error: ' + result.detail;
+          return;
+        }
+        
+        console.log('Action result:', result);
+        // Show success toast and undo option
+        showToast('success', `${action} action applied for TX ${tx_id.substring(0, 8)}...`);
+        const prev = result.updated?.previous_action || result.updated?.prev_action || prevAction;
+        if (prev) {
+          showUndoToast(tx_id, action, prev);
+        }
+        document.getElementById('qa_result').textContent = '✓ Action applied successfully!';
+        
+        // Add to admin logs
+        addAdminLog({
+          tx_id: tx_id,
+          user_id: result.updated?.user_id || 'unknown',
+          action: action,
+          time: new Date().toISOString()
+        });
+        
+        // Refresh transactions list
+        fetchRecent();
+        
+        // Clear form after successful action
+        document.getElementById('qa_txid').value = '';
+        document.getElementById('qa_action').value = 'ALLOW';
+        document.getElementById('qa_details').classList.add('hidden');
+        
+      } catch (e) {
+        console.error('Error:', e);
+        document.getElementById('qa_result').textContent = 'Error: ' + e.message;
+      } finally {
+        // Restore modal button state
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+        
+        // Restore Apply Action button state
+        const applyBtn = document.getElementById('qa_btn');
+        if (applyBtn) {
+          applyBtn.textContent = 'Apply Action';
+          applyBtn.disabled = false;
+        }
+      }
+    };
+  }
+
+  if (explainClose) {
+    explainClose.onclick = (e) => {
+      e.preventDefault();
+      hideExplain();
+    };
+  }
+
+  if (explainModal) {
+    explainModal.onclick = (e) => {
+      if (e.target.id === 'explainModal') hideExplain();
+    };
+  }
+}
+
+/* ---------- setup modal close button ---------- */
+function setupModalCloseBtn() {
+  const modal = document.getElementById('confirmModal');
+  if (modal) {
+    modal.onclick = (e) => {
+      if (e.target.id === 'confirmModal') {
+        hideConfirmation();
+      }
+    };
+  }
+}
 
 /* ---------- websocket live updates ---------- */
 function setupWS() {
@@ -221,6 +1061,7 @@ function setupWS() {
     div.className =
       'p-3 mb-2 bg-gray-50 border rounded flex justify-between items-center';
 
+    const badgeClass = log.action === 'BLOCK' ? 'badge-block' : (log.action === 'DELAY' ? 'badge-delay' : 'badge-allow');
     div.innerHTML = `
       <div>
         <div class="font-mono text-sm text-gray-800">${log.tx_id}</div>
@@ -229,14 +1070,7 @@ function setupWS() {
           • ${new Date(log.time).toLocaleTimeString()}
         </div>
       </div>
-      <span class="
-        px-3 py-1 text-xs rounded-full font-semibold
-        ${log.action === 'BLOCK' ? 'bg-red-100 text-red-700' :
-          log.action === 'DELAY' ? 'bg-yellow-100 text-yellow-700' :
-          'bg-green-100 text-green-700'}
-      ">
-        ${log.action}
-      </span>
+      <span class="px-3 py-1 text-xs rounded-full font-semibold action-badge ${badgeClass}">${log.action}</span>
     `;
 
     el.prepend(div);
@@ -248,6 +1082,9 @@ setupWS();
 
 document.getElementById('adminFilter')
   ?.addEventListener('change', redrawAdminRecent);
+
+document.getElementById('timeFilter')
+  ?.addEventListener('change', fetchRecent);
 </script>
 </body>
 </html>

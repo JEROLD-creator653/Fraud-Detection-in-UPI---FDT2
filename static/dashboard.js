@@ -1,11 +1,114 @@
 // UPI Fraud Detection Dashboard - Main JavaScript
 // Modularized for better maintainability
 
+console.log('=== Dashboard.js loading ===');
+
 // Global state
 let currentTimeRange = '24h';
-let txCache = [];
+let txCache = window.txCache || [];
 let chatHistory = [];
+let sortState = window.sortState || { column: 'time', direction: 'desc' };
+let useServerTimeline = false; // prefer server-provided timeline when available
+// Prevent stale server responses from overwriting live UI increments
+let lastServerTotal = null;
+// Track when the time range changes so server should be authoritative
+let _rangeChanged = false;
+// Simple debounce utility for bursty websocket updates (minimal delay for instant feedback)
+const _debounceTimers = {};
+function debounce(key, fn, delay = 50) {
+  clearTimeout(_debounceTimers[key]);
+  _debounceTimers[key] = setTimeout(fn, delay);
+}
 
+// Chart objects - will be initialized on DOMContentLoaded
+let timelineChart, riskPie, fraudBar;
+
+// Sort table function - MUST be defined immediately for onclick handlers
+console.log('Defining window.sortTable...');
+window.sortTable = function(column) {
+  console.log('✓✓✓ REAL sortTable called with column:', column);
+  console.log('Current sortState:', sortState);
+  console.log('txCache length:', txCache.length);
+  
+  // Toggle direction if same column, otherwise default to descending
+  if (sortState.column === column) {
+    sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortState.column = column;
+    sortState.direction = 'desc';
+  }
+
+  console.log('New sortState:', sortState);
+
+  // Update arrow indicators - remove all active classes first
+  document.querySelectorAll('.sort-arrow').forEach(arrow => {
+    arrow.classList.remove('active-asc', 'active-desc');
+  });
+  
+  // Add appropriate classes based on sort direction
+  const arrows = document.querySelectorAll(`.sort-arrow[data-column="${column}"]`);
+  arrows.forEach(arrow => {
+    if (sortState.direction === 'asc') {
+      arrow.classList.add('active-asc');
+    } else {
+      arrow.classList.add('active-desc');
+    }
+  });
+  
+  console.log('Arrows updated for column:', column, 'direction:', sortState.direction);
+
+  // Sort the cache
+  txCache.sort((a, b) => {
+    let aVal, bVal;
+
+    switch (column) {
+      case 'time':
+        aVal = new Date(a.ts || a.created_at || a.timestamp || 0).getTime();
+        bVal = new Date(b.ts || b.created_at || b.timestamp || 0).getTime();
+        break;
+      case 'user':
+        aVal = (a.user_id || a.user || '').toLowerCase();
+        bVal = (b.user_id || b.user || '').toLowerCase();
+        break;
+      case 'amount':
+        aVal = Number(a.amount || 0);
+        bVal = Number(b.amount || 0);
+        break;
+      case 'type':
+        aVal = (a.action || a.tx_type || a.type || '').toLowerCase();
+        bVal = (b.action || b.tx_type || b.type || '').toLowerCase();
+        break;
+      case 'channel':
+        aVal = (a.channel || '').toLowerCase();
+        bVal = (b.channel || '').toLowerCase();
+        break;
+      case 'risk':
+        aVal = Number(a.risk_score ?? a.risk ?? 0);
+        bVal = Number(b.risk_score ?? b.risk ?? 0);
+        break;
+      case 'confidence':
+        const confOrder = { 'high': 1, 'medium': 2, 'low': 3 };
+        aVal = confOrder[(a.confidence_level || 'HIGH').toLowerCase()] || 1;
+        bVal = confOrder[(b.confidence_level || 'HIGH').toLowerCase()] || 1;
+        break;
+      default:
+        return 0;
+    }
+
+    if (aVal < bVal) return sortState.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortState.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  console.log('Table sorted, calling renderTransactionTable');
+  // Re-render the table
+  renderTransactionTable();
+  console.log('renderTransactionTable completed');
+};
+
+console.log('✓ sortTable function defined on window');
+
+// Utility functions
 // Utility functions
 function fmtTS(ts) {
   try { return new Date(ts).toLocaleString(); } catch(e){ return ts; }
@@ -18,6 +121,24 @@ function safeNumber(el) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// User-facing simplified reason (no model details, no scores)
+function getSimplifiedReason(tx) {
+  const action = String(tx.action || '').toUpperCase();
+  if (action === 'BLOCK') return 'Transaction blocked for security reasons.';
+  if (action === 'DELAY') return 'Transaction delayed due to unusual activity.';
+  return 'Transaction processed successfully.';
+}
+
+function confidencePill(level) {
+  const lvl = (level || 'HIGH').toUpperCase();
+  const style = lvl === 'LOW'
+    ? 'bg-red-50 text-red-700 border border-red-100'
+    : lvl === 'MEDIUM'
+      ? 'bg-yellow-50 text-yellow-700 border border-yellow-100'
+      : 'bg-green-50 text-green-700 border border-green-100';
+  return `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${style}">${lvl}</span>`;
+}
+
 function getRangeLabel(range) {
   const labels = {
     '1h': 'Last 1 hour',
@@ -28,87 +149,211 @@ function getRangeLabel(range) {
   return labels[range] || 'Custom range';
 }
 
-// Chart initialization
-const timelineChart = new Chart(document.getElementById('timelineChart').getContext('2d'), {
-  type: 'line',
-  data: {
-    labels: [],
-    datasets: [
-      { label: 'Blocked', data: [], borderColor: '#EF4444', tension: 0.3, fill: false },
-      { label: 'Delayed', data: [], borderColor: '#F59E0B', tension: 0.3, fill: false },
-      { label: 'Allowed', data: [], borderColor: '#10B981', tension: 0.3, fill: false }
-    ]
-  },
-  options: { responsive: true, maintainAspectRatio: true, scales: { x: {}, y: { beginAtZero: true }}}
-});
+function formatTimelineLabel(raw, range) {
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  if (range === '1h' || range === '24h') {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return d.toLocaleDateString([], { month: 'short', day: '2-digit' });
+}
 
-const riskPie = new Chart(document.getElementById('riskPie').getContext('2d'), {
-  type: 'pie',
-  data: {
-    labels: ['Low', 'Medium', 'High', 'Critical'],
-    datasets: [{
-      data: [70, 20, 7, 3],
-      backgroundColor: ['#6BCF7F', '#FFD93D', '#FF9F40', '#FF6B6B']
-    }]
-  },
-  options: { responsive: true, maintainAspectRatio: true }
-});
+// Initialize charts after DOM is ready
+function initCharts() {
+  timelineChart = new Chart(document.getElementById('timelineChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Blocked', data: [], borderColor: '#EF4444', tension: 0.3, fill: false },
+        { label: 'Delayed', data: [], borderColor: '#F59E0B', tension: 0.3, fill: false },
+        { label: 'Allowed', data: [], borderColor: '#10B981', tension: 0.3, fill: false }
+      ]
+    },
+    options: { 
+      responsive: true, 
+      maintainAspectRatio: true, 
+      scales: { x: {}, y: { beginAtZero: true }},
+      animation: {
+        duration: 0 // Disable animations
+      }
+    }
+  });
 
-const fraudBar = new Chart(document.getElementById('fraudBar').getContext('2d'), {
-  type: 'bar',
-  data: {
-    labels: ['Unusual Amount', 'Suspicious Recipient', 'Rapid Transactions', 'New Device', 'Location Mismatch'],
-    datasets: [{
-      label: 'Count',
-      data: [35, 28, 22, 10, 5],
-      backgroundColor: ['#FF6B6B', '#FF9F40', '#FFD93D', '#6BCF7F', '#4ECDC4']
-    }]
-  },
-  options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true }
-});
+  riskPie = new Chart(document.getElementById('riskPie').getContext('2d'), {
+    type: 'pie',
+    data: {
+      labels: ['Low', 'Medium', 'High', 'Critical'],
+      datasets: [{
+        // Data populated live from txCache to keep the chart data-driven
+        data: [0, 0, 0, 0],
+        backgroundColor: ['#6BCF7F', '#FFD93D', '#FF9F40', '#FF6B6B']
+      }]
+    },
+    options: { 
+      responsive: true, 
+      maintainAspectRatio: true,
+      animation: {
+        duration: 0 // Disable animations
+      }
+    }
+  });
+
+  fraudBar = new Chart(document.getElementById('fraudBar').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: ['Amount Anomaly', 'Behavioural Anomaly', 'Device Anomaly', 'Velocity Anomaly', 'Model Consensus', 'Model Disagreement'],
+      datasets: [{
+        label: 'Count',
+        data: [0, 0, 0, 0, 0, 0],
+        backgroundColor: ['#FF6B6B', '#FF9F40', '#FFD93D', '#6BCF7F', '#4ECDC4', '#A78BFA']
+      }]
+    },
+    options: { 
+      indexAxis: 'y', 
+      responsive: true, 
+      maintainAspectRatio: true,
+      animation: {
+        duration: 0 // Disable animations
+      }
+    }
+  });
+}
 
 // Data loading functions
 async function loadDashboardData() {
   try {
-    const res = await fetch(`/dashboard-data?time_range=${currentTimeRange}`);
+    const res = await fetch(`/dashboard-data?time_range=${currentTimeRange}&_=${Date.now()}`);
     if (!res.ok) throw new Error('fetch dashboard failed');
 
     const j = await res.json();
     const s = j.stats || {};
 
-    document.getElementById('totalTx').textContent = Number(s.totalTransactions || 0).toLocaleString();
+    // Use max(current UI, serverTotal) to avoid overwriting live increments with a slightly stale value
+    const serverTotal = Number(s.totalTransactions || 0);
+    lastServerTotal = serverTotal;
+    const totalEl = document.getElementById('totalTx');
+    if (totalEl) {
+      const currentVal = parseInt(String(totalEl.textContent || '0').replace(/[,\s]/g, ''), 10) || 0;
+      if (_rangeChanged) {
+        // When the range changes, trust the server value exactly
+        totalEl.textContent = serverTotal.toLocaleString();
+        _rangeChanged = false;
+      } else {
+        const nextVal = Math.max(currentVal, serverTotal);
+        totalEl.textContent = nextVal.toLocaleString();
+      }
+    }
     document.getElementById('blockedTx').textContent = Number(s.blocked || 0).toLocaleString();
     document.getElementById('delayedTx').textContent = Number(s.delayed || 0).toLocaleString();
     document.getElementById('allowedTx').textContent = Number(s.allowed || 0).toLocaleString();
 
-    const labelEl = document.querySelector('#totalTx')?.nextElementSibling;
-    if (labelEl) {
-      labelEl.textContent = getRangeLabel(currentTimeRange);
+    // Update time range label in the first card (the <p> after #totalTx is the static label)
+    const totalTxCard = document.getElementById('totalTx')?.closest('.card');
+    const timeLabel = totalTxCard?.querySelector('p.text-xs.text-gray-500');
+    if (timeLabel) {
+      timeLabel.textContent = getRangeLabel(currentTimeRange);
     }
   } catch (e) {
     console.error('loadDashboardData error', e);
   }
 }
 
+async function loadPatternAnalytics() {
+  try {
+    const res = await fetch(`/pattern-analytics?time_range=${currentTimeRange}&_=${Date.now()}`);
+    if (!res.ok) {
+      console.warn('Pattern analytics fetch failed, leaving existing chart data intact');
+      return;
+    }
+
+    const data = await res.json();
+    
+    // Update fraud pattern chart with real aggregated data from backend
+    if (fraudBar) {
+      fraudBar.data.datasets[0].data = [
+        data.amount_anomaly || 0,
+        data.behavioural_anomaly || 0,
+        data.device_anomaly || 0,
+        data.velocity_anomaly || 0,
+        data.model_consensus || 0,
+        data.model_disagreement || 0
+      ];
+      fraudBar.update('none');
+    }
+  } catch (e) {
+    console.error('loadPatternAnalytics error, leaving existing chart data intact:', e);
+  }
+}
+
+function getLimitForRange(range) {
+  switch (range) {
+    case '1h':
+      return 50; // finer granularity
+    case '24h':
+      return 300; // enough to populate hourly buckets
+    case '7d':
+      return 1500; // larger window for week view
+    case '30d':
+      return 3000; // month view aggregation
+    default:
+      return 200;
+  }
+}
+
 async function loadRecentTransactions() {
   try {
-    const res = await fetch(`/recent-transactions?limit=10&time_range=${currentTimeRange}`);
+    const limit = getLimitForRange(currentTimeRange);
+    const res = await fetch(`/recent-transactions?limit=${limit}&time_range=${currentTimeRange}&_=${Date.now()}`);
     if (!res.ok) throw new Error('fetch recent failed');
 
     const j = await res.json();
     txCache = Array.isArray(j.transactions) ? j.transactions : [];
 
-    const tbody = document.getElementById('txTbody');
-    tbody.innerHTML = '';
-    txCache.forEach(tx => tbody.appendChild(makeTxRow(tx)));
+    // Sort and render table
+    if (window.sortTable) {
+      window.sortTable(sortState.column);
+    } else {
+      renderTransactionTable();
+    }
 
-    // Clear and update all charts with fresh data
+    // Immediately update charts from fresh cache data, including realtime timeline
     updateHighRiskAlerts(txCache);
-    updateFraudPatternAnalysisFromCache();
     updateTimelineFromCache();
     updateRiskDistributionFromCache();
   } catch (e) {
     console.error('loadRecentTransactions error', e);
+  }
+}
+
+// Aggregated analytics for charts
+async function loadDashboardAnalytics() {
+  try {
+    const res = await fetch(`/dashboard-analytics?time_range=${currentTimeRange}&_=${Date.now()}`);
+    if (!res.ok) throw new Error('fetch analytics failed');
+
+    const data = await res.json();
+    const tl = data.timeline || {};
+    const labelsRaw = Array.isArray(tl.labels) ? tl.labels : [];
+    const block = Array.isArray(tl.block) ? tl.block : [];
+    const delay = Array.isArray(tl.delay) ? tl.delay : [];
+    const allow = Array.isArray(tl.allow) ? tl.allow : [];
+
+    const labels = labelsRaw.map(l => formatTimelineLabel(l, currentTimeRange));
+
+    if (timelineChart && labels.length) {
+      useServerTimeline = true;
+      timelineChart.data.labels = labels;
+      timelineChart.data.datasets[0].data = block;
+      timelineChart.data.datasets[1].data = delay;
+      timelineChart.data.datasets[2].data = allow;
+      timelineChart.update('none');
+    }
+  } catch (e) {
+    console.error('loadDashboardAnalytics error, falling back to cache timeline', e);
+    useServerTimeline = false;
+    // Fallback to client-side cache aggregation if server fetch fails
+    updateTimelineFromCache();
   }
 }
 
@@ -120,8 +365,9 @@ function makeTxRow(tx) {
   const user = o.user_id || o.user || '';
   const amount = (o.amount === undefined) ? 0 : Number(o.amount);
   const type = o.action || o.tx_type || o.type || '';
-  const channel = o.channel || '';
-  const risk = Number(o.risk_score ?? o.risk ?? 0).toFixed(2);
+    const channel = o.channel || 'N/A';
+    const risk = Number(o.risk_score ?? o.risk ?? 0).toFixed(2);
+    const confidence = confidencePill(o.confidence_level);
 
   const tr = document.createElement('tr');
   tr.innerHTML = `
@@ -132,63 +378,36 @@ function makeTxRow(tx) {
     <td class="px-3 py-2">${type}</td>
     <td class="px-3 py-2">${channel}</td>
     <td class="px-3 py-2 font-medium text-gray-700">${risk}</td>
+      <td class="px-3 py-2">${confidence}</td>
   `;
+  // Tooltip with simplified reason only (no model names / scores)
+  tr.title = getSimplifiedReason(o);
   return tr;
 }
 
-// Chart update functions
-function updateFraudPatternAnalysisFromCache() {
-  if (!Array.isArray(txCache) || txCache.length === 0) {
-    // Clear chart if no data
-    fraudBar.data.datasets[0].data = [0, 0, 0, 0, 0];
-    fraudBar.update();
-    return;
-  }
-
-  let unusualAmount = 0;
-  let suspiciousRecipient = 0;
-  let rapidTx = 0;
-  let newDevice = 0;
-  let locationMismatch = 0;
-
-  const userCount = {};
-  const recipientCount = {};
-  const deviceSeen = new Set();
-
-  txCache.forEach(tx => {
-    const amt = Number(tx.amount || 0);
-    if (amt > 5000) unusualAmount++;
-
-    const recipient = tx.recipient_vpa;
-    if (recipient) {
-      recipientCount[recipient] = (recipientCount[recipient] || 0) + 1;
-      if (recipientCount[recipient] === 3) suspiciousRecipient++;
-    }
-
-    const user = tx.user_id;
-    if (user) {
-      userCount[user] = (userCount[user] || 0) + 1;
-      if (userCount[user] === 5) rapidTx++;
-    }
-
-    const device = tx.device_id;
-    if (device && !deviceSeen.has(device)) {
-      deviceSeen.add(device);
-      newDevice++;
-    }
-
-    if (tx.location_mismatch === true) locationMismatch++;
-  });
-
-  fraudBar.data.datasets[0].data = [unusualAmount, suspiciousRecipient, rapidTx, newDevice, locationMismatch];
-  fraudBar.update();
+// Render transaction table from cache
+function renderTransactionTable() {
+  const tbody = document.getElementById('txTbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  
+  // Apply filter if set
+  const filter = document.getElementById('txFilter')?.value || 'ALL';
+  const filteredTx = filter === 'ALL' 
+    ? txCache 
+    : txCache.filter(tx => (tx.action || tx.tx_type || tx.type || '') === filter);
+  
+  filteredTx.forEach(tx => tbody.appendChild(makeTxRow(tx)));
 }
 
+// Chart update functions
 function updateRiskDistributionFromCache() {
-  if (!Array.isArray(txCache) || txCache.length === 0) {
-    // Clear chart if no data
-    riskPie.data.datasets[0].data = [0, 0, 0, 0];
-    riskPie.update('none');
+  if (!riskPie || !Array.isArray(txCache) || txCache.length === 0) {
+    // Clear chart if no data or chart doesn't exist
+    if (riskPie) {
+      riskPie.data.datasets[0].data = [0, 0, 0, 0];
+      riskPie.update('none');
+    }
     return;
   }
 
@@ -208,7 +427,7 @@ function updateRiskDistributionFromCache() {
 }
 
 function updateTimelineFromCache() {
-  if (!Array.isArray(txCache)) return;
+  if (!timelineChart || !Array.isArray(txCache)) return;
 
   const buckets = {};
   let labels = [];
@@ -296,12 +515,13 @@ function updateTimelineFromCache() {
     labels = Object.keys(buckets).sort().slice(-10).reverse();
   }
 
-  timelineChart.data.labels = labels;
-  timelineChart.data.datasets[0].data = labels.map(l => buckets[l]?.BLOCK || 0);
-  timelineChart.data.datasets[1].data = labels.map(l => buckets[l]?.DELAY || 0);
-  timelineChart.data.datasets[2].data = labels.map(l => buckets[l]?.ALLOW || 0);
-
-  timelineChart.update();
+  if (timelineChart) {
+    timelineChart.data.labels = labels;
+    timelineChart.data.datasets[0].data = labels.map(l => buckets[l]?.BLOCK || 0);
+    timelineChart.data.datasets[1].data = labels.map(l => buckets[l]?.DELAY || 0);
+    timelineChart.data.datasets[2].data = labels.map(l => buckets[l]?.ALLOW || 0);
+    timelineChart.update('none');
+  }
 }
 
 function updateHighRiskAlerts(transactions) {
@@ -316,12 +536,17 @@ function updateHighRiskAlerts(transactions) {
     .forEach(tx => {
       const div = document.createElement('div');
       div.className = 'p-2 border rounded bg-red-50 text-red-800';
+      const reason = getSimplifiedReason(tx);
+      const confidence = String(tx.confidence_level || '').toUpperCase();
+      const confidenceTag = confidencePill(confidence);
+      const lowWarn = confidence === 'LOW' ? '<span class="text-xs text-red-700 font-semibold ml-1">⚠ low confidence</span>' : '';
       div.innerHTML = `
         <div class="font-semibold">${tx.tx_id}</div>
         <div>User: ${tx.user_id}</div>
         <div>Amount: ₹${Number(tx.amount).toFixed(2)}</div>
-        <div>Risk Score: <b>${Number(tx.risk_score).toFixed(2)}</b></div>
         <div>Action: ${tx.action}</div>
+        <div class="flex items-center gap-2">Confidence: ${confidenceTag} ${lowWarn}</div>
+        <div>Reason: ${reason}</div>
       `;
       container.appendChild(div);
     });
@@ -350,19 +575,35 @@ function setupWebSocket() {
         txCache.unshift(txObj);
         if (txCache.length > 200) txCache.pop();
 
-        const tbody = document.getElementById('txTbody');
-        tbody.insertBefore(makeTxRow(txObj), tbody.firstChild);
+        renderTransactionTable();
 
+        // Immediate chart updates with no debounce for instant visual feedback
         updateHighRiskAlerts(txCache);
-        updateFraudPatternAnalysisFromCache();
+        // Always push realtime updates to the timeline from cache
         updateTimelineFromCache();
         updateRiskDistributionFromCache();
-        loadDashboardData();
+
+        // Immediately reflect the new transaction in the total card
+        try {
+          const totalEl = document.getElementById('totalTx');
+          if (totalEl) {
+            const currentVal = parseInt(String(totalEl.textContent || '0').replace(/[,\s]/g, ''), 10) || 0;
+            const newVal = currentVal + 1;
+            totalEl.textContent = newVal.toLocaleString();
+          }
+        } catch (e) {
+          console.warn('Inline totalTx update failed, will refresh via API', e);
+        }
+
+        // Minimal debounce for backend refreshes (charts already updated from cache)
+        debounce('dashboardData', () => loadDashboardData(), 100);
+        debounce('patternAnalytics', () => loadPatternAnalytics(), 150);
       }
 
       if (msgType === 'tx_updated') {
         loadRecentTransactions();
-        loadDashboardData();
+        debounce('dashboardData', () => loadDashboardData(), 100);
+        debounce('patternAnalytics', () => loadPatternAnalytics(), 150);
       }
     } catch (e) {
       console.error('WebSocket error:', e);
@@ -477,6 +718,9 @@ async function sendChatMessage() {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize charts first
+  initCharts();
+  
   // Initialize dark mode from localStorage
   const darkMode = localStorage.getItem('darkMode') === 'true';
   if (darkMode) {
@@ -487,19 +731,29 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize
   loadDashboardData();
   loadRecentTransactions();
+  loadDashboardAnalytics(); // server aggregated timeline for full range coverage
+  loadPatternAnalytics();
   setupWebSocket();
   setInterval(loadDashboardData, 30000);
+  setInterval(loadPatternAnalytics, 30000); // Refresh patterns every 30s
 
-  // Time range selector
-  document.getElementById('timeRange').addEventListener('change', (e) => {
+  // Time range selector - optimized for instant updates
+  document.getElementById('timeRange').addEventListener('change', async (e) => {
     currentTimeRange = e.target.value;
-    loadDashboardData();
-    loadRecentTransactions();
+    _rangeChanged = true;
+    
+    // Fetch all data in parallel for fastest response
+    await Promise.all([
+      loadDashboardData(),
+      loadRecentTransactions(),
+      loadDashboardAnalytics(),
+      loadPatternAnalytics()
+    ]);
   });
 
   // Export CSV
   document.getElementById('exportBtn').addEventListener('click', () => {
-    const rows = [['Time', 'TX ID', 'User', 'Amount', 'Type', 'Channel', 'Risk Score']];
+    const rows = [['Time', 'TX ID', 'User', 'Amount', 'Type', 'Channel', 'Risk Score', 'Confidence']];
     document.querySelectorAll('#txTbody tr').forEach(tr => {
       const cols = [...tr.querySelectorAll('td')].map(td => td.textContent.trim());
       rows.push(cols);
@@ -516,13 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Transaction filter
   document.getElementById('txFilter').addEventListener('change', () => {
-    const filter = document.getElementById('txFilter').value;
-    document.querySelectorAll('#txTbody tr').forEach(row => {
-      const typeCell = row.children[4];
-      if (!typeCell) return;
-      const type = typeCell.textContent.trim().toUpperCase();
-      row.style.display = (filter === 'ALL' || type === filter) ? '' : 'none';
-    });
+    renderTransactionTable();
   });
 
   // Risk Score Modal

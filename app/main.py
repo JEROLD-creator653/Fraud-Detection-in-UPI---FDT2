@@ -36,8 +36,28 @@ def parse_time_range(time_range: str):
     else:
         return None
 
+
+def extract_confidence_level(row: Dict[str, Any], default: str = "HIGH") -> str:
+    """Safely derive confidence_level from row or embedded explainability."""
+    if not row:
+        return default
+    if row.get("confidence_level"):
+        return row.get("confidence_level")
+    expl = row.get("explainability") or {}
+    if isinstance(expl, dict):
+        return expl.get("confidence_level", default)
+    return default
+
+
+def attach_confidence_level(payload: Any, default: str = "HIGH") -> Any:
+    """Ensure confidence_level key is present for outbound payloads."""
+    if isinstance(payload, dict):
+        payload.setdefault("confidence_level", extract_confidence_level(payload, default))
+    return payload
+
 # --- config loader with defaults ---
-CFG_PATH = os.path.join(os.getcwd(), "config.yaml")
+# Prefer workspace config/config.yaml; fallback to env; final fallback to defaults.
+CFG_PATH = os.path.join(os.getcwd(), "config", "config.yaml")
 DEFAULT_CFG = {
     "db_url": "postgresql://fdt:fdtpass@host.docker.internal:5432/fdt_db",
     "thresholds": {"delay": 0.03, "block": 0.06},
@@ -62,7 +82,8 @@ if os.path.exists(CFG_PATH):
     except Exception as e:
         print("Failed to load config.yaml:", e)
 
-DB_URL = cfg.get("db_url")
+env_db_url = os.getenv("DB_URL")
+DB_URL = env_db_url or cfg.get("db_url")
 THRESHOLDS = cfg.get("thresholds", {"delay": 0.0, "block": 0.07})
 SECRET_KEY = cfg.get("secret_key", DEFAULT_CFG["secret_key"])
 ADMIN_USERNAME = cfg.get("admin_username", DEFAULT_CFG["admin_username"])
@@ -117,8 +138,12 @@ def db_get_transaction(tx_id):
     conn = get_conn()
     try:
         cur = conn.cursor()
+        has_expl = _ensure_explainability_column(conn)
+        cols = "tx_id, user_id, device_id, ts, amount, recipient_vpa, tx_type, channel, db_status, action, risk_score, created_at"
+        if has_expl:
+            cols += ", explainability"
         cur.execute(
-            "SELECT tx_id, user_id, device_id, ts, amount, recipient_vpa, tx_type, channel, db_status, action, risk_score, created_at FROM public.transactions WHERE tx_id=%s;",
+            f"SELECT {cols} FROM public.transactions WHERE tx_id=%s;",
             (tx_id,)
         )
         row = cur.fetchone()
@@ -127,10 +152,79 @@ def db_get_transaction(tx_id):
     finally:
         conn.close()
 
+_HAS_EXPL_COL = None
+
+
+def _ensure_explainability_column(conn) -> bool:
+    global _HAS_EXPL_COL
+    if _HAS_EXPL_COL is not None:
+        return _HAS_EXPL_COL
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'transactions'
+              AND column_name = 'explainability'
+            LIMIT 1;
+            """
+        )
+        _HAS_EXPL_COL = cur.fetchone() is not None
+        cur.close()
+    except Exception:
+        _HAS_EXPL_COL = False
+    return _HAS_EXPL_COL
+
+
 def db_insert_transaction(tx: Dict[str, Any]):
     conn = get_conn()
     try:
         cur = conn.cursor()
+        has_expl = _ensure_explainability_column(conn)
+
+        explainability_payload = psycopg2.extras.Json(tx.get("explainability")) if has_expl else None
+
+        if has_expl:
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO public.transactions
+                    (tx_id, user_id, device_id, ts, amount, recipient_vpa, tx_type, channel, risk_score, action, db_status, explainability, created_at)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, now())
+                    ON CONFLICT (tx_id) DO UPDATE
+                      SET risk_score = EXCLUDED.risk_score,
+                          action = EXCLUDED.action,
+                          db_status = EXCLUDED.db_status,
+                          explainability = EXCLUDED.explainability,
+                          created_at = now()
+                    RETURNING tx_id, risk_score, action, created_at, explainability;
+                    """,
+                    (
+                        tx.get("tx_id"),
+                        tx.get("user_id"),
+                        tx.get("device_id"),
+                        tx.get("ts"),
+                        tx.get("amount"),
+                        tx.get("recipient_vpa"),
+                        tx.get("tx_type"),
+                        tx.get("channel"),
+                        tx.get("risk_score"),
+                        tx.get("action"),
+                        tx.get("db_status", "inserted"),
+                        explainability_payload,
+                    ),
+                )
+                inserted = cur.fetchone()
+                conn.commit()
+                cur.close()
+                return inserted
+            except Exception as e:
+                conn.rollback()
+                print("Explainability column write failed, falling back without explainability:", e)
+
+        # Fallback without explainability
         cur.execute(
             """
             INSERT INTO public.transactions
@@ -168,8 +262,12 @@ def db_recent_transactions(limit=50, range_clause=None):
     conn = get_conn()
     try:
         cur = conn.cursor()
-        q = """
-            SELECT tx_id, user_id, amount, recipient_vpa, tx_type, channel, db_status, action, risk_score, created_at
+        has_expl = _ensure_explainability_column(conn)
+        cols = "tx_id, user_id, amount, recipient_vpa, tx_type, channel, db_status, action, risk_score, created_at"
+        if has_expl:
+            cols += ", explainability"
+        q = f"""
+            SELECT {cols}
             FROM public.transactions
             ORDER BY created_at DESC
             LIMIT %s
@@ -211,10 +309,147 @@ def db_dashboard_stats(time_range: str):
     finally:
         conn.close()
 
-def db_update_action(tx_id, action, risk_score=None):
+def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
+    """
+    Aggregate fraud pattern statistics from transactions.
+    
+    Args:
+        time_range: Time window (1h, 24h, 7d, 30d)
+        limit: Maximum number of transactions to analyze (fallback if no time_range)
+    
+    Returns:
+        Dict with pattern counts aggregated across transactions
+    """
     conn = get_conn()
     try:
         cur = conn.cursor()
+        
+        # Check if explainability column exists
+        has_expl = _ensure_explainability_column(conn)
+        if not has_expl:
+            return {
+                "amount_anomaly": 0,
+                "behavioural_anomaly": 0,
+                "device_anomaly": 0,
+                "velocity_anomaly": 0,
+                "model_consensus": 0,
+                "model_disagreement": 0,
+                "transactions_analyzed": 0,
+            }
+        
+        # Build query based on time_range or limit
+        since = parse_time_range(time_range)
+        if since:
+            cur.execute("""
+                SELECT explainability
+                FROM public.transactions
+                WHERE created_at >= %s
+                  AND explainability IS NOT NULL
+                ORDER BY created_at DESC
+            """, (since,))
+        else:
+            # Fallback: use limit
+            max_limit = limit if limit else 1000
+            cur.execute("""
+                SELECT explainability
+                FROM public.transactions
+                WHERE explainability IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, (max_limit,))
+        
+        rows = cur.fetchall()
+        
+        # Initialize counters
+        totals = {
+            "amount_anomaly": 0,
+            "behavioural_anomaly": 0,
+            "device_anomaly": 0,
+            "velocity_anomaly": 0,
+            "model_consensus": 0,
+            "model_disagreement": 0,
+            "transactions_analyzed": 0,
+        }
+        
+        # Aggregate pattern counts
+        # One transaction can contribute to multiple patterns
+        for row in rows:
+            totals["transactions_analyzed"] += 1
+            
+            expl = row.get("explainability")
+            if not expl or not isinstance(expl, dict):
+                continue
+            
+            # Check if pre-computed patterns exist
+            patterns = expl.get("patterns")
+            if patterns and isinstance(patterns, dict):
+                counts = patterns.get("pattern_counts", {})
+                for key in ["amount_anomaly", "behavioural_anomaly", "device_anomaly", 
+                           "velocity_anomaly", "model_consensus", "model_disagreement"]:
+                    totals[key] += counts.get(key, 0)
+            else:
+                # Fallback: compute patterns from features on-the-fly
+                try:
+                    from .pattern_mapper import PatternMapper
+                    features = expl.get("features", {})
+                    model_scores = expl.get("model_scores", {})
+                    
+                    if features and model_scores:
+                        pattern_results = PatternMapper.analyze_all_patterns(features, model_scores)
+                        for key, result in pattern_results.items():
+                            if result.detected:
+                                totals[key] += 1
+                except Exception as e:
+                    print(f"Pattern computation error: {e}")
+                    continue
+        
+        cur.close()
+        return totals
+    finally:
+        conn.close()
+
+def db_update_action(tx_id, action, risk_score=None, explainability=None):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        has_expl = _ensure_explainability_column(conn)
+
+        expl_payload = psycopg2.extras.Json(explainability) if (has_expl and explainability is not None) else None
+
+        if has_expl:
+            try:
+                # Only update explainability when explicitly provided; otherwise preserve existing JSON.
+                if explainability is not None:
+                    if risk_score is None:
+                        cur.execute(
+                            "UPDATE public.transactions SET action=%s, explainability=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
+                            (action, expl_payload, tx_id),
+                        )
+                    else:
+                        cur.execute(
+                            "UPDATE public.transactions SET action=%s, risk_score=%s, explainability=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
+                            (action, risk_score, expl_payload, tx_id),
+                        )
+                else:
+                    if risk_score is None:
+                        cur.execute(
+                            "UPDATE public.transactions SET action=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
+                            (action, tx_id),
+                        )
+                    else:
+                        cur.execute(
+                            "UPDATE public.transactions SET action=%s, risk_score=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
+                            (action, risk_score, tx_id),
+                        )
+                res = cur.fetchone()
+                conn.commit()
+                cur.close()
+                return res
+            except Exception as e:
+                conn.rollback()
+                print("Explainability column update failed, falling back without explainability:", e)
+
+        # Fallback without explainability
         if risk_score is None:
             cur.execute(
                 "UPDATE public.transactions SET action=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, created_at;",
@@ -229,6 +464,118 @@ def db_update_action(tx_id, action, risk_score=None):
         conn.commit()
         cur.close()
         return res
+    finally:
+        conn.close()
+
+# --- analytics helpers ---
+def db_dashboard_analytics(time_range: str):
+    since = parse_time_range(time_range)
+    bucket_unit = 'hour'
+    bucket_limit = 24
+    if time_range == '1h':
+        bucket_unit = 'minute'
+        bucket_limit = 60
+    elif time_range == '7d':
+        bucket_unit = 'day'
+        bucket_limit = 7
+    elif time_range == '30d':
+        bucket_unit = 'day'
+        bucket_limit = 30
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+
+        # Risk distribution
+        if since:
+            cur.execute(
+                """
+                SELECT
+                  SUM(CASE WHEN risk_score < 0.3 THEN 1 ELSE 0 END) AS low,
+                  SUM(CASE WHEN risk_score >= 0.3 AND risk_score < 0.6 THEN 1 ELSE 0 END) AS medium,
+                  SUM(CASE WHEN risk_score >= 0.6 AND risk_score < 0.8 THEN 1 ELSE 0 END) AS high,
+                  SUM(CASE WHEN risk_score >= 0.8 THEN 1 ELSE 0 END) AS critical
+                FROM public.transactions
+                WHERE created_at >= %s;
+                """,
+                (since,)
+            )
+        else:
+            cur.execute(
+                """
+                SELECT
+                  SUM(CASE WHEN risk_score < 0.3 THEN 1 ELSE 0 END) AS low,
+                  SUM(CASE WHEN risk_score >= 0.3 AND risk_score < 0.6 THEN 1 ELSE 0 END) AS medium,
+                  SUM(CASE WHEN risk_score >= 0.6 AND risk_score < 0.8 THEN 1 ELSE 0 END) AS high,
+                  SUM(CASE WHEN risk_score >= 0.8 THEN 1 ELSE 0 END) AS critical
+                FROM public.transactions;
+                """
+            )
+        risk_row = cur.fetchone() or {"low": 0, "medium": 0, "high": 0, "critical": 0}
+
+        # Timeline buckets
+        dt_expr = f"date_trunc('{bucket_unit}', created_at)"
+        if since:
+            cur.execute(
+                f"""
+                SELECT {dt_expr} AS bucket,
+                  SUM(CASE WHEN action = 'BLOCK' THEN 1 ELSE 0 END) AS block,
+                  SUM(CASE WHEN action = 'DELAY' THEN 1 ELSE 0 END) AS delay,
+                  SUM(CASE WHEN action = 'ALLOW' THEN 1 ELSE 0 END) AS allow
+                FROM public.transactions
+                WHERE created_at >= %s
+                GROUP BY bucket
+                ORDER BY bucket DESC
+                LIMIT %s;
+                """,
+                (since, bucket_limit)
+            )
+        else:
+            cur.execute(
+                f"""
+                SELECT {dt_expr} AS bucket,
+                  SUM(CASE WHEN action = 'BLOCK' THEN 1 ELSE 0 END) AS block,
+                  SUM(CASE WHEN action = 'DELAY' THEN 1 ELSE 0 END) AS delay,
+                  SUM(CASE WHEN action = 'ALLOW' THEN 1 ELSE 0 END) AS allow
+                FROM public.transactions
+                GROUP BY bucket
+                ORDER BY bucket DESC
+                LIMIT %s;
+                """,
+                (bucket_limit,)
+            )
+        timeline_rows = cur.fetchall() or []
+
+        # Reverse to chronological order
+        timeline_rows = list(reversed(timeline_rows))
+
+        # Prepare response
+        labels = []
+        blocks = []
+        delays = []
+        allows = []
+        for r in timeline_rows:
+            b = r["bucket"]
+            # Convert to ISO string for client-side formatting
+            labels.append(b.isoformat())
+            blocks.append(int(r["block"]))
+            delays.append(int(r["delay"]))
+            allows.append(int(r["allow"]))
+
+        return {
+            "risk": {
+                "low": int(risk_row["low"] or 0),
+                "medium": int(risk_row["medium"] or 0),
+                "high": int(risk_row["high"] or 0),
+                "critical": int(risk_row["critical"] or 0),
+            },
+            "timeline": {
+                "labels": labels,
+                "block": blocks,
+                "delay": delays,
+                "allow": allows,
+            }
+        }
     finally:
         conn.close()
 
@@ -265,6 +612,27 @@ async def dashboard_data(time_range: str = "24h"):
         }
     }
 
+@app.get("/dashboard-analytics")
+async def dashboard_analytics(time_range: str = "24h"):
+    """Aggregated analytics for charts to align with card stats."""
+    data = await run_in_threadpool(db_dashboard_analytics, time_range)
+    return data
+
+@app.get("/pattern-analytics")
+async def pattern_analytics(time_range: str = "24h", limit: int = None):
+    """
+    Get aggregated fraud pattern counts for the given time range.
+    
+    Args:
+        time_range: Time window (1h, 24h, 7d, 30d)
+        limit: Optional max transactions to analyze (used as fallback)
+    
+    Returns:
+        JSON with pattern counts and metadata
+    """
+    stats = await run_in_threadpool(db_aggregate_fraud_patterns, time_range, limit)
+    return stats
+
 @app.get("/recent-transactions")
 async def recent_transactions(limit: int = 10, time_range: str = "24h"):
     since = parse_time_range(time_range)
@@ -287,6 +655,9 @@ async def recent_transactions(limit: int = 10, time_range: str = "24h"):
             """, (limit,))
         rows = cur.fetchall()
         conn.close()
+        # Enrich confidence_level from explainability if missing
+        for r in rows:
+            r["confidence_level"] = extract_confidence_level(r, "HIGH")
         return rows
 
     return {"transactions": await run_in_threadpool(query)}
@@ -297,16 +668,25 @@ async def new_transaction(request: Request):
     tx = dict(body)
 
     # Enhanced scoring with ensemble models
+    scoring_details = None
     risk_score = None
+    confidence_level = "HIGH"
+    disagreement = 0.0
+    final_risk_score = None
     try:
         from . import scoring
         try:
-            risk_score = scoring.score_transaction(tx)
+            scoring_details = scoring.score_transaction(tx, return_details=True)
+            risk_score = scoring_details.get("risk_score")
+            confidence_level = scoring_details.get("confidence_level", confidence_level)
+            disagreement = scoring_details.get("disagreement", disagreement)
+            final_risk_score = scoring_details.get("final_risk_score")
         except Exception as e:
             print("Ensemble scoring failed, trying legacy:", e)
             try:
                 features = scoring.extract_features(tx)
-                risk_score = scoring.score_features(features)
+                legacy_score = scoring.score_features(features)
+                risk_score = legacy_score
             except Exception as e2:
                 print("Legacy scoring also failed:", e2)
                 risk_score = None
@@ -318,6 +698,43 @@ async def new_transaction(request: Request):
         risk_score = float(tx.get("risk_score", 0.0))
 
     tx["risk_score"] = float(risk_score)
+    tx["confidence_level"] = confidence_level
+
+    # Attach explainability data so it is persisted/auditable when possible
+    if scoring_details:
+        # Generate pattern analysis using the mapper
+        pattern_summary = None
+        pattern_reasons: List[str] = []
+        try:
+            from .pattern_mapper import PatternMapper
+            pattern_summary = PatternMapper.get_pattern_summary(
+                scoring_details.get("features", {}),
+                scoring_details.get("model_scores", {})
+            )
+            # Align explainability reasons with fraud pattern categories so UI narratives stay consistent
+            for p in pattern_summary.get("detected_patterns", []):
+                name = p.get("name") or "Pattern"
+                expl = p.get("explanation") or "Detected"
+                pattern_reasons.append(f"{name}: {expl}")
+        except Exception as e:
+            print(f"Pattern mapping error: {e}")
+        
+        # Merge base reasons with pattern-driven reasons, preserving order and uniqueness
+        merged_reasons: List[str] = []
+        for reason in list(scoring_details.get("reasons", [])) + pattern_reasons:
+            if reason and reason not in merged_reasons:
+                merged_reasons.append(reason)
+
+        tx["explainability"] = {
+            "reasons": merged_reasons,
+            "pattern_reasons": pattern_reasons,
+            "model_scores": scoring_details.get("model_scores", {}),
+            "features": scoring_details.get("features", {}),
+            "patterns": pattern_summary,
+            "confidence_level": confidence_level,
+            "disagreement": disagreement,
+            "final_risk_score": final_risk_score if final_risk_score is not None else risk_score,
+        }
 
     if "action" not in tx or not tx.get("action"):
         if tx["risk_score"] >= THRESHOLDS["block"]:
@@ -328,7 +745,10 @@ async def new_transaction(request: Request):
             tx["action"] = "ALLOW"
 
     inserted = await run_in_threadpool(db_insert_transaction, tx)
+    if isinstance(inserted, dict):
+        inserted["confidence_level"] = confidence_level
     full_row = await run_in_threadpool(db_get_transaction, inserted["tx_id"])
+    full_row = attach_confidence_level(full_row, confidence_level)
 
     # broadcast to websockets
     asyncio.create_task(ws_manager.broadcast({"type": "tx_inserted", "data": full_row}))
@@ -374,6 +794,7 @@ async def admin_action(request: Request):
         return JSONResponse({"detail": "tx not found"}, status_code=404)
 
     full = await run_in_threadpool(db_get_transaction, tx_id)
+    full = attach_confidence_level(full, "HIGH")
     asyncio.create_task(ws_manager.broadcast({"type": "tx_updated", "data": full}))
     return {"status": "ok", "updated": full}
 
