@@ -6,7 +6,6 @@ const Dashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     loadDashboard();
@@ -18,8 +17,7 @@ const Dashboard = ({ user, onLogout }) => {
       const data = await getUserDashboard();
       setDashboardData(data);
     } catch (err) {
-      setError('Failed to load dashboard');
-      console.error(err);
+      console.error('Failed to load dashboard:', err);
     } finally {
       setLoading(false);
     }
