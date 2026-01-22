@@ -7,111 +7,413 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/static/dashboard.css">
   <style>
-    /* Dark-mode adjustments for admin containers */
-    body.dark-mode .bg-white { background-color: #1f2937 !important; color: #e5e7eb; }
-    body.dark-mode .text-gray-600 { color: #d1d5db !important; }
-    body.dark-mode .border { border-color: #374151 !important; }
-    body.dark-mode a { color: #bfdbfe; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     
-    /* Fix hover translucency on transaction rows */
-    body.dark-mode .group:hover { background-color: #2d3748 !important; }
-    body.dark-mode .group { background-color: #1f2937 !important; }
-    
-    /* Fix admin log backgrounds in dark mode */
-    body.dark-mode .bg-gray-50 { background-color: #2d3748 !important; color: #e5e7eb !important; }
-    body.dark-mode .text-gray-600 { color: #d1d5db !important; }
-    body.dark-mode .text-xs.text-gray-500 { color: #9ca3af !important; }    
-    /* Fix form inputs in dark mode - no translucency */
-    body.dark-mode input[type="text"],
-    body.dark-mode input[type="email"],
-    body.dark-mode input[type="password"],
-    body.dark-mode select,
-    body.dark-mode textarea {
-      background-color: #374151 !important;
-      color: #e5e7eb !important;
-      border-color: #4b5563 !important;
-      opacity: 1 !important;
+    * {
+      font-family: 'Inter', sans-serif;
     }
     
-    body.dark-mode input:focus,
-    body.dark-mode select:focus,
-    body.dark-mode textarea:focus {
-      background-color: #4b5563 !important;
-      border-color: #667eea !important;
-      opacity: 1 !important;
+    body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 50%, #dee2e6 100%);
+      min-height: 100vh;
+      transition: background 0.3s ease;
     }
     
-    body.dark-mode input::placeholder {
-      color: #9ca3af;
-      opacity: 1 !important;
+    body.dark-mode {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
     }
     
-    /* Keep Quick Action panel white/visible in BOTH modes */
-    .bg-white {
-      opacity: 1 !important;
+    /* Header Styles */
+    .admin-header {
+      background: white;
+      border-radius: 20px;
+      padding: 28px 32px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      margin-bottom: 24px;
+      transition: all 0.3s ease;
     }
     
-    body.dark-mode .bg-white {
-      background-color: #1f2937 !important;
-      color: #e5e7eb !important;
-      opacity: 1 !important;
+    body.dark-mode .admin-header {
+      background: #1e293b;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     }
     
-    body.dark-mode h3 {
-      color: #e5e7eb !important;
-      opacity: 1 !important;
+    .page-title {
+      font-size: 36px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin: 0;
+      line-height: 1.2;
     }
     
-    body.dark-mode label {
-      color: #e5e7eb !important;
-      opacity: 1 !important;
+    .page-subtitle {
+      color: #6b7280;
+      font-size: 15px;
+      font-weight: 500;
+      margin-top: 6px;
     }
     
-    body.dark-mode button {
-      opacity: 1 !important;
+    body.dark-mode .page-subtitle {
+      color: #94a3b8;
     }
     
-    body.dark-mode .text-xs {
-      opacity: 1 !important;
+    /* Card Styles */
+    .admin-card {
+      background: white;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      transition: all 0.3s ease;
+      border: 1px solid #e5e7eb;
     }
     
-    /* Confirmation Modal styling */
-    #confirmModal {
-      animation: fadeIn 0.2s ease-in;
+    body.dark-mode .admin-card {
+      background: #1e293b;
+      border-color: #334155;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
     }
     
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 16px;
     }
     
-    body.dark-mode #confirmModal .bg-white {
-      background-color: #1f2937 !important;
-      color: #e5e7eb;
+    body.dark-mode .card-title {
+      color: #f1f5f9;
     }
     
-    body.dark-mode #confirmModal .bg-gray-50 {
-      background-color: #374151 !important;
+    /* Form Elements */
+    .form-label-modern {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+      letter-spacing: 0.3px;
     }
     
-    body.dark-mode #confirmModal .text-gray-600,
-    body.dark-mode #confirmModal .text-gray-800 {
-      color: #e5e7eb !important;
+    body.dark-mode .form-label-modern {
+      color: #cbd5e1;
     }
     
-    /* Toast notifications styling */
+    .input-modern {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      background: white;
+      color: #1f2937;
+    }
+    
+    .input-modern:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+    
+    body.dark-mode .input-modern {
+      background: #334155;
+      border-color: #475569;
+      color: #f1f5f9;
+    }
+    
+    body.dark-mode .input-modern:focus {
+      border-color: #818cf8;
+      box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.2);
+    }
+    
+    select.input-modern {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 20px;
+      padding-right: 40px;
+    }
+    
+    /* Buttons */
+    .btn-modern {
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .btn-modern:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+    }
+    
+    .btn-modern:active {
+      transform: translateY(0);
+    }
+    
+    .btn-primary-modern {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-blue-modern {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+    }
+    
+    .btn-green-modern {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+    }
+    
+    .btn-red-modern {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+    }
+    
+    .btn-modern:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    
+    /* Transaction Details Box */
+    .tx-details-box {
+      background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    
+    body.dark-mode .tx-details-box {
+      background: linear-gradient(135deg, #334155 0%, #475569 100%);
+      border-color: #475569;
+    }
+    
+    .tx-details-box > div {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+    
+    .tx-details-box strong {
+      color: #4b5563;
+      font-weight: 600;
+    }
+    
+    body.dark-mode .tx-details-box strong {
+      color: #cbd5e1;
+    }
+    
+    .tx-details-box span {
+      color: #1f2937;
+      font-weight: 500;
+    }
+    
+    body.dark-mode .tx-details-box span {
+      color: #f1f5f9;
+    }
+    
+    /* System Status */
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      border: 2px solid #6ee7b7;
+      border-radius: 10px;
+      color: #065f46;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    body.dark-mode .status-indicator {
+      background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+      border-color: #10b981;
+      color: #6ee7b7;
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      background: #10b981;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* Admin Logs */
+    .admin-log-item {
+      background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+      border: 1px solid #e5e7eb;
+      border-left: 4px solid #667eea;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      transition: all 0.3s ease;
+    }
+    
+    .admin-log-item:hover {
+      transform: translateX(4px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    body.dark-mode .admin-log-item {
+      background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+      border-color: #475569;
+      border-left-color: #818cf8;
+    }
+    
+    /* Transaction Table */
+    .tx-table-container {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+    }
+    
+    body.dark-mode .tx-table-container {
+      border-color: #334155;
+    }
+    
+    .tx-row {
+      padding: 16px;
+      border-bottom: 1px solid #e5e7eb;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+    }
+    
+    .tx-row:hover {
+      background: linear-gradient(90deg, #f9fafb 0%, #f3f4f6 100%);
+      padding-left: 20px;
+    }
+    
+    body.dark-mode .tx-row {
+      background: #1e293b;
+      border-bottom-color: #334155;
+    }
+    
+    body.dark-mode .tx-row:hover {
+      background: linear-gradient(90deg, #334155 0%, #475569 100%);
+    }
+    
+    /* Action Buttons Group */
+    .action-buttons {
+      display: flex;
+      gap: 6px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .tx-row:hover .action-buttons {
+      opacity: 1;
+    }
+    
+    .action-btn-sm {
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .action-btn-sm:hover {
+      transform: translateY(-2px) scale(1.05);
+    }
+    
+    /* Modals */
+    .modal-backdrop {
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+    }
+    
+    .modal-content-modern {
+      background: white;
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 90%;
+      animation: modalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    
+    body.dark-mode .modal-content-modern {
+      background: #1e293b;
+      border: 1px solid #334155;
+    }
+    
+    @keyframes modalSlide {
+      from {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    
+    .modal-title-modern {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1f2937;
+      margin-bottom: 20px;
+    }
+    
+    body.dark-mode .modal-title-modern {
+      color: #f1f5f9;
+    }
+    
+    .modal-info-box {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border-left: 4px solid #3b82f6;
+      padding: 16px;
+      border-radius: 12px;
+      margin: 16px 0;
+    }
+    
+    body.dark-mode .modal-info-box {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      border-left-color: #60a5fa;
+    }
+    
+    /* Toast Notifications */
     .toast {
       animation: slideInRight 0.3s ease-out, fadeOut 0.3s ease-in 2.7s;
-      min-width: 300px;
-      max-width: 400px;
-      padding: 12px 16px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      min-width: 320px;
+      max-width: 420px;
+      padding: 16px 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-size: 14px;
-      opacity: 1;
+      gap: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      backdrop-filter: blur(10px);
     }
     
     @keyframes slideInRight {
@@ -135,191 +437,197 @@
     }
     
     .toast-success {
-      background-color: #10b981;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
       color: white;
     }
     
     .toast-error {
-      background-color: #ef4444;
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
       color: white;
     }
     
     .toast-info {
-      background-color: #3b82f6;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
       color: white;
     }
     
-    body.dark-mode .toast {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    /* Confidence Badges */
+    .confidence-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
-
-    /* ================================
-       QUICK ACTION HOVER GLOW BUTTONS (A/D/B/View)
-       ================================ */
+    
+    .badge-high {
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      color: #065f46;
+      border: 1px solid #6ee7b7;
+    }
+    
+    .badge-medium {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      color: #78350f;
+      border: 1px solid #fbbf24;
+    }
+    
+    .badge-low {
+      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+      color: #991b1b;
+      border: 1px solid #f87171;
+    }
+    
+    /* Action Badges */
+    .action-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .badge-allow {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+    }
+    
+    .badge-delay {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: white;
+    }
+    
+    .badge-block {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+    }
+    
+    /* Dark mode fixes */
+    body.dark-mode .bg-white { background-color: #1e293b !important; color: #e5e7eb; }
+    body.dark-mode .text-gray-600 { color: #cbd5e1 !important; }
+    body.dark-mode .border { border-color: #334155 !important; }
+    body.dark-mode a { color: #93c5fd; }
+    body.dark-mode .group:hover { background-color: #334155 !important; }
+    body.dark-mode .group { background-color: #1e293b !important; }
+    body.dark-mode .bg-gray-50 { background-color: #334155 !important; color: #e5e7eb !important; }
+    body.dark-mode .text-xs.text-gray-500 { color: #94a3b8 !important; }
+    body.dark-mode input[type="text"],
+    body.dark-mode input[type="email"],
+    body.dark-mode input[type="password"],
+    body.dark-mode select,
+    body.dark-mode textarea {
+      background-color: #334155 !important;
+      color: #f1f5f9 !important;
+      border-color: #475569 !important;
+    }
+    body.dark-mode input:focus,
+    body.dark-mode select:focus,
+    body.dark-mode textarea:focus {
+      background-color: #475569 !important;
+      border-color: #818cf8 !important;
+    }
+    body.dark-mode h3 { color: #f1f5f9 !important; }
+    body.dark-mode label { color: #e5e7eb !important; }
+    body.dark-mode #confirmModal .bg-white { background-color: #1e293b !important; color: #e5e7eb; }
+    body.dark-mode #confirmModal .bg-gray-50 { background-color: #334155 !important; }
+    body.dark-mode #confirmModal .text-gray-600,
+    body.dark-mode #confirmModal .text-gray-800 { color: #e5e7eb !important; }
+    body.dark-mode #explainModal .bg-white { background-color: #1e293b !important; color: #e5e7eb !important; }
+    body.dark-mode #explainModal .bg-gray-50 { background-color: #334155 !important; color: #e5e7eb !important; }
+    body.dark-mode #explainModal .text-gray-800 { color: #e5e7eb !important; }
+    body.dark-mode #explainModal .text-gray-600 { color: #cbd5e1 !important; }
+    body.dark-mode #explainModal .text-gray-900 { color: #e5e7eb !important; }
+    body.dark-mode #explainModal .text-gray-500 { color: #94a3b8 !important; }
+    body.dark-mode #explainModal .text-blue-700 { color: #60a5fa !important; }
+    body.dark-mode #admin_logs { background-color: transparent !important; color: #e5e7eb !important; }
+    body.dark-mode #admin_logs .bg-gray-50 { background-color: #334155 !important; color: #e5e7eb !important; border-color: #475569 !important; }
+    body.dark-mode #admin_logs .text-gray-500 { color: #94a3b8 !important; }
+    body.dark-mode #admin_logs .text-xs { color: #cbd5e1 !important; }
+    body.dark-mode #admin_logs .text-sm.font-mono { color: #cbd5e1 !important; }
+    #admin_logs .bg-gray-50 { background-color: #f9fafb !important; color: #1f2937 !important; border-color: #e5e7eb !important; }
+    #admin_logs .text-xs { color: #6b7280 !important; }
+    #admin_logs .text-sm.font-mono { color: #1f2937 !important; }
+    #admin_logs .action-badge { opacity: 1 !important; filter: none !important; mix-blend-mode: normal !important; color: #ffffff !important; }
+    #admin_logs .px-2.py-0.5.rounded.text-white { opacity: 1 !important; }
+    body.dark-mode #admin_logs .action-badge { opacity: 1 !important; color: #ffffff !important; }
+    body.dark-mode #admin_logs .px-2.py-0.5.rounded.text-white { opacity: 1 !important; }
+    
+    /* Hover glow buttons */
     .hover-glow-button {
       transition: all 0.3s ease;
       position: relative;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     }
-
     .hover-glow-button:hover {
       transform: translateY(-2px) scale(1.05);
       filter: brightness(1.15);
     }
-
-    /* Blue buttons - View */
     .hover-glow-button.bg-blue-500:hover {
       box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5), 0 0 12px rgba(59, 130, 246, 0.4);
     }
-
-    /* Green buttons - Allow */
     .hover-glow-button.bg-green-500:hover {
       box-shadow: 0 6px 16px rgba(34, 197, 94, 0.5), 0 0 12px rgba(34, 197, 94, 0.4);
     }
-
-    /* Yellow buttons - Delay */
     .hover-glow-button.bg-yellow-500:hover {
       box-shadow: 0 6px 16px rgba(234, 179, 8, 0.5), 0 0 12px rgba(234, 179, 8, 0.4);
     }
-
-    /* Red buttons - Block */
     .hover-glow-button.bg-red-500:hover {
       box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5), 0 0 12px rgba(239, 68, 68, 0.4);
     }
-
-    /* Active state */
     .hover-glow-button:active {
       transform: translateY(0) scale(0.98);
     }
-
     body.dark-mode .hover-glow-button.bg-blue-500:hover {
       box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6), 0 0 16px rgba(59, 130, 246, 0.5);
     }
-
     body.dark-mode .hover-glow-button.bg-green-500:hover {
       box-shadow: 0 6px 20px rgba(34, 197, 94, 0.6), 0 0 16px rgba(34, 197, 94, 0.5);
     }
-
     body.dark-mode .hover-glow-button.bg-yellow-500:hover {
       box-shadow: 0 6px 20px rgba(234, 179, 8, 0.6), 0 0 16px rgba(234, 179, 8, 0.5);
     }
-
     body.dark-mode .hover-glow-button.bg-red-500:hover {
       box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6), 0 0 16px rgba(239, 68, 68, 0.5);
-    }
-
-    /* Explainability Modal: enforce light in light-mode, dark in dark-mode */
-    #explainModal .bg-white { background-color: #ffffff !important; color: #1f2937 !important; }
-    #explainModal .bg-gray-50 { background-color: #f9fafb !important; color: #1f2937 !important; }
-    #explainModal .text-gray-800 { color: #1f2937 !important; }
-    #explainModal .text-gray-600 { color: #4b5563 !important; }
-    #explainModal .text-gray-500 { color: #6b7280 !important; }
-    #explainModal .text-blue-700 { color: #1d4ed8 !important; }
-
-    body.dark-mode #explainModal .bg-white { background-color: #1f2937 !important; color: #e5e7eb !important; }
-    body.dark-mode #explainModal .bg-gray-50 { background-color: #374151 !important; color: #e5e7eb !important; }
-    body.dark-mode #explainModal .text-gray-800 { color: #e5e7eb !important; }
-    body.dark-mode #explainModal .text-gray-600 { color: #d1d5db !important; }
-    body.dark-mode #explainModal .text-gray-900 { color: #e5e7eb !important; }
-    body.dark-mode #explainModal .text-gray-500 { color: #9ca3af !important; }
-    body.dark-mode #explainModal .text-blue-700 { color: #60a5fa !important; }
-
-    /* Model Scores labels: solid visibility */
-    #expl_models > div > span { font-weight: 700; }
-    
-    /* Admin logs action badges: remove translucency */
-    #admin_logs .action-badge { opacity: 1 !important; filter: none !important; mix-blend-mode: normal !important; color: #ffffff !important; }
-    #admin_logs .badge-block { background-color: #ef4444 !important; }
-    #admin_logs .badge-delay { background-color: #f59e0b !important; }
-    #admin_logs .badge-allow { background-color: #22c55e !important; }
-    body.dark-mode #admin_logs .action-badge { opacity: 1 !important; filter: none !important; mix-blend-mode: normal !important; color: #ffffff !important; }
-
-    /* Admin logs action badge opacity fix for dark mode */
-    body.dark-mode #admin_logs .px-2.py-0.5.rounded.text-white {
-      opacity: 1 !important;
-    }
-    
-    #admin_logs .px-2.py-0.5.rounded.text-white {
-      opacity: 1 !important;
-    }
-
-    /* Fix Admin Logs visibility in dark mode */
-    #admin_logs {
-      transition: background-color 0.1s ease, color 0.1s ease;
-      background-color: transparent;
-      color: #1f2937;
-    }
-    
-    body.dark-mode #admin_logs {
-      background-color: transparent !important;
-      color: #e5e7eb !important;
-    }
-    
-    body.dark-mode #admin_logs .bg-gray-50 {
-      background-color: #374151 !important;
-      color: #e5e7eb !important;
-      border-color: #4b5563 !important;
-    }
-    
-    body.dark-mode #admin_logs .text-gray-500 {
-      color: #9ca3af !important;
-    }
-    
-    body.dark-mode #admin_logs .text-xs {
-      color: #d1d5db !important;
-    }
-    
-    body.dark-mode #admin_logs .text-sm.font-mono {
-      color: #d1d5db !important;
-    }
-    
-    /* Light mode admin logs styling */
-    #admin_logs .bg-gray-50 {
-      background-color: #f9fafb !important;
-      color: #1f2937 !important;
-      border-color: #e5e7eb !important;
-    }
-    
-    #admin_logs .text-xs {
-      color: #6b7280 !important;
-    }
-    
-    #admin_logs .text-sm.font-mono {
-      color: #1f2937 !important;
     }
   </style>
 </head>
 
-<body class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6">
-  <div class="max-w-6xl mx-auto">
+<body class="min-h-screen p-6">
+  <div class="max-w-7xl mx-auto">
 
     <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
-      <div>
-        <h1 class="text-3xl font-extrabold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-          Admin Console
-        </h1>
-        <p class="text-sm text-gray-600">Fraud control & monitoring</p>
-      </div>
-      <div class="flex gap-3 items-center">
-        <button id="darkModeToggleAdmin" class="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-sm" title="Toggle Dark Mode">🌙 Dark</button>
-        <a href="/dashboard" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm">Open User Dashboard</a>
-        <a href="/admin/logout" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm">Logout</a>
+    <div class="admin-header">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="page-title">Admin Console</h1>
+          <p class="page-subtitle">Fraud control & monitoring</p>
+        </div>
+        <div class="flex gap-3 items-center flex-wrap">
+          <button id="darkModeToggleAdmin" class="btn-modern btn-primary-modern" title="Toggle Dark Mode">🌙 Dark</button>
+          <a href="/dashboard" class="btn-modern btn-blue-modern">User Dashboard</a>
+          <a href="/admin/logout" class="btn-modern btn-red-modern">Logout</a>
+        </div>
       </div>
     </div>
 
     <!-- Top panels -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
       <!-- Quick Action -->
-      <div class="bg-white rounded-xl shadow p-4">
-        <h3 class="font-semibold mb-3">Quick Action (Manual)</h3>
-        <label class="text-sm">TX ID</label>
-        <input id="qa_txid" class="w-full mt-1 mb-2 px-3 py-2 border rounded" />
-        <button id="qa_fetch_btn" class="w-full py-2 bg-blue-600 text-white rounded mb-3">Get Details</button>
+      <div class="admin-card">
+        <h3 class="card-title">Quick Action (Manual)</h3>
+        <label class="form-label-modern">Transaction ID</label>
+        <input id="qa_txid" class="input-modern mb-3" placeholder="Enter TX ID" />
+        <button id="qa_fetch_btn" class="btn-modern btn-blue-modern w-full mb-4">Get Details</button>
         
         <!-- Transaction Details (hidden initially) -->
-        <div id="qa_details" class="hidden mb-3 p-2 bg-gray-50 rounded border text-xs space-y-1">
+        <div id="qa_details" class="hidden tx-details-box">
           <div><strong>User:</strong> <span id="qa_detail_user">-</span></div>
           <div><strong>Amount:</strong> <span id="qa_detail_amount">-</span></div>
           <div><strong>Current Action:</strong> <span id="qa_detail_action">-</span></div>
@@ -327,94 +635,96 @@
           <div><strong>Reason:</strong> <span id="qa_detail_reason">-</span></div>
         </div>
         
-        <label class="text-sm">Action</label>
-        <select id="qa_action" class="w-full mt-1 mb-3 px-3 py-2 border rounded">
+        <label class="form-label-modern">Action</label>
+        <select id="qa_action" class="input-modern mb-4">
           <option value="ALLOW">ALLOW</option>
           <option value="DELAY">DELAY</option>
           <option value="BLOCK">BLOCK</option>
         </select>
-        <button id="qa_btn" class="w-full py-2 bg-green-600 text-white rounded disabled:opacity-50" disabled>Apply Action</button>
-        <div id="qa_result" class="mt-2 text-xs text-gray-600"></div>
+        <button id="qa_btn" class="btn-modern btn-green-modern w-full" disabled>Apply Action</button>
+        <div id="qa_result" class="mt-3 text-sm text-gray-600"></div>
       </div>
 
       <!-- System status -->
-      <div class="bg-white rounded-xl shadow p-4">
-        <h3 class="font-semibold mb-2">System Status</h3>
-        <div id="sys_status" class="text-sm text-green-600 font-medium">
-          ● Live – WebSocket connected
+      <div class="admin-card">
+        <h3 class="card-title">System Status</h3>
+        <div id="sys_status" class="status-indicator">
+          <span class="status-dot"></span>
+          Live – WebSocket connected
         </div>
       </div>
 
       <!-- Admin logs -->
-      <div class="bg-white rounded-xl shadow p-4">
-        <h3 class="font-semibold mb-2">Recent Admin Logs</h3>
-        <div id="admin_logs" class="text-sm overflow-y-auto space-y-2" style="max-height: 70vh;">
-        </div>
+      <div class="admin-card">
+        <h3 class="card-title">Recent Admin Logs</h3>
+        <div id="admin_logs" class="text-sm overflow-y-auto space-y-2" style="max-height: 70vh;"></div>
       </div>
     </div>
 
     <!-- Confirmation Modal -->
-    <div id="confirmModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full mx-4">
-        <h3 class="text-lg font-bold mb-4 text-gray-800">Confirm Action</h3>
+    <div id="confirmModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+      <div class="modal-content-modern">
+        <h3 class="modal-title-modern">Confirm Action</h3>
         
-        <div class="bg-gray-50 p-3 rounded-lg mb-4 space-y-2 text-sm">
-          <div><strong>TX ID:</strong> <span id="confirm_tx_id" class="font-mono text-blue-600">-</span></div>
+        <div class="modal-info-box">
+          <div class="mb-2"><strong>TX ID:</strong> <span id="confirm_tx_id" class="font-mono text-blue-600">-</span></div>
           <div><strong>Action:</strong> <span id="confirm_action" class="font-bold">-</span></div>
         </div>
         
-        <p class="text-sm text-gray-600 mb-4">Confirm this action. A 5-second grace window lets you undo it immediately after applying.</p>
+        <p class="text-sm text-gray-600 mb-6">Confirm this action. A 5-second grace window lets you undo it immediately after applying.</p>
         
-        <div class="flex gap-2">
-          <button id="confirm_cancel" class="flex-1 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 transition">Cancel</button>
-          <button id="confirm_submit" class="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">Confirm</button>
+        <div class="flex gap-3">
+          <button id="confirm_cancel" class="flex-1 btn-modern" style="background: #9ca3af; color: white;">Cancel</button>
+          <button id="confirm_submit" class="flex-1 btn-modern btn-red-modern">Confirm</button>
         </div>
       </div>
     </div>
 
     <!-- Explainability Modal -->
-    <div id="explainModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-2xl p-6 max-w-xl w-full mx-4">
-        <div class="flex justify-between items-start mb-3">
+    <div id="explainModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+      <div class="modal-content-modern" style="max-width: 700px;">
+        <div class="flex justify-between items-start mb-4">
           <div>
-            <h3 class="text-lg font-bold text-gray-800">Explainability</h3>
-            <div class="text-xs text-gray-500">Why the system decided • Suspicious patterns</div>
+            <h3 class="text-2xl font-bold text-gray-800">Explainability</h3>
+            <div class="text-sm text-gray-500">Why the system decided • Suspicious patterns</div>
           </div>
-          <button id="explainClose" class="text-gray-500 hover:text-gray-800">✕</button>
+          <button id="explainClose" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>
         </div>
 
-        <div class="border rounded p-3 bg-gray-50 mb-3">
-          <div class="text-xs text-gray-500 dark:text-gray-400">TX ID</div>
-          <div id="expl_tx_id" class="font-mono text-sm text-blue-700">-</div>
-          <div class="text-xs text-gray-500 mt-1">Action / Risk</div>
+        <div class="border rounded-lg p-4 bg-gray-50 mb-4">
+          <div class="text-xs text-gray-500">TX ID</div>
+          <div id="expl_tx_id" class="font-mono text-sm text-blue-700 mb-2">-</div>
+          <div class="text-xs text-gray-500">Action / Risk</div>
           <div class="text-sm text-gray-800"><span id="expl_action" class="font-semibold"></span> • <span id="expl_risk"></span></div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div class="border rounded p-3 bg-white">
-            <div class="text-xs font-semibold text-gray-600 mb-2">Reasons</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="border rounded-lg p-4 bg-white">
+            <div class="text-xs font-semibold text-gray-600 mb-3">Reasons</div>
             <ul id="expl_reasons" class="text-sm space-y-1 list-disc list-inside text-gray-800"></ul>
           </div>
-          <div class="border rounded p-3 bg-white">
-            <div class="text-xs font-semibold text-gray-600 mb-2">Model Scores</div>
+          <div class="border rounded-lg p-4 bg-white">
+            <div class="text-xs font-semibold text-gray-600 mb-3">Model Scores</div>
             <div id="expl_models" class="text-sm space-y-1 text-gray-800"></div>
           </div>
         </div>
       </div>
     </div>
 
+
+
     <!-- Transactions -->
-    <div class="bg-white rounded-xl shadow p-4">
-      <div class="flex justify-between items-center mb-2">
-        <h3 class="font-semibold">Transactions (Admin View)</h3>
-        <div class="flex gap-2">
-          <select id="timeFilter" class="px-3 py-1 pr-8 border rounded text-sm bg-white">
+    <div class="admin-card">
+      <div class="flex justify-between items-center mb-4 flex-wrap gap-3">
+        <h3 class="card-title mb-0">Transactions (Admin View)</h3>
+        <div class="flex gap-3">
+          <select id="timeFilter" class="input-modern" style="width: auto; min-width: 160px;">
             <option value="1h">Last 1 Hour</option>
             <option value="24h" selected>Last 24 Hours</option>
             <option value="7d">Last 7 Days</option>
             <option value="30d">Last 30 Days</option>
           </select>
-          <select id="adminFilter" class="px-3 py-1 pr-8 border rounded text-sm bg-white">
+          <select id="adminFilter" class="input-modern" style="width: auto; min-width: 140px;">
             <option value="ALL">All</option>
             <option value="ALLOW">Allowed</option>
             <option value="DELAY">Delayed</option>
@@ -422,12 +732,12 @@
           </select>
         </div>
       </div>
-      <div id="admin_recent" class="text-sm max-h-80 overflow-y-auto border rounded"></div>
+      <div id="admin_recent" class="tx-table-container max-h-96 overflow-y-auto"></div>
     </div>
   </div>
 
   <!-- Toast Container -->
-  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-50 space-y-3"></div>
 
 <script>
 let adminTxCache = [];
@@ -445,11 +755,11 @@ function getPrevAction(tx_id) {
 function confidenceBadge(level) {
   const lvl = (level || 'HIGH').toUpperCase();
   const style = lvl === 'LOW'
-    ? 'bg-red-50 text-red-700 border border-red-100'
+    ? 'badge-low'
     : lvl === 'MEDIUM'
-      ? 'bg-yellow-50 text-yellow-700 border border-yellow-100'
-      : 'bg-green-50 text-green-700 border border-green-100';
-  return `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${style}">${lvl}</span>`;
+      ? 'badge-medium'
+      : 'badge-high';
+  return `<span class="confidence-badge ${style}">${lvl}</span>`;
 }
 
 /* ---------- Toast Notification System ---------- */
@@ -466,7 +776,7 @@ function showToast(type, message) {
   
   toast.className = `toast toast-${type}`;
   toast.innerHTML = `
-    <span style="font-size: 20px;">${icons[type] || 'ℹ️'}</span>
+    <span style="font-size: 24px;">${icons[type] || 'ℹ️'}</span>
     <span>${message}</span>
   `;
   
@@ -486,12 +796,12 @@ function showUndoToast(tx_id, newAction, prevAction) {
 
   let seconds = 5;
   toast.innerHTML = `
-    <span style="font-size: 20px;">⏳</span>
+    <span style="font-size: 24px;">⏳</span>
     <div class="flex-1">
       <div class="font-semibold">${newAction} applied to ${tx_id.slice(0, 8)}...</div>
       <div class="text-sm">Undo available (${seconds}s)</div>
     </div>
-    <button id="undoBtn" class="px-2 py-1 text-xs bg-white/20 border border-white/30 rounded">Undo</button>
+    <button id="undoBtn" class="px-3 py-1 text-sm bg-white/30 border border-white/50 rounded-lg hover:bg-white/40 transition">Undo</button>
   `;
 
   container.appendChild(toast);
@@ -547,10 +857,8 @@ function updateDarkModeButtonAdmin(isDark) {
   if (!btn) return;
   if (isDark) {
     btn.textContent = '☀️ Light';
-    btn.className = 'px-4 py-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm';
   } else {
     btn.textContent = '🌙 Dark';
-    btn.className = 'px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-sm';
   }
 }
 
@@ -593,16 +901,15 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ---------- render transaction row ---------- */
 function renderAdminTx(tx) {
   const div = document.createElement('div');
-  div.className =
-    'group p-3 rounded-lg border flex justify-between items-center hover:bg-gray-50 transition cursor-pointer';
+  div.className = 'tx-row';
 
   const risk = Number(tx.risk_score ?? 0);
   const riskColor = risk >= 0.8 ? 'text-red-600' : risk >= 0.6 ? 'text-orange-600' : 'text-green-600';
 
   div.innerHTML = `
     <div class="flex-1">
-      <div class="font-mono text-xs">${tx.tx_id}</div>
-      <div class="text-xs text-gray-600">
+      <div class="font-mono text-xs font-semibold text-gray-700">${tx.tx_id}</div>
+      <div class="text-xs text-gray-600 mt-1">
         ${tx.user_id || ''} • ₹${Number(tx.amount || 0).toFixed(2)} • Risk: <span class="${riskColor} font-semibold">${risk.toFixed(2)}</span>
       </div>
       <div class="text-xs text-gray-500 mt-1">
@@ -620,12 +927,12 @@ function renderAdminTx(tx) {
       <span>${confidenceBadge(tx.confidence_level)}</span>
 
       <!-- Hover quick actions -->
-      <div class="hidden group-hover:flex gap-1">
-        <button onclick="showExplain('${tx.tx_id}')" class="px-2 py-1 text-xs bg-indigo-500 text-white rounded hover-glow-button" title="Explainability">Exp</button>
-        <button onclick="fillAndFetchTx('${tx.tx_id}')" class="px-2 py-1 text-xs bg-blue-500 text-white rounded hover-glow-button">View</button>
-        <button onclick="showConfirmation('${tx.tx_id}','ALLOW')" class="px-2 py-1 text-xs bg-green-500 text-white rounded hover-glow-button">A</button>
-        <button onclick="showConfirmation('${tx.tx_id}','DELAY')" class="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover-glow-button">D</button>
-        <button onclick="showConfirmation('${tx.tx_id}','BLOCK')" class="px-2 py-1 text-xs bg-red-500 text-white rounded hover-glow-button">B</button>
+      <div class="action-buttons">
+        <button onclick="showExplain('${tx.tx_id}')" class="action-btn-sm bg-indigo-500 text-white hover-glow-button" title="Explainability">Exp</button>
+        <button onclick="fillAndFetchTx('${tx.tx_id}')" class="action-btn-sm bg-blue-500 text-white hover-glow-button">View</button>
+        <button onclick="showConfirmation('${tx.tx_id}','ALLOW')" class="action-btn-sm bg-green-500 text-white hover-glow-button">A</button>
+        <button onclick="showConfirmation('${tx.tx_id}','DELAY')" class="action-btn-sm bg-yellow-500 text-white hover-glow-button">D</button>
+        <button onclick="showConfirmation('${tx.tx_id}','BLOCK')" class="action-btn-sm bg-red-500 text-white hover-glow-button">B</button>
       </div>
     </div>
   `;
@@ -769,14 +1076,16 @@ async function quickAction(tx_id, action) {
 
   const logs = document.getElementById('admin_logs');
   const log = document.createElement('div');
-  log.className = 'flex justify-between items-center bg-gray-50 border rounded px-2 py-1';
+  log.className = 'admin-log-item';
 
   const badgeClass = action === 'BLOCK' ? 'badge-block' : (action === 'DELAY' ? 'badge-delay' : 'badge-allow');
   log.innerHTML = `
-    <div class="text-xs font-mono">${tx_id}</div>
-    <div class="flex items-center gap-2">
-      <span class="text-[10px] text-gray-500">${new Date().toLocaleTimeString()}</span>
-      <span class="px-2 py-0.5 rounded text-[10px] font-semibold action-badge ${badgeClass}">${action}</span>
+    <div class="flex justify-between items-center">
+      <div class="text-xs font-mono font-semibold">${tx_id}</div>
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] text-gray-500">${new Date().toLocaleTimeString()}</span>
+        <span class="action-badge ${badgeClass}">${action}</span>
+      </div>
     </div>
   `;
 
@@ -1058,19 +1367,20 @@ function setupWS() {
     if (!el) return;
 
     const div = document.createElement('div');
-    div.className =
-      'p-3 mb-2 bg-gray-50 border rounded flex justify-between items-center';
+    div.className = 'admin-log-item';
 
     const badgeClass = log.action === 'BLOCK' ? 'badge-block' : (log.action === 'DELAY' ? 'badge-delay' : 'badge-allow');
     div.innerHTML = `
-      <div>
-        <div class="font-mono text-sm text-gray-800">${log.tx_id}</div>
-        <div class="text-xs text-gray-500">
-          User: <span class="font-semibold">${log.user_id || 'unknown'}</span>
-          • ${new Date(log.time).toLocaleTimeString()}
+      <div class="flex justify-between items-center">
+        <div>
+          <div class="font-mono text-sm font-semibold">${log.tx_id}</div>
+          <div class="text-xs text-gray-500 mt-1">
+            User: <span class="font-semibold">${log.user_id || 'unknown'}</span>
+            • ${new Date(log.time).toLocaleTimeString()}
+          </div>
         </div>
+        <span class="action-badge ${badgeClass}">${log.action}</span>
       </div>
-      <span class="px-3 py-1 text-xs rounded-full font-semibold action-badge ${badgeClass}">${log.action}</span>
     `;
 
     el.prepend(div);
