@@ -89,11 +89,12 @@ CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);
 CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON push_tokens(user_id);
 
 -- Insert demo users for testing
+-- Password for all users: password123
 INSERT INTO users (user_id, name, phone, email, password_hash, balance) 
 VALUES 
-    ('user_001', 'Rajesh Kumar', '+919876543210', 'rajesh@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYzpXw/6Nti', 25000.00),
-    ('user_002', 'Priya Sharma', '+919876543211', 'priya@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYzpXw/6Nti', 15000.00),
-    ('user_003', 'Amit Patel', '+919876543212', 'amit@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYzpXw/6Nti', 30000.00)
+    ('user_001', 'Rajesh Kumar', '+919876543210', 'rajesh@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 25000.00),
+    ('user_002', 'Priya Sharma', '+919876543211', 'priya@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 15000.00),
+    ('user_003', 'Amit Patel', '+919876543212', 'amit@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 30000.00)
 ON CONFLICT (user_id) DO NOTHING;
 
 -- Insert demo devices
