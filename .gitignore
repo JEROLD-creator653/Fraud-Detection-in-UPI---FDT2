@@ -1,25 +1,58 @@
-# Environment files
+# Environment files - NEVER COMMIT THESE
 .env
-.env.local
-.env.development
-.env.production
+.env.*
+*.env
 backend/.env
+backend/.env.*
 frontend/.env
-frontend/.env.development
+frontend/.env.*
+
+# API Keys and Secrets
+**/google-services.json
+**/*-firebase-adminsdk-*.json
+*.pem
+*.key
 
 # Dependencies
 node_modules/
 __pycache__/
 *.pyc
+*.pyo
 .venv/
 venv/
+.Python
+env/
 
 # Build outputs
 frontend/build/
+frontend/dist/
 *.log
+*.pid
+*.seed
+*.pid.lock
 
 # IDE
 .vscode/
 .idea/
 *.swp
-.env
+*.swo
+*~
+.DS_Store
+
+# Testing
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
