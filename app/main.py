@@ -395,6 +395,203 @@ async def websocket_endpoint(ws: WebSocket):
 def health():
     return {"status": "ok"}
 
+# --- USER APIs for mobile app ---
+@app.post("/api/register")
+async def register_user(request: Request):
+    """Register new user for mobile app"""
+    body = await request.json()
+    
+    def _register():
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            import uuid
+            from passlib.hash import bcrypt
+            
+            user_id = f"user_{uuid.uuid4().hex[:8]}"
+            phone = body.get("phone")
+            password_hash = bcrypt.hash(body.get("password"))
+            
+            # Check if exists
+            cur.execute("SELECT user_id FROM users WHERE phone = %s", (phone,))
+            if cur.fetchone():
+                raise HTTPException(status_code=400, detail="Phone already registered")
+            
+            cur.execute(
+                "INSERT INTO users (user_id, name, phone, email, password_hash, balance) VALUES (%s, %s, %s, %s, %s, 10000.00) RETURNING user_id, name, phone, balance",
+                (user_id, body.get("name"), phone, body.get("email"), password_hash)
+            )
+            user = cur.fetchone()
+            conn.commit()
+            
+            import jwt
+            token = jwt.encode({"user_id": user_id, "exp": datetime.utcnow() + timedelta(hours=24)}, SECRET_KEY, algorithm="HS256")
+            
+            return {"status": "success", "user": dict(user), "token": token}
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_register)
+
+@app.post("/api/login")
+async def login_user(request: Request):
+    """Login user for mobile app"""
+    body = await request.json()
+    
+    def _login():
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            from passlib.hash import bcrypt
+            import jwt
+            
+            phone = body.get("phone")
+            cur.execute("SELECT user_id, name, phone, email, password_hash, balance FROM users WHERE phone = %s", (phone,))
+            user = cur.fetchone()
+            
+            if not user or not bcrypt.verify(body.get("password"), user["password_hash"]):
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+            token = jwt.encode({"user_id": user["user_id"], "exp": datetime.utcnow() + timedelta(hours=24)}, SECRET_KEY, algorithm="HS256")
+            
+            user_data = dict(user)
+            del user_data["password_hash"]
+            return {"status": "success", "user": user_data, "token": token}
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_login)
+
+@app.get("/api/user/dashboard")
+async def get_user_dashboard(request: Request):
+    """Get user dashboard"""
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    import jwt
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload["user_id"]
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    def _get_dashboard():
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT user_id, name, phone, email, balance FROM users WHERE user_id = %s", (user_id,))
+            user = cur.fetchone()
+            
+            cur.execute("SELECT * FROM transactions WHERE user_id = %s ORDER BY created_at DESC LIMIT 5", (user_id,))
+            recent = cur.fetchall()
+            
+            cur.execute("SELECT COUNT(*) FILTER (WHERE action='ALLOW') as successful, COUNT(*) FILTER (WHERE action='BLOCK') as blocked, COUNT(*) FILTER (WHERE action='DELAY') as pending FROM transactions WHERE user_id = %s", (user_id,))
+            stats = cur.fetchone()
+            
+            return {"status": "success", "user": dict(user), "recent_transactions": [dict(t) for t in recent], "stats": dict(stats)}
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_get_dashboard)
+
+@app.post("/api/transaction")
+async def create_user_transaction(request: Request):
+    """Create transaction from mobile app"""
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    import jwt
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload["user_id"]
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    body = await request.json()
+    import uuid
+    
+    tx_id = f"tx_{uuid.uuid4().hex[:12]}"
+    tx = {
+        "tx_id": tx_id,
+        "user_id": user_id,
+        "device_id": body.get("device_id", "mobile_web"),
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "amount": body.get("amount"),
+        "recipient_vpa": body.get("recipient_vpa"),
+        "tx_type": "P2M" if "@merchant" in body.get("recipient_vpa", "") else "P2P",
+        "channel": "app"
+    }
+    
+    # Score using ML
+    risk_score = None
+    try:
+        from . import scoring
+        risk_score = scoring.score_transaction(tx)
+    except:
+        risk_score = 0.1
+    
+    tx["risk_score"] = float(risk_score)
+    
+    if risk_score >= THRESHOLDS["block"]:
+        tx["action"] = "BLOCK"
+    elif risk_score >= THRESHOLDS["delay"]:
+        tx["action"] = "DELAY"
+    else:
+        tx["action"] = "ALLOW"
+    
+    tx["db_status"] = "pending" if tx["action"] != "ALLOW" else "success"
+    
+    inserted = await run_in_threadpool(db_insert_transaction, tx)
+    full_row = await run_in_threadpool(db_get_transaction, inserted["tx_id"])
+    
+    # Broadcast to admin dashboard
+    asyncio.create_task(ws_manager.broadcast({"type": "tx_inserted", "data": full_row}))
+    
+    return {"status": "success", "transaction": dict(full_row), "requires_confirmation": tx["action"] != "ALLOW", "risk_level": "high" if risk_score >= THRESHOLDS["block"] else "medium" if risk_score >= THRESHOLDS["delay"] else "low"}
+
+@app.get("/api/user/transactions")
+async def get_user_transactions(request: Request):
+    """Get user transaction history"""
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    import jwt
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload["user_id"]
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    def _get_txs():
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM transactions WHERE user_id = %s ORDER BY created_at DESC LIMIT 50", (user_id,))
+            return {"status": "success", "transactions": [dict(t) for t in cur.fetchall()]}
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_get_txs)
+
+@app.post("/api/user-decision")
+async def user_decision(request: Request):
+    """Handle user decision on flagged transaction"""
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    import jwt
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload["user_id"]
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    body = await request.json()
+    tx_id = body.get("tx_id")
+    decision = body.get("decision")
+    
+    new_action = "ALLOW" if decision == "confirm" else "BLOCK"
+    updated = await run_in_threadpool(db_update_action, tx_id, new_action)
+    
+    return {"status": "success", "message": "Transaction updated", "transaction": dict(updated)}
+
+# --- health ---
+@app.get("/api/health")
+def api_health():
+    return {"status": "healthy", "service": "FDT Backend"}
+
 # --- chatbot endpoint ---
 @app.post("/api/chatbot")
 async def chatbot_endpoint(request: Request):
