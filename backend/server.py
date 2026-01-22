@@ -35,13 +35,14 @@ JWT_EXPIRATION_HOURS = 24
 # Initialize FastAPI app
 app = FastAPI(title="FDT API", version="1.0.0")
 
-# CORS Configuration - Allow frontend access
+# CORS Configuration - Allow all origins including preview URLs
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # ============================================================================
