@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv('/app/backend/.env')
 
-DB_URL = os.getenv('DB_URL', 'postgresql://fdt:fdt_password@postgres:5432/fdt_db')
+DB_URL = os.getenv('DB_URL', 'postgresql://user:password@host:port/dbname')
 
 def init_database():
     """Initialize database with schema"""

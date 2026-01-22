@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuration
-DB_URL = os.getenv("DB_URL", "postgresql://fdt:fdt_password@postgres:5432/fdt_db")
+DB_URL = os.getenv("DB_URL", "postgresql://user:password@host:port/dbname")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "fdt_jwt_secret_key_change_in_production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
