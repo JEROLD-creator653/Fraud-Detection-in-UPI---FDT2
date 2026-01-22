@@ -64,3 +64,4 @@ temp/
 # Environment files
 *.env
 *.env.*
+config.yaml

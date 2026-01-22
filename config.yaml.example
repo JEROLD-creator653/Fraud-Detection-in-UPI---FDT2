@@ -1,0 +1,7 @@
+﻿db_url: "postgresql://user:password@host:port/dbname"
+thresholds:
+  delay: 0.30
+  block: 0.60
+secret_key: "YOUR_SECRET_KEY_HERE"
+admin_username: "admin"
+admin_password_hash: "YOUR_PASSWORD_HASH_HERE"
