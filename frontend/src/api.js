@@ -1,7 +1,8 @@
 // API utilities for backend communication
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001/api';
+// Use relative URL for API calls (works with any domain/preview URL)
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || '/api';
 
 // Create axios instance
 const api = axios.create({
