@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "FDT - Fraud Detection in UPI Transactions PWA",
   "private": true,
+  "proxy": "http://localhost:8001",
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
