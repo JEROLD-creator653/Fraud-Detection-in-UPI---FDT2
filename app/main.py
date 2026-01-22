@@ -518,6 +518,45 @@ async def create_user_transaction(request: Request):
         "channel": "app"
     }
     
+
+# Serve React mobile app
+@app.get("/", response_class=HTMLResponse)
+async def serve_mobile_app():
+    """Serve React mobile app"""
+    with open("/app/frontend/build/index.html", "r") as f:
+        return f.read()
+
+@app.get("/login", response_class=HTMLResponse)
+async def serve_mobile_login():
+    with open("/app/frontend/build/index.html", "r") as f:
+        return f.read()
+
+@app.get("/register", response_class=HTMLResponse)  
+async def serve_mobile_register():
+    with open("/app/frontend/build/index.html", "r") as f:
+        return f.read()
+
+@app.get("/new-transaction", response_class=HTMLResponse)
+async def serve_mobile_transaction():
+    with open("/app/frontend/build/index.html", "r") as f:
+        return f.read()
+
+@app.get("/transactions", response_class=HTMLResponse)
+async def serve_mobile_history():
+    with open("/app/frontend/build/index.html", "r") as f:
+        return f.read()
+
+@app.get("/manifest.json")
+async def serve_manifest():
+    with open("/app/frontend/build/manifest.json", "r") as f:
+        import json
+        return JSONResponse(json.load(f))
+
+@app.get("/firebase-messaging-sw.js")
+async def serve_sw():
+    with open("/app/frontend/build/firebase-messaging-sw.js", "r") as f:
+        return HTMLResponse(f.read(), media_type="application/javascript")
+
     # Score using ML
     risk_score = None
     try:
@@ -555,6 +594,39 @@ async def get_user_transactions(request: Request):
         user_id = payload["user_id"]
     except:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+# Serve mobile app PWA
+@app.get("/mobile")
+async def mobile_app():
+    """Serve mobile app"""
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/login")
+async def mobile_login():
+    """Mobile login page"""
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/register")
+async def mobile_register():
+    """Mobile register page"""
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/new-transaction")
+async def mobile_new_transaction():
+    """Mobile new transaction page"""
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/transactions")
+async def mobile_transactions():
+    """Mobile transactions page"""
+    return FileResponse("frontend/build/index.html")
+
+# Root serves mobile app
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    """Serve mobile app at root"""
+    return FileResponse("frontend/build/index.html")
+
     
     def _get_txs():
         conn = get_conn()
