@@ -11,6 +11,7 @@ const TransactionHistory = ({ user }) => {
 
   useEffect(() => {
     loadTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
   const loadTransactions = async () => {
