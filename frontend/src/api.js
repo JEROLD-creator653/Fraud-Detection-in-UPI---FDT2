@@ -1,8 +1,8 @@
 // API utilities for backend communication
 import axios from 'axios';
 
-// Use relative URL for API calls (works with any domain/preview URL)
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || '/api';
+// Use explicit backend URL
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 // Create axios instance
 const api = axios.create({
@@ -42,48 +42,48 @@ api.interceptors.response.use(
 
 // Auth APIs
 export const registerUser = async (userData) => {
-  const response = await api.post('/register', userData);
+  const response = await api.post('/api/register', userData);
   return response.data;
 };
 
 export const loginUser = async (credentials) => {
-  const response = await api.post('/login', credentials);
+  const response = await api.post('/api/login', credentials);
   return response.data;
 };
 
 // User APIs
 export const getUserDashboard = async () => {
-  const response = await api.get('/user/dashboard');
+  const response = await api.get('/api/user/dashboard');
   return response.data;
 };
 
 export const getUserTransactions = async (limit = 20, statusFilter = null) => {
   const params = { limit };
   if (statusFilter) params.status_filter = statusFilter;
-  const response = await api.get('/user/transactions', { params });
+  const response = await api.get('/api/user/transactions', { params });
   return response.data;
 };
 
 // Transaction APIs
 export const createTransaction = async (transactionData) => {
-  const response = await api.post('/transaction', transactionData);
+  const response = await api.post('/api/transaction', transactionData);
   return response.data;
 };
 
 export const submitUserDecision = async (decisionData) => {
-  const response = await api.post('/user-decision', decisionData);
+  const response = await api.post('/api/user-decision', decisionData);
   return response.data;
 };
 
 // Push notification APIs
 export const registerPushToken = async (fcmToken, deviceId) => {
-  const response = await api.post('/push-token', { fcm_token: fcmToken, device_id: deviceId });
+  const response = await api.post('/api/push-token', { fcm_token: fcmToken, device_id: deviceId });
   return response.data;
 };
 
 // Health check
 export const healthCheck = async () => {
-  const response = await api.get('/health');
+  const response = await api.get('/api/health');
   return response.data;
 };
 

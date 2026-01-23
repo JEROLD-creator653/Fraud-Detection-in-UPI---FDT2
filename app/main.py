@@ -365,6 +365,8 @@ def dashboard_page(request: Request):
     if not is_logged_in(request):
         return RedirectResponse("/admin/login")
     return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.post("/admin/action")
 async def admin_action(request: Request):
     if not is_logged_in(request):
         return JSONResponse({"detail": "unauthenticated"}, status_code=401)
