@@ -160,6 +160,10 @@ function formatTimelineLabel(raw, range) {
 
 // Initialize charts after DOM is ready
 function initCharts() {
+  const isDarkMode = document.body.classList.contains('dark-mode');
+  const textColor = isDarkMode ? '#e5e7eb' : '#374151';
+  const gridColor = isDarkMode ? 'rgba(71, 85, 105, 0.3)' : 'rgba(229, 231, 235, 0.8)';
+
   timelineChart = new Chart(document.getElementById('timelineChart').getContext('2d'), {
     type: 'line',
     data: {
@@ -173,7 +177,22 @@ function initCharts() {
     options: { 
       responsive: true, 
       maintainAspectRatio: true, 
-      scales: { x: {}, y: { beginAtZero: true }},
+      scales: { 
+        x: {
+          ticks: { color: textColor },
+          grid: { color: gridColor }
+        }, 
+        y: { 
+          beginAtZero: true,
+          ticks: { color: textColor },
+          grid: { color: gridColor }
+        }
+      },
+      plugins: {
+        legend: {
+          labels: { color: textColor }
+        }
+      },
       animation: {
         duration: 0 // Disable animations
       }
@@ -193,6 +212,11 @@ function initCharts() {
     options: { 
       responsive: true, 
       maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          labels: { color: textColor }
+        }
+      },
       animation: {
         duration: 0 // Disable animations
       }
@@ -213,6 +237,21 @@ function initCharts() {
       indexAxis: 'y', 
       responsive: true, 
       maintainAspectRatio: true,
+      scales: {
+        x: {
+          ticks: { color: textColor },
+          grid: { color: gridColor }
+        },
+        y: {
+          ticks: { color: textColor },
+          grid: { color: gridColor }
+        }
+      },
+      plugins: {
+        legend: {
+          labels: { color: textColor }
+        }
+      },
       animation: {
         duration: 0 // Disable animations
       }
@@ -286,6 +325,31 @@ async function loadPatternAnalytics() {
   }
 }
 
+async function loadModelAccuracy() {
+  try {
+    const res = await fetch(`/model-accuracy?_=${Date.now()}`);
+    if (!res.ok) {
+      console.warn('Model accuracy fetch failed');
+      return;
+    }
+
+    const data = await res.json();
+    
+    // Update model accuracy displays
+    const rfEl = document.getElementById('rfAccuracy');
+    const xgbEl = document.getElementById('xgbAccuracy');
+    const ifEl = document.getElementById('iforestAccuracy');
+    const ensembleEl = document.getElementById('ensembleAccuracy');
+    
+    if (rfEl) rfEl.textContent = `${data.random_forest}%`;
+    if (xgbEl) xgbEl.textContent = `${data.xgboost}%`;
+    if (ifEl) ifEl.textContent = `${data.isolation_forest}%`;
+    if (ensembleEl) ensembleEl.textContent = `${data.ensemble}%`;
+  } catch (e) {
+    console.error('loadModelAccuracy error:', e);
+  }
+}
+
 function getLimitForRange(range) {
   switch (range) {
     case '1h':
@@ -333,27 +397,13 @@ async function loadDashboardAnalytics() {
     if (!res.ok) throw new Error('fetch analytics failed');
 
     const data = await res.json();
-    const tl = data.timeline || {};
-    const labelsRaw = Array.isArray(tl.labels) ? tl.labels : [];
-    const block = Array.isArray(tl.block) ? tl.block : [];
-    const delay = Array.isArray(tl.delay) ? tl.delay : [];
-    const allow = Array.isArray(tl.allow) ? tl.allow : [];
-
-    const labels = labelsRaw.map(l => formatTimelineLabel(l, currentTimeRange));
-
-    if (timelineChart && labels.length) {
-      useServerTimeline = true;
-      timelineChart.data.labels = labels;
-      timelineChart.data.datasets[0].data = block;
-      timelineChart.data.datasets[1].data = delay;
-      timelineChart.data.datasets[2].data = allow;
-      timelineChart.update('none');
-    }
+    
+    // DISABLED server timeline - using client-side cache timeline for consistency
+    // This prevents dual updates that overwrite each other
+    console.log('Server analytics loaded, but using client-side timeline generation');
+    
   } catch (e) {
-    console.error('loadDashboardAnalytics error, falling back to cache timeline', e);
-    useServerTimeline = false;
-    // Fallback to client-side cache aggregation if server fetch fails
-    updateTimelineFromCache();
+    console.error('loadDashboardAnalytics error', e);
   }
 }
 
@@ -430,54 +480,56 @@ function updateTimelineFromCache() {
   if (!timelineChart || !Array.isArray(txCache)) return;
 
   const buckets = {};
-  let labels = [];
+  const labelDates = []; // Store dates with their string labels for proper sorting
   let labelFormat;
 
   // Determine label format based on time range
   if (currentTimeRange === '1h') {
     labelFormat = 'time'; // HH:MM format
   } else if (currentTimeRange === '24h') {
-    labelFormat = 'time_1h'; // 1-hour interval format for better granularity
+    labelFormat = 'time_1h'; // 1-hour interval format
   } else if (currentTimeRange === '7d') {
-    labelFormat = 'date'; // MMM DD format - generate all 7 days
+    labelFormat = 'date'; // MMM DD format - all 7 days
   } else if (currentTimeRange === '30d') {
-    labelFormat = 'date'; // MMM DD format - generate all 30 days
+    labelFormat = 'date'; // MMM DD format - all 30 days
   }
 
-  // Generate labels for date-based views first
+  // Generate labels for date-based views first (oldest to newest)
   if (currentTimeRange === '7d') {
     const today = new Date();
-    for (let i = 0; i < 7; i++) {
+    today.setHours(0, 0, 0, 0);
+    for (let i = 6; i >= 0; i--) { // Start from 6 days ago to today
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const label = d.toLocaleDateString([], { month: 'short', day: '2-digit' });
-      labels.push(label);
+      labelDates.push({ date: new Date(d), label });
       buckets[label] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
     }
   } else if (currentTimeRange === '30d') {
     const today = new Date();
-    for (let i = 0; i < 30; i++) {
+    today.setHours(0, 0, 0, 0);
+    for (let i = 29; i >= 0; i--) { // Start from 29 days ago to today
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const label = d.toLocaleDateString([], { month: 'short', day: '2-digit' });
-      labels.push(label);
+      labelDates.push({ date: new Date(d), label });
       buckets[label] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
     }
   } else if (currentTimeRange === '24h') {
-    // Generate 24 hourly labels (newest on left, oldest on right)
+    // Generate 24 hourly labels (oldest to newest)
     const now = new Date();
-    for (let i = 0; i < 24; i++) {
+    for (let i = 23; i >= 0; i--) {
       const d = new Date(now);
       d.setHours(d.getHours() - i);
       d.setMinutes(0, 0, 0);
       const hour = String(d.getHours()).padStart(2, '0');
       const label = `${hour}:00`;
-      labels.push(label);
+      labelDates.push({ date: new Date(d), label });
       buckets[label] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
     }
   }
 
-  // Process transactions if data exists
+  // Process transactions and match to buckets
   if (Array.isArray(txCache) && txCache.length > 0) {
     txCache.forEach(tx => {
       const ts = new Date(tx.ts || tx.created_at || tx.timestamp);
@@ -489,32 +541,31 @@ function updateTimelineFromCache() {
         key = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         if (!buckets[key]) {
           buckets[key] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
+          labelDates.push({ date: ts, label: key });
         }
       } else if (labelFormat === 'time_1h') {
         // For 24h: Group into hourly buckets
         const hour = ts.getHours();
         const label = String(hour).padStart(2, '0') + ':00';
         key = label;
-        if (!buckets[key]) {
-          buckets[key] = { BLOCK: 0, DELAY: 0, ALLOW: 0 };
-        }
       } else if (labelFormat === 'date') {
         // For 7d and 30d: Show date (MMM DD)
         key = ts.toLocaleDateString([], { month: 'short', day: '2-digit' });
       }
 
       const action = (tx.action || '').toUpperCase();
-      if (buckets[key] && buckets[key][action] !== undefined) {
-        buckets[key][action]++;
+      if (buckets[key]) {
+        if (buckets[key][action] !== undefined) {
+          buckets[key][action]++;
+        }
       }
     });
   }
 
-  // For 1h time-based labels, get last 10 in reverse chronological order
-  if (labelFormat === 'time') {
-    labels = Object.keys(buckets).sort().slice(-10).reverse();
-  }
+  // Extract labels in chronological order
+  const labels = labelDates.map(item => item.label);
 
+  // Update chart
   if (timelineChart) {
     timelineChart.data.labels = labels;
     timelineChart.data.datasets[0].data = labels.map(l => buckets[l]?.BLOCK || 0);
@@ -718,21 +769,22 @@ async function sendChatMessage() {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
-  // Initialize charts first
-  initCharts();
-  
-  // Initialize dark mode from localStorage
+  // Initialize dark mode from localStorage FIRST (before charts)
   const darkMode = localStorage.getItem('darkMode') === 'true';
   if (darkMode) {
     document.body.classList.add('dark-mode');
     updateDarkModeButton(true);
   }
 
+  // Initialize charts AFTER dark mode is set
+  initCharts();
+
   // Initialize
   loadDashboardData();
   loadRecentTransactions();
   loadDashboardAnalytics(); // server aggregated timeline for full range coverage
   loadPatternAnalytics();
+  loadModelAccuracy(); // Load model performance metrics
   setupWebSocket();
   setInterval(loadDashboardData, 30000);
   setInterval(loadPatternAnalytics, 30000); // Refresh patterns every 30s
@@ -788,6 +840,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Fraud Pattern Modal
+  document.getElementById('fraudPatternInfoBtn').addEventListener('click', () => {
+    document.getElementById('fraudPatternModal').classList.add('open');
+  });
+
+  document.getElementById('closeFraudPatternModal').addEventListener('click', () => {
+    document.getElementById('fraudPatternModal').classList.remove('open');
+  });
+
+  document.getElementById('fraudPatternModal').addEventListener('click', (e) => {
+    if (e.target.id === 'fraudPatternModal') {
+      document.getElementById('fraudPatternModal').classList.remove('open');
+    }
+  });
+
+  // Risk Distribution Modal
+  document.getElementById('riskDistInfoBtn').addEventListener('click', () => {
+    document.getElementById('riskDistModal').classList.add('open');
+  });
+
+  document.getElementById('closeRiskDistModal').addEventListener('click', () => {
+    document.getElementById('riskDistModal').classList.remove('open');
+  });
+
+  document.getElementById('riskDistModal').addEventListener('click', (e) => {
+    if (e.target.id === 'riskDistModal') {
+      document.getElementById('riskDistModal').classList.remove('open');
+    }
+  });
+
+  // Model Performance Metrics Modal
+  document.getElementById('modelMetricsInfoBtn').addEventListener('click', () => {
+    document.getElementById('modelMetricsModal').classList.add('open');
+  });
+
+  document.getElementById('closeModelMetricsModal').addEventListener('click', () => {
+    document.getElementById('modelMetricsModal').classList.remove('open');
+  });
+
+  document.getElementById('modelMetricsModal').addEventListener('click', (e) => {
+    if (e.target.id === 'modelMetricsModal') {
+      document.getElementById('modelMetricsModal').classList.remove('open');
+    }
+  });
+
   // Chatbot
   document.getElementById('chatbotToggle').addEventListener('click', () => {
     const chatbotWindow = document.getElementById('chatbotWindow');
@@ -814,19 +911,52 @@ document.addEventListener('DOMContentLoaded', () => {
     const isDarkMode = document.body.classList.toggle('dark-mode');
     localStorage.setItem('darkMode', isDarkMode);
     updateDarkModeButton(isDarkMode);
+    updateChartColors(isDarkMode);
   });
 });
+
+// Update chart colors for dark mode
+function updateChartColors(isDarkMode) {
+  const textColor = isDarkMode ? '#e5e7eb' : '#374151';
+  const gridColor = isDarkMode ? 'rgba(71, 85, 105, 0.3)' : 'rgba(229, 231, 235, 0.8)';
+
+  // Update timeline chart
+  if (timelineChart) {
+    timelineChart.options.scales.x.ticks.color = textColor;
+    timelineChart.options.scales.x.grid.color = gridColor;
+    timelineChart.options.scales.y.ticks.color = textColor;
+    timelineChart.options.scales.y.grid.color = gridColor;
+    timelineChart.options.plugins.legend.labels.color = textColor;
+    timelineChart.update();
+  }
+
+  // Update risk pie chart
+  if (riskPie) {
+    riskPie.options.plugins.legend.labels.color = textColor;
+    riskPie.update();
+  }
+
+  // Update fraud bar chart
+  if (fraudBar) {
+    fraudBar.options.scales.x.ticks.color = textColor;
+    fraudBar.options.scales.x.grid.color = gridColor;
+    fraudBar.options.scales.y.ticks.color = textColor;
+    fraudBar.options.scales.y.grid.color = gridColor;
+    fraudBar.options.plugins.legend.labels.color = textColor;
+    fraudBar.update();
+  }
+}
 
 // Dark mode button text updater
 function updateDarkModeButton(isDarkMode) {
   const btn = document.getElementById('darkModeToggle');
   if (isDarkMode) {
     btn.textContent = '☀️ Light';
-    btn.style.backgroundColor = '#374151';
-    btn.style.color = '#fbbf24';
+    btn.style.background = 'linear-gradient(to right, #f59e0b, #eab308)';
+    btn.style.color = '#ffffff';
   } else {
     btn.textContent = '🌙 Dark';
-    btn.style.backgroundColor = '#e5e7eb';
-    btn.style.color = '#1f2937';
+    btn.style.background = 'linear-gradient(to right, #4f46e5, #3b82f6)';
+    btn.style.color = '#ffffff';
   }
 }

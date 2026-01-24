@@ -595,6 +595,22 @@
     body.dark-mode .hover-glow-button.bg-red-500:hover {
       box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6), 0 0 16px rgba(239, 68, 68, 0.5);
     }
+
+    /* Chatbot Styles */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    body.dark-mode #chatbotMessages {
+      background-color: #334155 !important;
+    }
+
+    body.dark-mode #chatbotInput {
+      background-color: #475569 !important;
+      color: #f1f5f9 !important;
+      border-color: #64748b !important;
+    }
   </style>
 </head>
 
@@ -606,11 +622,11 @@
       <div class="flex justify-between items-center">
         <div>
           <h1 class="page-title">Admin Console</h1>
-          <p class="page-subtitle">Fraud control & monitoring</p>
+          <p class="page-subtitle">Fraud control & monitoring • Admin Actions • FDT2</p>
         </div>
         <div class="flex gap-3 items-center flex-wrap">
           <button id="darkModeToggleAdmin" class="btn-modern btn-primary-modern" title="Toggle Dark Mode">🌙 Dark</button>
-          <a href="/dashboard" class="btn-modern btn-blue-modern">User Dashboard</a>
+          <a href="/dashboard" class="btn-modern btn-blue-modern">Activity Dashboard</a>
           <a href="/admin/logout" class="btn-modern btn-red-modern">Logout</a>
         </div>
       </div>
@@ -658,6 +674,18 @@
       <div class="admin-card">
         <h3 class="card-title">Recent Admin Logs</h3>
         <div id="admin_logs" class="text-sm overflow-y-auto space-y-2" style="max-height: 70vh;"></div>
+      </div>
+    </div>
+
+    <!-- Chatbot Panel -->
+    <div class="admin-card" style="display: flex; flex-direction: column; height: 500px;">
+      <h3 class="card-title">🤖 Fraud Analytics Assistant</h3>
+      <div id="chatbotMessages" style="flex: 1; overflow-y: auto; margin-bottom: 12px; padding: 12px; background: #f9fafb; border-radius: 8px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 8px;">Chat initialized. Ask me about fraud patterns, transactions, or analytics.</div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <input id="chatbotInput" type="text" placeholder="Ask about fraud patterns..." class="input-modern" style="flex: 1; padding: 10px;" />
+        <button id="chatbotSend" class="btn-modern btn-blue-modern" style="padding: 10px 16px;">Send</button>
       </div>
     </div>
 
@@ -1389,6 +1417,79 @@ function setupWS() {
 
 fetchRecent();
 setupWS();
+
+// Chatbot setup
+let chatHistory = [];
+document.getElementById('chatbotSend')?.addEventListener('click', async () => {
+  const chatbotInput = document.getElementById('chatbotInput');
+  const chatbotSend = document.getElementById('chatbotSend');
+  const message = chatbotInput.value.trim();
+  if (!message) return;
+  
+  // Add user message
+  const userDiv = document.createElement('div');
+  userDiv.style.cssText = 'align-self: flex-end; max-width: 70%; padding: 8px 12px; background: #667eea; color: white; border-radius: 8px; word-wrap: break-word;';
+  userDiv.textContent = message;
+  document.getElementById('chatbotMessages').appendChild(userDiv);
+  
+  chatHistory.push({ role: 'user', content: message });
+  chatbotInput.value = '';
+  chatbotSend.disabled = true;
+  chatbotInput.disabled = true;
+  
+  // Show typing indicator
+  const typingDiv = document.createElement('div');
+  typingDiv.id = 'typingIndicator';
+  typingDiv.style.cssText = 'align-self: flex-start; display: flex; gap: 4px; padding: 8px 12px; background: #e5e7eb; border-radius: 8px;';
+  typingDiv.innerHTML = '<span style="width: 8px; height: 8px; background: #6b7280; border-radius: 50%; animation: pulse 1.5s infinite;"></span><span style="width: 8px; height: 8px; background: #6b7280; border-radius: 50%; animation: pulse 1.5s infinite 0.3s;"></span><span style="width: 8px; height: 8px; background: #6b7280; border-radius: 50%; animation: pulse 1.5s infinite 0.6s;"></span>';
+  document.getElementById('chatbotMessages').appendChild(typingDiv);
+  document.getElementById('chatbotMessages').scrollTop = document.getElementById('chatbotMessages').scrollHeight;
+  
+  try {
+    const response = await fetch('/api/chatbot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: message,
+        time_range: '24h',
+        history: chatHistory.slice(-10)
+      })
+    });
+    
+    if (!response.ok) throw new Error('Chatbot request failed');
+    
+    const data = await response.json();
+    typingDiv.remove();
+    
+    // Add bot response
+    const botDiv = document.createElement('div');
+    botDiv.style.cssText = 'align-self: flex-start; max-width: 70%; padding: 8px 12px; background: #f3f4f6; color: #1f2937; border-radius: 8px; word-wrap: break-word; white-space: pre-wrap;';
+    botDiv.textContent = data.response;
+    document.getElementById('chatbotMessages').appendChild(botDiv);
+    
+    chatHistory.push({ role: 'assistant', content: data.response });
+  } catch (error) {
+    console.error('Chatbot error:', error);
+    typingDiv.remove();
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'align-self: flex-start; max-width: 70%; padding: 8px 12px; background: #fee2e2; color: #991b1b; border-radius: 8px;';
+    errorDiv.textContent = 'Sorry, I encountered an error. Please try again.';
+    document.getElementById('chatbotMessages').appendChild(errorDiv);
+  } finally {
+    chatbotSend.disabled = false;
+    chatbotInput.disabled = false;
+    chatbotInput.focus();
+    document.getElementById('chatbotMessages').scrollTop = document.getElementById('chatbotMessages').scrollHeight;
+  }
+});
+
+// Allow Enter key to send
+document.getElementById('chatbotInput')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById('chatbotSend')?.click();
+  }
+});
 
 document.getElementById('adminFilter')
   ?.addEventListener('change', redrawAdminRecent);

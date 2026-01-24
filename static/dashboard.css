@@ -205,20 +205,85 @@ body.dark-mode .table-scroll tbody td {
 
 /* Sort Arrows */
 .sort-arrow {
-  display: inline-block;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
   margin-left: 4px;
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+  vertical-align: middle;
+  line-height: 0.5;
+  font-size: 10px;
+}
+
+.sort-arrow:hover {
+  opacity: 0.8;
+}
+
+/* Show both arrows by default */
+.sort-arrow::before {
+  content: '▲';
   color: #9ca3af;
-  font-size: 12px;
-  transition: all 0.2s ease;
+  display: block;
 }
 
+.sort-arrow::after {
+  content: '▼';
+  color: #9ca3af;
+  display: block;
+  margin-top: -2px;
+}
+
+/* Active ascending - darken up arrow */
 .sort-arrow.active-asc {
-  color: #667eea;
-  transform: rotate(180deg);
+  opacity: 1;
 }
 
+.sort-arrow.active-asc::before {
+  color: #1f2937;
+  font-weight: bold;
+}
+
+.sort-arrow.active-asc::after {
+  color: #d1d5db;
+}
+
+/* Active descending - darken down arrow */
 .sort-arrow.active-desc {
-  color: #667eea;
+  opacity: 1;
+}
+
+.sort-arrow.active-desc::before {
+  color: #d1d5db;
+}
+
+.sort-arrow.active-desc::after {
+  color: #1f2937;
+  font-weight: bold;
+}
+
+/* Dark mode */
+body.dark-mode .sort-arrow::before,
+body.dark-mode .sort-arrow::after {
+  color: #6b7280;
+}
+
+body.dark-mode .sort-arrow.active-asc::before {
+  color: #f1f5f9;
+}
+
+body.dark-mode .sort-arrow.active-asc::after {
+  color: #475569;
+}
+
+body.dark-mode .sort-arrow.active-desc::before {
+  color: #475569;
+}
+
+body.dark-mode .sort-arrow.active-desc::after {
+  color: #f1f5f9;
 }
 
 /* Buttons */
@@ -970,6 +1035,143 @@ a.bg-orange-600:hover {
   .risk-threshold {
     grid-template-columns: 1fr;
   }
+}
+
+/* Dark mode for pro tip section */
+body.dark-mode .bg-blue-50 {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+body.dark-mode .border-blue-500 {
+  border-color: #3b82f6;
+}
+
+body.dark-mode .text-blue-900 {
+  color: #93c5fd;
+}
+
+body.dark-mode .text-blue-800 {
+  color: #bfdbfe;
+}
+
+body.dark-mode .text-blue-600 {
+  color: #60a5fa;
+}
+
+/* Dark mode for model accuracy cards */
+body.dark-mode .bg-gradient-to-br.from-purple-50 {
+  background: linear-gradient(to bottom right, rgba(139, 92, 246, 0.15), rgba(124, 58, 237, 0.2)) !important;
+}
+
+body.dark-mode .bg-gradient-to-br.from-blue-50 {
+  background: linear-gradient(to bottom right, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.2)) !important;
+}
+
+body.dark-mode .bg-gradient-to-br.from-green-50 {
+  background: linear-gradient(to bottom right, rgba(34, 197, 94, 0.15), rgba(22, 163, 74, 0.2)) !important;
+}
+
+body.dark-mode .bg-gradient-to-br.from-indigo-50 {
+  background: linear-gradient(to bottom right, rgba(99, 102, 241, 0.15), rgba(79, 70, 229, 0.2)) !important;
+}
+
+body.dark-mode .text-purple-900,
+body.dark-mode .text-purple-800 {
+  color: #c4b5fd;
+}
+
+body.dark-mode .text-purple-700 {
+  color: #d8b4fe;
+}
+
+body.dark-mode .text-purple-600 {
+  color: #e9d5ff;
+}
+
+body.dark-mode .text-blue-900,
+body.dark-mode .text-blue-800 {
+  color: #93c5fd;
+}
+
+body.dark-mode .text-blue-700 {
+  color: #bfdbfe;
+}
+
+body.dark-mode .text-blue-600 {
+  color: #dbeafe;
+}
+
+body.dark-mode .text-green-900,
+body.dark-mode .text-green-800 {
+  color: #86efac;
+}
+
+body.dark-mode .text-green-700 {
+  color: #bbf7d0;
+}
+
+body.dark-mode .text-green-600 {
+  color: #dcfce7;
+}
+
+body.dark-mode .text-indigo-900,
+body.dark-mode .text-indigo-800 {
+  color: #a5b4fc;
+}
+
+body.dark-mode .text-indigo-700 {
+  color: #c7d2fe;
+}
+
+body.dark-mode .text-indigo-600 {
+  color: #e0e7ff;
+}
+
+/* Dark mode for confidence badge pills only (not alert cards) */
+body.dark-mode .rounded-full.bg-green-50 {
+  background-color: #065f46 !important;
+}
+
+body.dark-mode .rounded-full.text-green-700 {
+  color: #a7f3d0 !important;
+}
+
+body.dark-mode .rounded-full.border-green-100 {
+  border-color: #047857 !important;
+}
+
+body.dark-mode .rounded-full.bg-yellow-50 {
+  background-color: #78350f !important;
+}
+
+body.dark-mode .rounded-full.text-yellow-700 {
+  color: #fcd34d !important;
+}
+
+body.dark-mode .rounded-full.border-yellow-100 {
+  border-color: #92400e !important;
+}
+
+body.dark-mode .rounded-full.bg-red-50 {
+  background-color: #7f1d1d !important;
+}
+
+body.dark-mode .rounded-full.text-red-700 {
+  color: #fca5a5 !important;
+}
+
+body.dark-mode .rounded-full.border-red-100 {
+  border-color: #991b1b !important;
+}
+
+/* Dark mode for Chart.js legends and labels */
+body.dark-mode canvas {
+  filter: brightness(1.1);
+}
+
+/* Dark mode text colors for chart legends */
+body.dark-mode .chart-wrap {
+  color: #e5e7eb;
 }
 
 /* Smooth transitions for everything */

@@ -633,6 +633,43 @@ async def pattern_analytics(time_range: str = "24h", limit: int = None):
     stats = await run_in_threadpool(db_aggregate_fraud_patterns, time_range, limit)
     return stats
 
+@app.get("/model-accuracy")
+async def model_accuracy():
+    """Get model accuracy metrics from metadata.json"""
+    try:
+        metadata_path = os.path.join(os.path.dirname(__file__), "..", "models", "metadata.json")
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+        
+        model_results = metadata.get("model_results", {})
+        
+        # Calculate accuracy from confusion matrix
+        def calculate_accuracy(confusion_matrix):
+            tn, fp, fn, tp = confusion_matrix[0][0], confusion_matrix[0][1], confusion_matrix[1][0], confusion_matrix[1][1]
+            total = tn + fp + fn + tp
+            return ((tn + tp) / total * 100) if total > 0 else 0
+        
+        rf_acc = calculate_accuracy(model_results.get("random_forest", {}).get("confusion_matrix", [[0,0],[0,0]]))
+        xgb_acc = calculate_accuracy(model_results.get("xgboost", {}).get("confusion_matrix", [[0,0],[0,0]]))
+        if_detection = model_results.get("iforest", {}).get("roc_auc", 0) * 100
+        
+        ensemble_acc = (rf_acc + xgb_acc) / 2
+        
+        return {
+            "random_forest": round(rf_acc, 2),
+            "xgboost": round(xgb_acc, 2),
+            "isolation_forest": round(if_detection, 2),
+            "ensemble": round(ensemble_acc, 2)
+        }
+    except Exception as e:
+        print(f"Error loading model accuracy: {e}")
+        return {
+            "random_forest": 0,
+            "xgboost": 0,
+            "isolation_forest": 0,
+            "ensemble": 0
+        }
+
 @app.get("/recent-transactions")
 async def recent_transactions(limit: int = 10, time_range: str = "24h"):
     since = parse_time_range(time_range)
@@ -844,7 +881,7 @@ async def chatbot_endpoint(request: Request):
             conversation_history
         )
         
-        return result
+        return JSONResponse(result)
         
     except Exception as e:
         print(f"Chatbot error: {e}")
