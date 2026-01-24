@@ -231,7 +231,7 @@ class FraudDetectionChatbot:
         # Help/greeting
         elif any(word in message_lower for word in ["hello", "hi", "help", "what can"]):
             return ("👋 Welcome to UPI Fraud Detection Assistant!\n\n"
-                   "I'm here to help you understand fraud patterns and transaction analytics.\n\n"
+                   "Your Synara is here to help you understand fraud patterns and transaction analytics.\n\n"
                    "═══ What I Can Help You With ═══\n\n"
                    "• 📊 Transaction statistics and counts\n"
                    "• 💻 Risk score analysis\n"

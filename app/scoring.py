@@ -6,8 +6,10 @@ Uses multiple trained models with proper feature extraction and ensemble voting
 import os
 import math
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, Optional, Union, Any
 import numpy as np
+
+from .explainability import explain_transaction
 
 # Model loading and caching
 _MODELS_LOADED = False
@@ -214,9 +216,30 @@ def score_with_ensemble(features_dict: dict) -> Dict[str, float]:
         total_weight = sum(weights.get(model, 0) for model in scores.keys())
         
         scores["ensemble"] = float(weighted_sum / total_weight) if total_weight > 0 else 0.0
+
+        # Final risk score: simple average of available model scores (excluding ensemble)
+        model_values = [v for k, v in scores.items() if k != "ensemble"]
+        if model_values:
+            scores["final_risk_score"] = float(sum(model_values) / len(model_values))
+            # Disagreement: spread between max and min model scores
+            scores["disagreement"] = float(max(model_values) - min(model_values))
+            # Confidence level from disagreement
+            if scores["disagreement"] < 0.2:
+                scores["confidence_level"] = "HIGH"
+            elif scores["disagreement"] <= 0.4:
+                scores["confidence_level"] = "MEDIUM"
+            else:
+                scores["confidence_level"] = "LOW"
+        else:
+            scores["final_risk_score"] = scores["ensemble"]
+            scores["disagreement"] = 0.0
+            scores["confidence_level"] = "HIGH"
     else:
         # No models available, use fallback
         scores["ensemble"] = fallback_rule_based_score(features_dict)
+        scores["final_risk_score"] = scores["ensemble"]
+        scores["disagreement"] = 0.0
+        scores["confidence_level"] = "HIGH"
     
     return scores
 
@@ -271,30 +294,68 @@ def fallback_rule_based_score(features: dict) -> float:
     return float(max(0.0, min(1.0, score)))
 
 
-def score_transaction(tx: dict) -> float:
+def score_transaction(tx: dict, return_details: bool = False) -> Union[float, Dict[str, Any]]:
     """
-    Main scoring function - extracts features and returns ensemble risk score.
-    
+    Main scoring function.
+    - Always computes per-model scores.
+    - Optionally returns full details (model scores + explainability reasons).
+
     Args:
         tx: Transaction dictionary
-    
+        return_details: When True, return dict with risk score, model-wise scores, and reasons.
+
     Returns:
-        Risk score between 0.0 (safe) and 1.0 (high risk)
+        float risk score (default) OR
+        dict {"risk_score", "final_risk_score", "model_scores", "disagreement", "confidence_level", "reasons", "features"}
     """
     try:
         # Extract features
         features = extract_features(tx)
-        
+
         # Score with ensemble
-        scores = score_with_ensemble(features)
-        
-        # Return ensemble score
-        return scores.get("ensemble", 0.0)
-        
+        model_scores = score_with_ensemble(features)
+        risk_score = model_scores.get("ensemble", 0.0)
+        final_risk_score = model_scores.get("final_risk_score", risk_score)
+        disagreement = model_scores.get("disagreement", 0.0)
+        confidence_level = model_scores.get("confidence_level", "HIGH")
+
+        if not return_details:
+            return risk_score
+
+        # Build explainability reasons using the dedicated module (no scoring done here)
+        reasons = explain_transaction(
+            features,
+            {
+                "iforest_score": model_scores.get("iforest"),
+                "rf_proba": model_scores.get("random_forest"),
+                "xgb_proba": model_scores.get("xgboost"),
+            },
+        )
+
+        return {
+            "risk_score": risk_score,
+            "final_risk_score": final_risk_score,
+            "model_scores": model_scores,
+            "disagreement": disagreement,
+            "confidence_level": confidence_level,
+            "reasons": reasons,
+            "features": features,
+        }
+
     except Exception as e:
         print(f"Scoring error: {e}")
         # Emergency fallback
-        return 0.5  # Medium risk if error occurs
+        if return_details:
+            return {
+                "risk_score": 0.5,
+                "final_risk_score": 0.5,
+                "model_scores": {},
+                "disagreement": 0.0,
+                "confidence_level": "LOW",
+                "reasons": ["Scoring fallback due to error"],
+                "features": {},
+            }
+        return 0.5
 
 
 # Legacy compatibility functions
