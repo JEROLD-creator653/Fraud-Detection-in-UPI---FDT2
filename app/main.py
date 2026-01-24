@@ -36,10 +36,17 @@ def parse_time_range(time_range: str):
     else:
         return None
 
+# --- paths ---
+BASE_DIR = os.path.dirname(__file__)
+ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
+TEMPLATES_DIR = os.path.join(ROOT_DIR, "templates")
+STATIC_DIR = os.path.join(ROOT_DIR, "static")
+
 # --- config loader with defaults ---
-CFG_PATH = os.path.join(os.getcwd(), "config.yaml")
+CFG_PATH = os.path.join(ROOT_DIR, "config.yaml")
 DEFAULT_CFG = {
-    "db_url": "postgresql://fdt:fdtpass@host.docker.internal:5432/fdt_db",
+    # prefer local Postgres on 5433; overridden by env DB_URL or config.yaml
+    "db_url": "postgresql://fdt:fdtpass@localhost:5433/fdt_db",
     "thresholds": {"delay": 0.03, "block": 0.06},
     # WARNING: change secret_key before production
     "secret_key": "dev-secret-change-me-please",
@@ -62,7 +69,7 @@ if os.path.exists(CFG_PATH):
     except Exception as e:
         print("Failed to load config.yaml:", e)
 
-DB_URL = cfg.get("db_url")
+DB_URL = os.getenv("DB_URL", cfg.get("db_url"))
 THRESHOLDS = cfg.get("thresholds", {"delay": 0.0, "block": 0.07})
 SECRET_KEY = cfg.get("secret_key", DEFAULT_CFG["secret_key"])
 ADMIN_USERNAME = cfg.get("admin_username", DEFAULT_CFG["admin_username"])
@@ -71,10 +78,10 @@ ADMIN_PASSWORD_HASH = cfg.get("admin_password_hash", DEFAULT_CFG["admin_password
 # --- FastAPI app and templates ---
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 # serve static if directory exists
-if os.path.isdir("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # --- websockets manager ---
 class WSManager:
