@@ -19,7 +19,24 @@ from sklearn.metrics import (
     roc_auc_score, precision_recall_curve, auc
 )
 import xgboost as xgb
-from app.feature_engine import extract_features, features_to_vector, get_feature_names
+
+# Define feature names for this training pipeline
+def get_feature_names():
+    """Return ordered list of feature names for model training."""
+    return [
+        # Basic (3)
+        "amount", "log_amount", "is_round_amount",
+        # Temporal (6) - added month
+        "hour_of_day", "month_of_year", "day_of_week", "is_weekend", "is_night", "is_business_hours",
+        # Velocity (5)
+        "tx_count_1h", "tx_count_6h", "tx_count_24h", "tx_count_1min", "tx_count_5min",
+        # Behavioral (6) - added is_p2p
+        "is_new_recipient", "recipient_tx_count", "is_new_device", "device_count", "is_p2m", "is_p2p",
+        # Statistical (4)
+        "amount_mean", "amount_std", "amount_max", "amount_deviation",
+        # Risk (3)
+        "merchant_risk_score", "is_qr_channel", "is_web_channel"
+    ]
 
 # Set random seeds for reproducibility
 random.seed(42)
@@ -109,14 +126,13 @@ def generate_fraud_transaction():
     return tx
 
 
-def create_training_dataset(n_normal=10000, n_fraud=1000, use_redis=False):
+def create_training_dataset(n_normal=10000, n_fraud=1000):
     """
     Create a realistic training dataset with labels.
     
     Args:
         n_normal: Number of normal transactions
         n_fraud: Number of fraudulent transactions
-        use_redis: Whether to extract features using Redis (requires Redis connection)
     
     Returns:
         X: Feature matrix
@@ -146,13 +162,8 @@ def create_training_dataset(n_normal=10000, n_fraud=1000, use_redis=False):
     
     for idx, tx in enumerate(transactions):
         try:
-            if use_redis:
-                # Use Redis-based feature extraction (realistic but slower)
-                features_dict = extract_features(tx)
-                feature_vec = features_to_vector(features_dict)
-            else:
-                # Simplified feature extraction without Redis (faster for training)
-                feature_vec = extract_features_simple(tx)
+            # Use simplified feature extraction
+            feature_vec = extract_features_simple(tx)
             
             X.append(feature_vec)
             valid_indices.append(idx)
@@ -172,7 +183,10 @@ def create_training_dataset(n_normal=10000, n_fraud=1000, use_redis=False):
 
 def extract_features_simple(tx):
     """Simplified feature extraction without Redis (for training)."""
-    ts = datetime.fromisoformat(tx["timestamp"].replace("Z", "+00:00"))
+    ts_str = tx["timestamp"]
+    if ts_str.endswith('Z'):
+        ts_str = ts_str[:-1] + '+00:00'
+    ts = datetime.fromisoformat(ts_str)
     amount = float(tx["amount"])
     merchant = tx["recipient_vpa"].split("@")[0]
     
@@ -181,6 +195,7 @@ def extract_features_simple(tx):
         np.log1p(amount),  # log_amount
         1.0 if (amount % 100 == 0 or amount % 500 == 0) else 0.0,  # is_round_amount
         float(ts.hour),  # hour_of_day
+        float(ts.month),  # month_of_year
         float(ts.weekday()),  # day_of_week
         1.0 if ts.weekday() >= 5 else 0.0,  # is_weekend
         1.0 if (ts.hour >= 22 or ts.hour <= 5) else 0.0,  # is_night
@@ -193,6 +208,7 @@ def extract_features_simple(tx):
         1.0 if "new" in tx["device_id"] else 0.0,  # is_new_device
         random.uniform(1, 3),  # device_count
         1.0 if tx["tx_type"] == "P2M" else 0.0,  # is_p2m
+        1.0 if tx["tx_type"] == "P2P" else 0.0,  # is_p2p
         # Statistical features
         amount * random.uniform(0.8, 1.2),  # amount_mean (simulated)
         amount * 0.3,  # amount_std (simulated)
@@ -278,15 +294,19 @@ def evaluate_model(model, X_test, y_test, model_name, is_supervised=True):
     if is_supervised:
         # Supervised models (RF, XGBoost)
         y_pred = model.predict(X_test)
-        y_proba = model.predict_proba(X_test)[:, 1]
+        if hasattr(model, 'predict_proba'):
+            y_proba = model.predict_proba(X_test)[:, 1]
+        else:
+            y_proba = model.decision_function(X_test)
         
         print("\nClassification Report:")
-        print(classification_report(y_test, y_pred, target_names=['Normal', 'Fraud']))
+        print(classification_report(y_test, y_pred, target_names=['Normal', 'Fraud'], zero_division=0))
         
         print("\nConfusion Matrix:")
         cm = confusion_matrix(y_test, y_pred)
         print(cm)
-        print(f"TN: {cm[0,0]}, FP: {cm[0,1]}, FN: {cm[1,0]}, TP: {cm[1,1]}")
+        if cm.size == 4:
+            print(f"TN: {cm[0,0]}, FP: {cm[0,1]}, FN: {cm[1,0]}, TP: {cm[1,1]}")
         
         # ROC-AUC
         roc_auc = roc_auc_score(y_test, y_proba)
@@ -312,11 +332,13 @@ def evaluate_model(model, X_test, y_test, model_name, is_supervised=True):
         anomaly_scores = -model.decision_function(X_test)  # Higher = more anomalous
         
         print("\nClassification Report:")
-        print(classification_report(y_test, y_pred, target_names=['Normal', 'Fraud']))
+        print(classification_report(y_test, y_pred, target_names=['Normal', 'Fraud'], zero_division=0))
         
         print("\nConfusion Matrix:")
         cm = confusion_matrix(y_test, y_pred)
         print(cm)
+        if cm.size == 4:
+            print(f"TN: {cm[0,0]}, FP: {cm[0,1]}, FN: {cm[1,0]}, TP: {cm[1,1]}")
         
         # ROC-AUC using anomaly scores
         roc_auc = roc_auc_score(y_test, anomaly_scores)
@@ -342,8 +364,7 @@ def main():
     # 1. Generate dataset
     X, y, raw_data = create_training_dataset(
         n_normal=10000,
-        n_fraud=1000,
-        use_redis=False  # Set to True if Redis is running
+        n_fraud=1000
     )
     
     # 2. Train/test split

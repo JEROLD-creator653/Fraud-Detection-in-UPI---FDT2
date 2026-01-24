@@ -1,13 +1,14 @@
 {
-  "training_date": "2026-01-16T19:21:57.117015",
+  "training_date": "2026-01-24T01:54:48.340220",
   "training_samples": 7700,
   "test_samples": 3300,
-  "num_features": 25,
+  "num_features": 27,
   "feature_names": [
     "amount",
     "log_amount",
     "is_round_amount",
     "hour_of_day",
+    "month_of_year",
     "day_of_week",
     "is_weekend",
     "is_night",
@@ -22,6 +23,7 @@
     "is_new_device",
     "device_count",
     "is_p2m",
+    "is_p2p",
     "amount_mean",
     "amount_std",
     "amount_max",
@@ -34,45 +36,45 @@
   "model_results": {
     "iforest": {
       "model_name": "Isolation Forest",
-      "roc_auc": 0.95721,
+      "roc_auc": 0.9577622222222224,
       "confusion_matrix": [
         [
-          2921,
-          79
+          2909,
+          91
         ],
         [
-          56,
-          244
+          53,
+          247
         ]
       ]
     },
     "random_forest": {
       "model_name": "Random Forest",
-      "roc_auc": 0.9891211111111111,
-      "pr_auc": 0.945894822069206,
+      "roc_auc": 0.9881977777777777,
+      "pr_auc": 0.9456520203058587,
       "confusion_matrix": [
         [
           2949,
           51
         ],
         [
-          41,
-          259
+          39,
+          261
         ]
       ]
     },
     "xgboost": {
       "model_name": "XGBoost",
-      "roc_auc": 0.9887088888888889,
-      "pr_auc": 0.9421317230739694,
+      "roc_auc": 0.9873377777777779,
+      "pr_auc": 0.9402288157766744,
       "confusion_matrix": [
         [
-          2923,
-          77
+          2932,
+          68
         ],
         [
-          35,
-          265
+          36,
+          264
         ]
       ]
     }
