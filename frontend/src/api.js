@@ -1,5 +1,6 @@
 // API utilities for backend communication
 import axios from 'axios';
+import cacheManager from './utils/cacheManager';
 
 // Use explicit backend URL
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
@@ -53,15 +54,34 @@ export const loginUser = async (credentials) => {
 
 // User APIs
 export const getUserDashboard = async () => {
+  const cacheKey = 'user_dashboard';
+  const cachedData = cacheManager.get(cacheKey);
+  
+  if (cachedData) {
+    return cachedData;
+  }
+
   const response = await api.get('/api/user/dashboard');
-  return response.data;
+  const data = response.data;
+  cacheManager.set(cacheKey, data, 'dashboard');
+  return data;
 };
 
 export const getUserTransactions = async (limit = 20, statusFilter = null) => {
   const params = { limit };
   if (statusFilter) params.status_filter = statusFilter;
+  
+  const cacheKey = `transactions_${limit}_${statusFilter || 'all'}`;
+  const cachedData = cacheManager.get(cacheKey);
+  
+  if (cachedData) {
+    return cachedData;
+  }
+
   const response = await api.get('/api/user/transactions', { params });
-  return response.data;
+  const data = response.data;
+  cacheManager.set(cacheKey, data, 'transactions');
+  return data;
 };
 
 // Transaction APIs

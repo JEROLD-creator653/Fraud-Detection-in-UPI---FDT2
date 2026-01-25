@@ -237,10 +237,14 @@ async def get_user_dashboard(user_id: str = Depends(get_current_user)):
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
             
+            # Add UPI ID to user data
+            user_dict = dict(user)
+            user_dict["upi_id"] = f"{user_dict['phone'].replace('+91', '').replace('+', '')}@upi"
+            
             # Get recent transactions (last 5)
             cur.execute(
                 """
-                SELECT tx_id, amount, recipient_vpa, tx_type, action, risk_score, created_at, db_status
+                SELECT tx_id, amount, recipient_vpa, tx_type, action, risk_score, created_at, db_status, remarks
                 FROM transactions
                 WHERE user_id = %s
                 ORDER BY created_at DESC
@@ -268,7 +272,7 @@ async def get_user_dashboard(user_id: str = Depends(get_current_user)):
             
             return {
                 "status": "success",
-                "user": dict_to_json_serializable(dict(user)),
+                "user": dict_to_json_serializable(user_dict),
                 "recent_transactions": dict_to_json_serializable([dict(t) for t in recent_transactions]),
                 "stats": dict_to_json_serializable(dict(stats))
             }
@@ -483,27 +487,38 @@ async def get_user_transactions(
             cur = conn.cursor()
             
             query = """
-                SELECT tx_id, amount, recipient_vpa, tx_type, action, risk_score, 
-                       db_status, remarks, created_at
-                FROM transactions
-                WHERE user_id = %s
+                SELECT t.tx_id, t.amount, t.recipient_vpa, t.tx_type, t.action, t.risk_score, 
+                       t.db_status, t.remarks, t.created_at, fa.reason as fraud_reasons
+                FROM transactions t
+                LEFT JOIN fraud_alerts fa ON t.tx_id = fa.tx_id
+                WHERE t.user_id = %s
             """
             params = [user_id]
             
             if status_filter:
-                query += " AND action = %s"
+                query += " AND t.action = %s"
                 params.append(status_filter.upper())
             
-            query += " ORDER BY created_at DESC LIMIT %s"
+            query += " ORDER BY t.created_at DESC LIMIT %s"
             params.append(limit)
             
             cur.execute(query, params)
             transactions = cur.fetchall()
             
+            # Process transactions to split fraud reasons into arrays
+            processed_transactions = []
+            for tx in transactions:
+                tx_dict = dict(tx)
+                if tx_dict.get("fraud_reasons"):
+                    tx_dict["fraud_reasons"] = [reason.strip() for reason in tx_dict["fraud_reasons"].split(";")]
+                else:
+                    tx_dict["fraud_reasons"] = []
+                processed_transactions.append(tx_dict)
+            
             return {
                 "status": "success",
-                "transactions": dict_to_json_serializable([dict(t) for t in transactions]),
-                "count": len(transactions)
+                "transactions": dict_to_json_serializable(processed_transactions),
+                "count": len(processed_transactions)
             }
         finally:
             conn.close()

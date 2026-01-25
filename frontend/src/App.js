@@ -4,17 +4,18 @@ import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
 import Dashboard from './components/Dashboard';
-import NewTransaction from './components/NewTransaction';
+import SendMoney from './components/SendMoney';
 import TransactionHistory from './components/TransactionHistory';
-import FraudAlert from './components/FraudAlert';
-import { requestNotificationPermission, onMessageListener } from './firebase';
-import { registerPushToken } from './api';
+import FraudAlertEnhanced from './components/FraudAlertEnhanced';
+import RiskAnalysis from './components/RiskAnalysis';
+import SecuritySettings from './components/SecuritySettings';
+import NotificationPanel from './components/NotificationPanel';
+import { NotificationProvider } from './components/NotificationSystem';
 
-function App() {
+function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
-  const [notification, setNotification] = useState(null);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -22,38 +23,16 @@ function App() {
     const userData = localStorage.getItem('fdt_user');
     
     if (token && userData) {
-      setUser(JSON.parse(userData));
-      setIsAuthenticated(true);
-      
-      // Request notification permission
-      requestNotificationPermission().then((fcmToken) => {
-        if (fcmToken) {
-          registerPushToken(fcmToken, 'web_device')
-            .then(() => console.log('Push token registered'))
-            .catch((err) => console.error('Failed to register push token:', err));
-        }
-      });
+      try {
+        setUser(JSON.parse(userData));
+        setIsAuthenticated(true);
+      } catch (e) {
+        console.error('Failed to parse user data:', e);
+      }
     }
     
-    // Show splash screen for 2 seconds
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
-  }, []);
-
-  useEffect(() => {
-    // Listen for foreground push notifications
-    onMessageListener()
-      .then((payload) => {
-        setNotification({
-          title: payload.notification.title,
-          body: payload.notification.body
-        });
-        
-        // Auto-hide notification after 5 seconds
-        setTimeout(() => setNotification(null), 5000);
-      })
-      .catch((err) => console.log('Error in foreground message listener:', err));
+    // Skip splash screen - go directly to login/dashboard
+    setIsLoading(false);
   }, []);
 
   const handleLogin = (userData, token) => {
@@ -61,15 +40,6 @@ function App() {
     localStorage.setItem('fdt_user', JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
-    
-    // Request notification permission after login
-    requestNotificationPermission().then((fcmToken) => {
-      if (fcmToken) {
-        registerPushToken(fcmToken, 'web_device')
-          .then(() => console.log('Push token registered'))
-          .catch((err) => console.error('Failed to register push token:', err));
-      }
-    });
   };
 
   const handleLogout = () => {
@@ -86,14 +56,6 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
-        {/* Push Notification Display */}
-        {notification && (
-          <div className="fixed top-4 left-4 right-4 z-50 bg-red-500 text-white p-4 rounded-lg shadow-lg slide-up">
-            <h3 className="font-bold">{notification.title}</h3>
-            <p className="text-sm">{notification.body}</p>
-          </div>
-        )}
-
         <Routes>
           <Route
             path="/login"
@@ -125,11 +87,12 @@ function App() {
               )
             }
           />
+
           <Route
-            path="/new-transaction"
+            path="/send-money"
             element={
               isAuthenticated ? (
-                <NewTransaction user={user} />
+                <SendMoney user={user} onBack={() => window.history.back()} />
               ) : (
                 <Navigate to="/login" />
               )
@@ -149,7 +112,27 @@ function App() {
             path="/fraud-alert/:txId"
             element={
               isAuthenticated ? (
-                <FraudAlert user={user} />
+                <FraudAlertEnhanced user={user} />
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+          <Route
+            path="/risk-analysis"
+            element={
+              isAuthenticated ? (
+                <RiskAnalysis user={user} />
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+          <Route
+            path="/security-settings"
+            element={
+              isAuthenticated ? (
+                <SecuritySettings user={user} />
               ) : (
                 <Navigate to="/login" />
               )
@@ -166,8 +149,17 @@ function App() {
             }
           />
         </Routes>
+        <NotificationPanel />
       </div>
     </Router>
+  );
+}
+
+function App() {
+  return (
+    <NotificationProvider>
+      <AppContent />
+    </NotificationProvider>
   );
 }
 

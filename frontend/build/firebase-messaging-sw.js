@@ -2,13 +2,15 @@
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
+// Firebase config loaded from environment
+// Note: Service workers cannot access process.env, so config must be injected at build time
 firebase.initializeApp({
-  apiKey: "AIzaSyAHorLTy4VirROVhCYGT4bFjakhlmWSDB0",
-  authDomain: "fdt-fraud-detecction-upi.firebaseapp.com",
-  projectId: "fdt-fraud-detecction-upi",
-  storageBucket: "fdt-fraud-detecction-upi.firebasestorage.app",
-  messagingSenderId: "580819831702",
-  appId: "1:580819831702:android:34d7e1041c245563772bb7"
+  apiKey: "YOUR_FIREBASE_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.firebasestorage.app",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 });
 
 const messaging = firebase.messaging();
