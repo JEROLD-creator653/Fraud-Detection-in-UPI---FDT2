@@ -321,7 +321,9 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             try:
                 # Import scoring module from parent app directory
                 import sys
-                sys.path.insert(0, '/app')
+                import os
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                sys.path.insert(0, project_root)
                 from app import scoring
                 
                 risk_score = scoring.score_transaction(transaction)
