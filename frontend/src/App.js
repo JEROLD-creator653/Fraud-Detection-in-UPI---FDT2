@@ -4,7 +4,6 @@ import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
 import Dashboard from './components/Dashboard';
-import SendMoney from './components/SendMoney';
 import TransactionHistory from './components/TransactionHistory';
 import FraudAlertEnhanced from './components/FraudAlertEnhanced';
 import RiskAnalysis from './components/RiskAnalysis';
@@ -18,20 +17,11 @@ function AppContent() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const token = localStorage.getItem('fdt_token');
-    const userData = localStorage.getItem('fdt_user');
+    // Clear any existing authentication to force login
+    localStorage.removeItem('fdt_token');
+    localStorage.removeItem('fdt_user');
     
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-        setIsAuthenticated(true);
-      } catch (e) {
-        console.error('Failed to parse user data:', e);
-      }
-    }
-    
-    // Skip splash screen - go directly to login/dashboard
+    // Don't auto-authenticate - always show login screen
     setIsLoading(false);
   }, []);
 
@@ -86,19 +76,8 @@ function AppContent() {
                 <Navigate to="/login" />
               )
             }
-          />
-
-          <Route
-            path="/send-money"
-            element={
-              isAuthenticated ? (
-                <SendMoney user={user} onBack={() => window.history.back()} />
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
-          />
-          <Route
+           />
+           <Route
             path="/transactions"
             element={
               isAuthenticated ? (
