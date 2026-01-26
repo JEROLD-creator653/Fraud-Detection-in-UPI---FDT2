@@ -1,0 +1,1501 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    
+    * {
+      font-family: 'Inter', sans-serif;
+    }
+    
+    body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 50%, #dee2e6 100%);
+      min-height: 100vh;
+      transition: background 0.3s ease;
+    }
+    
+    body.dark-mode {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+    }
+    
+    /* Header Styles */
+    .admin-header {
+      background: white;
+      border-radius: 20px;
+      padding: 28px 32px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      margin-bottom: 24px;
+      transition: all 0.3s ease;
+    }
+    
+    body.dark-mode .admin-header {
+      background: #1e293b;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .page-title {
+      font-size: 36px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin: 0;
+      line-height: 1.2;
+    }
+    
+    .page-subtitle {
+      color: #6b7280;
+      font-size: 15px;
+      font-weight: 500;
+      margin-top: 6px;
+    }
+    
+    body.dark-mode .page-subtitle {
+      color: #94a3b8;
+    }
+    
+    /* Card Styles */
+    .admin-card {
+      background: white;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      transition: all 0.3s ease;
+      border: 1px solid #e5e7eb;
+    }
+    
+    body.dark-mode .admin-card {
+      background: #1e293b;
+      border-color: #334155;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 16px;
+    }
+    
+    body.dark-mode .card-title {
+      color: #f1f5f9;
+    }
+    
+    /* Form Elements */
+    .form-label-modern {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+      letter-spacing: 0.3px;
+    }
+    
+    body.dark-mode .form-label-modern {
+      color: #cbd5e1;
+    }
+    
+    .input-modern {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      background: white;
+      color: #1f2937;
+    }
+    
+    .input-modern:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+    
+    body.dark-mode .input-modern {
+      background: #334155;
+      border-color: #475569;
+      color: #f1f5f9;
+    }
+    
+    body.dark-mode .input-modern:focus {
+      border-color: #818cf8;
+      box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.2);
+    }
+    
+    select.input-modern {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 20px;
+      padding-right: 40px;
+    }
+    
+    /* Buttons */
+    .btn-modern {
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .btn-modern:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+    }
+    
+    .btn-modern:active {
+      transform: translateY(0);
+    }
+    
+    .btn-primary-modern {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-blue-modern {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+    }
+    
+    .btn-green-modern {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+    }
+    
+    .btn-red-modern {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+    }
+    
+    .btn-modern:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    
+    /* Transaction Details Box */
+    .tx-details-box {
+      background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    
+    body.dark-mode .tx-details-box {
+      background: linear-gradient(135deg, #334155 0%, #475569 100%);
+      border-color: #475569;
+    }
+    
+    .tx-details-box > div {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+    
+    .tx-details-box strong {
+      color: #4b5563;
+      font-weight: 600;
+    }
+    
+    body.dark-mode .tx-details-box strong {
+      color: #cbd5e1;
+    }
+    
+    .tx-details-box span {
+      color: #1f2937;
+      font-weight: 500;
+    }
+    
+    body.dark-mode .tx-details-box span {
+      color: #f1f5f9;
+    }
+    
+    /* System Status */
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      border: 2px solid #6ee7b7;
+      border-radius: 10px;
+      color: #065f46;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    body.dark-mode .status-indicator {
+      background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+      border-color: #10b981;
+      color: #6ee7b7;
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      background: #10b981;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* Admin Logs */
+    .admin-log-item {
+      background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+      border: 1px solid #e5e7eb;
+      border-left: 4px solid #667eea;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      transition: all 0.3s ease;
+    }
+    
+    .admin-log-item:hover {
+      transform: translateX(4px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    body.dark-mode .admin-log-item {
+      background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+      border-color: #475569;
+      border-left-color: #818cf8;
+    }
+    
+    /* Transaction Table */
+    .tx-table-container {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+    }
+    
+    body.dark-mode .tx-table-container {
+      border-color: #334155;
+    }
+    
+    .tx-row {
+      padding: 16px;
+      border-bottom: 1px solid #e5e7eb;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+    }
+    
+    .tx-row:hover {
+      background: linear-gradient(90deg, #f9fafb 0%, #f3f4f6 100%);
+      padding-left: 20px;
+    }
+    
+    body.dark-mode .tx-row {
+      background: #1e293b;
+      border-bottom-color: #334155;
+    }
+    
+    body.dark-mode .tx-row:hover {
+      background: linear-gradient(90deg, #334155 0%, #475569 100%);
+    }
+    
+    /* Action Buttons Group */
+    .action-buttons {
+      display: flex;
+      gap: 6px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .tx-row:hover .action-buttons {
+      opacity: 1;
+    }
+    
+    .action-btn-sm {
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .action-btn-sm:hover {
+      transform: translateY(-2px) scale(1.05);
+    }
+    
+    /* Modals */
+    .modal-backdrop {
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+    }
+    
+    .modal-content-modern {
+      background: white;
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 90%;
+      animation: modalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    
+    body.dark-mode .modal-content-modern {
+      background: #1e293b;
+      border: 1px solid #334155;
+    }
+    
+    @keyframes modalSlide {
+      from {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    
+    .modal-title-modern {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1f2937;
+      margin-bottom: 20px;
+    }
+    
+    body.dark-mode .modal-title-modern {
+      color: #f1f5f9;
+    }
+    
+    .modal-info-box {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border-left: 4px solid #3b82f6;
+      padding: 16px;
+      border-radius: 12px;
+      margin: 16px 0;
+    }
+    
+    body.dark-mode .modal-info-box {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      border-left-color: #60a5fa;
+    }
+    
+    /* Toast Notifications */
+    .toast {
+      animation: slideInRight 0.3s ease-out, fadeOut 0.3s ease-in 2.7s;
+      min-width: 320px;
+      max-width: 420px;
+      padding: 16px 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      backdrop-filter: blur(10px);
+    }
+    
+    @keyframes slideInRight {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
+    
+    .toast-success {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+    }
+    
+    .toast-error {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+    }
+    
+    .toast-info {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+    }
+    
+    /* Confidence Badges */
+    .confidence-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .badge-high {
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      color: #065f46;
+      border: 1px solid #6ee7b7;
+    }
+    
+    .badge-medium {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      color: #78350f;
+      border: 1px solid #fbbf24;
+    }
+    
+    .badge-low {
+      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+      color: #991b1b;
+      border: 1px solid #f87171;
+    }
+    
+    /* Action Badges */
+    .action-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .badge-allow {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+    }
+    
+    .badge-delay {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: white;
+    }
+    
+    .badge-block {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+    }
+    
+    /* Dark mode fixes */
+    body.dark-mode .bg-white { background-color: #1e293b !important; color: #e5e7eb; }
+    body.dark-mode .text-gray-600 { color: #cbd5e1 !important; }
+    body.dark-mode .border { border-color: #334155 !important; }
+    body.dark-mode a { color: #93c5fd; }
+    body.dark-mode .group:hover { background-color: #334155 !important; }
+    body.dark-mode .group { background-color: #1e293b !important; }
+    body.dark-mode .bg-gray-50 { background-color: #334155 !important; color: #e5e7eb !important; }
+    body.dark-mode .text-xs.text-gray-500 { color: #94a3b8 !important; }
+    body.dark-mode input[type="text"],
+    body.dark-mode input[type="email"],
+    body.dark-mode input[type="password"],
+    body.dark-mode select,
+    body.dark-mode textarea {
+      background-color: #334155 !important;
+      color: #f1f5f9 !important;
+      border-color: #475569 !important;
+    }
+    body.dark-mode input:focus,
+    body.dark-mode select:focus,
+    body.dark-mode textarea:focus {
+      background-color: #475569 !important;
+      border-color: #818cf8 !important;
+    }
+    body.dark-mode h3 { color: #f1f5f9 !important; }
+    body.dark-mode label { color: #e5e7eb !important; }
+    body.dark-mode #confirmModal .bg-white { background-color: #1e293b !important; color: #e5e7eb; }
+    body.dark-mode #confirmModal .bg-gray-50 { background-color: #334155 !important; }
+    body.dark-mode #confirmModal .text-gray-600,
+    body.dark-mode #confirmModal .text-gray-800 { color: #e5e7eb !important; }
+    body.dark-mode #explainModal .bg-white { background-color: #1e293b !important; color: #e5e7eb !important; }
+    body.dark-mode #explainModal .bg-gray-50 { background-color: #334155 !important; color: #e5e7eb !important; }
+    body.dark-mode #explainModal .text-gray-800 { color: #e5e7eb !important; }
+    body.dark-mode #explainModal .text-gray-600 { color: #cbd5e1 !important; }
+    body.dark-mode #explainModal .text-gray-900 { color: #e5e7eb !important; }
+    body.dark-mode #explainModal .text-gray-500 { color: #94a3b8 !important; }
+    body.dark-mode #explainModal .text-blue-700 { color: #60a5fa !important; }
+    body.dark-mode #admin_logs { background-color: transparent !important; color: #e5e7eb !important; }
+    body.dark-mode #admin_logs .bg-gray-50 { background-color: #334155 !important; color: #e5e7eb !important; border-color: #475569 !important; }
+    body.dark-mode #admin_logs .text-gray-500 { color: #94a3b8 !important; }
+    body.dark-mode #admin_logs .text-xs { color: #cbd5e1 !important; }
+    body.dark-mode #admin_logs .text-sm.font-mono { color: #cbd5e1 !important; }
+    #admin_logs .bg-gray-50 { background-color: #f9fafb !important; color: #1f2937 !important; border-color: #e5e7eb !important; }
+    #admin_logs .text-xs { color: #6b7280 !important; }
+    #admin_logs .text-sm.font-mono { color: #1f2937 !important; }
+    #admin_logs .action-badge { opacity: 1 !important; filter: none !important; mix-blend-mode: normal !important; color: #ffffff !important; }
+    #admin_logs .px-2.py-0.5.rounded.text-white { opacity: 1 !important; }
+    body.dark-mode #admin_logs .action-badge { opacity: 1 !important; color: #ffffff !important; }
+    body.dark-mode #admin_logs .px-2.py-0.5.rounded.text-white { opacity: 1 !important; }
+    
+    /* Hover glow buttons */
+    .hover-glow-button {
+      transition: all 0.3s ease;
+      position: relative;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+    .hover-glow-button:hover {
+      transform: translateY(-2px) scale(1.05);
+      filter: brightness(1.15);
+    }
+    .hover-glow-button.bg-blue-500:hover {
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5), 0 0 12px rgba(59, 130, 246, 0.4);
+    }
+    .hover-glow-button.bg-green-500:hover {
+      box-shadow: 0 6px 16px rgba(34, 197, 94, 0.5), 0 0 12px rgba(34, 197, 94, 0.4);
+    }
+    .hover-glow-button.bg-yellow-500:hover {
+      box-shadow: 0 6px 16px rgba(234, 179, 8, 0.5), 0 0 12px rgba(234, 179, 8, 0.4);
+    }
+    .hover-glow-button.bg-red-500:hover {
+      box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5), 0 0 12px rgba(239, 68, 68, 0.4);
+    }
+    .hover-glow-button:active {
+      transform: translateY(0) scale(0.98);
+    }
+    body.dark-mode .hover-glow-button.bg-blue-500:hover {
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6), 0 0 16px rgba(59, 130, 246, 0.5);
+    }
+    body.dark-mode .hover-glow-button.bg-green-500:hover {
+      box-shadow: 0 6px 20px rgba(34, 197, 94, 0.6), 0 0 16px rgba(34, 197, 94, 0.5);
+    }
+    body.dark-mode .hover-glow-button.bg-yellow-500:hover {
+      box-shadow: 0 6px 20px rgba(234, 179, 8, 0.6), 0 0 16px rgba(234, 179, 8, 0.5);
+    }
+    body.dark-mode .hover-glow-button.bg-red-500:hover {
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6), 0 0 16px rgba(239, 68, 68, 0.5);
+    }
+
+    /* Chatbot Styles */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    body.dark-mode #chatbotMessages {
+      background-color: #334155 !important;
+    }
+
+    body.dark-mode #chatbotInput {
+      background-color: #475569 !important;
+      color: #f1f5f9 !important;
+      border-color: #64748b !important;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen p-6">
+  <div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="admin-header">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="page-title">Admin Console</h1>
+          <p class="page-subtitle">Fraud control & monitoring • Admin Actions • FDT2</p>
+        </div>
+        <div class="flex gap-3 items-center flex-wrap">
+          <button id="darkModeToggleAdmin" class="btn-modern btn-primary-modern" title="Toggle Dark Mode">🌙 Dark</button>
+          <a href="/dashboard" class="btn-modern btn-blue-modern">Activity Dashboard</a>
+          <a href="/admin/logout" class="btn-modern btn-red-modern">Logout</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top panels -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+      <!-- Quick Action -->
+      <div class="admin-card">
+        <h3 class="card-title">Quick Action (Manual)</h3>
+        <label class="form-label-modern">Transaction ID</label>
+        <input id="qa_txid" class="input-modern mb-3" placeholder="Enter TX ID" />
+        <button id="qa_fetch_btn" class="btn-modern btn-blue-modern w-full mb-4">Get Details</button>
+        
+        <!-- Transaction Details (hidden initially) -->
+        <div id="qa_details" class="hidden tx-details-box">
+          <div><strong>User:</strong> <span id="qa_detail_user">-</span></div>
+          <div><strong>Amount:</strong> <span id="qa_detail_amount">-</span></div>
+          <div><strong>Current Action:</strong> <span id="qa_detail_action">-</span></div>
+          <div><strong>Risk Score:</strong> <span id="qa_detail_risk">-</span></div>
+          <div><strong>Reason:</strong> <span id="qa_detail_reason">-</span></div>
+        </div>
+        
+        <label class="form-label-modern">Action</label>
+        <select id="qa_action" class="input-modern mb-4">
+          <option value="ALLOW">ALLOW</option>
+          <option value="DELAY">DELAY</option>
+          <option value="BLOCK">BLOCK</option>
+        </select>
+        <button id="qa_btn" class="btn-modern btn-green-modern w-full" disabled>Apply Action</button>
+        <div id="qa_result" class="mt-3 text-sm text-gray-600"></div>
+      </div>
+
+      <!-- System status -->
+      <div class="admin-card">
+        <h3 class="card-title">System Status</h3>
+        <div id="sys_status" class="status-indicator">
+          <span class="status-dot"></span>
+          Live – WebSocket connected
+        </div>
+      </div>
+
+      <!-- Admin logs -->
+      <div class="admin-card">
+        <h3 class="card-title">Recent Admin Logs</h3>
+        <div id="admin_logs" class="text-sm overflow-y-auto space-y-2" style="max-height: 70vh;"></div>
+      </div>
+    </div>
+
+    <!-- Chatbot Panel -->
+    <div class="admin-card" style="display: flex; flex-direction: column; height: 500px;">
+      <h3 class="card-title">🤖 Fraud Analytics Assistant</h3>
+      <div id="chatbotMessages" style="flex: 1; overflow-y: auto; margin-bottom: 12px; padding: 12px; background: #f9fafb; border-radius: 8px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 8px;">Chat initialized. Ask me about fraud patterns, transactions, or analytics.</div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <input id="chatbotInput" type="text" placeholder="Ask about fraud patterns..." class="input-modern" style="flex: 1; padding: 10px;" />
+        <button id="chatbotSend" class="btn-modern btn-blue-modern" style="padding: 10px 16px;">Send</button>
+      </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+      <div class="modal-content-modern">
+        <h3 class="modal-title-modern">Confirm Action</h3>
+        
+        <div class="modal-info-box">
+          <div class="mb-2"><strong>TX ID:</strong> <span id="confirm_tx_id" class="font-mono text-blue-600">-</span></div>
+          <div><strong>Action:</strong> <span id="confirm_action" class="font-bold">-</span></div>
+        </div>
+        
+        <p class="text-sm text-gray-600 mb-6">Confirm this action. A 5-second grace window lets you undo it immediately after applying.</p>
+        
+        <div class="flex gap-3">
+          <button id="confirm_cancel" class="flex-1 btn-modern" style="background: #9ca3af; color: white;">Cancel</button>
+          <button id="confirm_submit" class="flex-1 btn-modern btn-red-modern">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Explainability Modal -->
+    <div id="explainModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+      <div class="modal-content-modern" style="max-width: 700px;">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <h3 class="text-2xl font-bold text-gray-800">Explainability</h3>
+            <div class="text-sm text-gray-500">Why the system decided • Suspicious patterns</div>
+          </div>
+          <button id="explainClose" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>
+        </div>
+
+        <div class="border rounded-lg p-4 bg-gray-50 mb-4">
+          <div class="text-xs text-gray-500">TX ID</div>
+          <div id="expl_tx_id" class="font-mono text-sm text-blue-700 mb-2">-</div>
+          <div class="text-xs text-gray-500">Action / Risk</div>
+          <div class="text-sm text-gray-800"><span id="expl_action" class="font-semibold"></span> • <span id="expl_risk"></span></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="border rounded-lg p-4 bg-white">
+            <div class="text-xs font-semibold text-gray-600 mb-3">Reasons</div>
+            <ul id="expl_reasons" class="text-sm space-y-1 list-disc list-inside text-gray-800"></ul>
+          </div>
+          <div class="border rounded-lg p-4 bg-white">
+            <div class="text-xs font-semibold text-gray-600 mb-3">Model Scores</div>
+            <div id="expl_models" class="text-sm space-y-1 text-gray-800"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- Transactions -->
+    <div class="admin-card">
+      <div class="flex justify-between items-center mb-4 flex-wrap gap-3">
+        <h3 class="card-title mb-0">Transactions (Admin View)</h3>
+        <div class="flex gap-3">
+          <select id="timeFilter" class="input-modern" style="width: auto; min-width: 160px;">
+            <option value="1h">Last 1 Hour</option>
+            <option value="24h" selected>Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+          </select>
+          <select id="adminFilter" class="input-modern" style="width: auto; min-width: 140px;">
+            <option value="ALL">All</option>
+            <option value="ALLOW">Allowed</option>
+            <option value="DELAY">Delayed</option>
+            <option value="BLOCK">Blocked</option>
+          </select>
+        </div>
+      </div>
+      <div id="admin_recent" class="tx-table-container max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-50 space-y-3"></div>
+
+<script>
+let adminTxCache = [];
+let undoTimer = null;
+
+/* ---------- Helpers ---------- */
+function getPrevAction(tx_id) {
+  const fromCache = adminTxCache.find(t => t.tx_id === tx_id);
+  if (fromCache?.action) return fromCache.action;
+  const detail = document.getElementById('qa_detail_action')?.textContent?.trim();
+  if (detail) return detail;
+  return null;
+}
+
+function confidenceBadge(level) {
+  const lvl = (level || 'HIGH').toUpperCase();
+  const style = lvl === 'LOW'
+    ? 'badge-low'
+    : lvl === 'MEDIUM'
+      ? 'badge-medium'
+      : 'badge-high';
+  return `<span class="confidence-badge ${style}">${lvl}</span>`;
+}
+
+/* ---------- Toast Notification System ---------- */
+
+function showToast(type, message) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  
+  const icons = {
+    success: '✅',
+    error: '❌',
+    info: 'ℹ️'
+  };
+  
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    <span style="font-size: 24px;">${icons[type] || 'ℹ️'}</span>
+    <span>${message}</span>
+  `;
+  
+  container.appendChild(toast);
+  
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    toast.remove();
+  }, 3000);
+}
+
+// Undo toast with countdown and button
+function showUndoToast(tx_id, newAction, prevAction) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-info';
+
+  let seconds = 5;
+  toast.innerHTML = `
+    <span style="font-size: 24px;">⏳</span>
+    <div class="flex-1">
+      <div class="font-semibold">${newAction} applied to ${tx_id.slice(0, 8)}...</div>
+      <div class="text-sm">Undo available (${seconds}s)</div>
+    </div>
+    <button id="undoBtn" class="px-3 py-1 text-sm bg-white/30 border border-white/50 rounded-lg hover:bg-white/40 transition">Undo</button>
+  `;
+
+  container.appendChild(toast);
+
+  const countdownEl = toast.querySelector('div.text-sm');
+  const undoBtn = toast.querySelector('#undoBtn');
+
+  const clearAll = () => {
+    if (undoTimer) clearInterval(undoTimer);
+    toast.remove();
+  };
+
+  undoTimer = setInterval(async () => {
+    seconds -= 1;
+    if (countdownEl) countdownEl.textContent = `Undo available (${seconds}s)`;
+    if (seconds <= 0) {
+      clearAll();
+    }
+  }, 1000);
+
+  undoBtn.onclick = async (e) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch('/admin/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx_id, action: prevAction })
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        showToast('error', result.detail || 'Undo failed');
+      } else {
+        showToast('success', `Reverted to ${prevAction} for ${tx_id.slice(0, 8)}...`);
+        addAdminLog({
+          tx_id,
+          user_id: (result && result.updated && result.updated.user_id) ? result.updated.user_id : 'unknown',
+          action: prevAction,
+          time: new Date().toISOString()
+        });
+        fetchRecent();
+      }
+    } catch (err) {
+      showToast('error', err.message || 'Undo failed');
+    } finally {
+      clearAll();
+    }
+  };
+}
+
+/* ---------- Dark Mode Toggle (Admin) ---------- */
+function updateDarkModeButtonAdmin(isDark) {
+  const btn = document.getElementById('darkModeToggleAdmin');
+  if (!btn) return;
+  if (isDark) {
+    btn.textContent = '☀️ Light';
+  } else {
+    btn.textContent = '🌙 Dark';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const isDark = localStorage.getItem('darkMode') === 'true';
+  if (isDark) document.body.classList.add('dark-mode');
+  updateDarkModeButtonAdmin(isDark);
+  document.getElementById('darkModeToggleAdmin').addEventListener('click', () => {
+    const nowDark = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('darkMode', nowDark);
+    updateDarkModeButtonAdmin(nowDark);
+  });
+  
+  // Setup modal buttons
+  setupModalButtons();
+  setupModalCloseBtn();
+  
+  // Setup Apply Action button
+  const qaBtn = document.getElementById('qa_btn');
+  if (qaBtn) {
+    qaBtn.onclick = (e) => {
+      e.preventDefault();
+      const tx_id = document.getElementById('qa_txid').value.trim();
+      const action = document.getElementById('qa_action').value;
+      
+      if (!tx_id) {
+        document.getElementById('qa_result').textContent = 'Please enter TX ID first';
+        return;
+      }
+      
+      // Change button to loading state immediately
+      qaBtn.textContent = 'Applying action...';
+      qaBtn.disabled = true;
+      
+      showConfirmation(tx_id, action);
+    };
+  }
+});
+
+/* ---------- render transaction row ---------- */
+function renderAdminTx(tx) {
+  const div = document.createElement('div');
+  div.className = 'tx-row';
+
+  const risk = Number(tx.risk_score ?? 0);
+  const riskColor = risk >= 0.8 ? 'text-red-600' : risk >= 0.6 ? 'text-orange-600' : 'text-green-600';
+
+  div.innerHTML = `
+    <div class="flex-1">
+      <div class="font-mono text-xs font-semibold text-gray-700">${tx.tx_id}</div>
+      <div class="text-xs text-gray-600 mt-1">
+        ${tx.user_id || ''} • ₹${Number(tx.amount || 0).toFixed(2)} • Risk: <span class="${riskColor} font-semibold">${risk.toFixed(2)}</span>
+      </div>
+      <div class="text-xs text-gray-500 mt-1">
+        Channel: ${tx.channel || 'N/A'} • Type: ${tx.tx_type || 'N/A'}
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <span class="text-xs font-semibold ${
+        tx.action === 'BLOCK' ? 'text-red-600' :
+        tx.action === 'DELAY' ? 'text-yellow-600' : 'text-green-600'
+      }">
+        ${tx.action || 'ALLOW'}
+      </span>
+      <span>${confidenceBadge(tx.confidence_level)}</span>
+
+      <!-- Hover quick actions -->
+      <div class="action-buttons">
+        <button onclick="showExplain('${tx.tx_id}')" class="action-btn-sm bg-indigo-500 text-white hover-glow-button" title="Explainability">Exp</button>
+        <button onclick="fillAndFetchTx('${tx.tx_id}')" class="action-btn-sm bg-blue-500 text-white hover-glow-button">View</button>
+        <button onclick="showConfirmation('${tx.tx_id}','ALLOW')" class="action-btn-sm bg-green-500 text-white hover-glow-button">A</button>
+        <button onclick="showConfirmation('${tx.tx_id}','DELAY')" class="action-btn-sm bg-yellow-500 text-white hover-glow-button">D</button>
+        <button onclick="showConfirmation('${tx.tx_id}','BLOCK')" class="action-btn-sm bg-red-500 text-white hover-glow-button">B</button>
+      </div>
+    </div>
+  `;
+
+  // Click on row to fill TX ID only (no fetch)
+  div.onclick = (e) => {
+    if (!e.target.closest('button')) {
+      fillTxIdOnly(tx.tx_id);
+    }
+  };
+
+  return div;
+}
+
+/* ---------- load recent ---------- */
+async function fetchRecent() {
+  const timeRange = document.getElementById('timeFilter')?.value || '24h';
+  const res = await fetch(`/recent-transactions?limit=2000&time_range=${timeRange}`);
+  const j = await res.json();
+  adminTxCache = Array.isArray(j.transactions) ? j.transactions : [];
+  redrawAdminRecent();
+}
+
+function redrawAdminRecent() {
+  const el = document.getElementById('admin_recent');
+  const filter = document.getElementById('adminFilter')?.value || 'ALL';
+
+  el.innerHTML = '';
+
+  adminTxCache
+    .filter(tx => filter === 'ALL' || tx.action === filter)
+    .forEach(tx => el.appendChild(renderAdminTx(tx)));
+}
+
+/* ---------- explainability modal ---------- */
+function hideExplain() {
+  document.getElementById('explainModal')?.classList.add('hidden');
+}
+
+function showExplain(tx_id) {
+  const modal = document.getElementById('explainModal');
+  if (!modal) return;
+
+  const tx = adminTxCache.find(t => t.tx_id === tx_id);
+  if (!tx) {
+    showToast('error', 'Transaction not found');
+    return;
+  }
+
+  console.log('showExplain - Full transaction data:', tx);
+  console.log('showExplain - Explainability field:', tx.explainability);
+
+  // Try multiple ways to get explainability data
+  let expl = {};
+  if (tx.explainability) {
+    // If it's a string (JSON), parse it
+    if (typeof tx.explainability === 'string') {
+      try {
+        expl = JSON.parse(tx.explainability);
+      } catch (e) {
+        console.error('Failed to parse explainability JSON:', e);
+        expl = {};
+      }
+    } else {
+      expl = tx.explainability;
+    }
+  }
+  
+  const reasonsRaw = expl.reasons || tx.reasons || tx.fraud_reasons || [];
+  const modelScores = expl.model_scores || tx.model_scores || {};
+  
+  console.log('Extracted reasons:', reasonsRaw);
+  console.log('Extracted model scores:', modelScores);
+
+  document.getElementById('expl_tx_id').textContent = tx.tx_id || '-';
+
+  const actionEl = document.getElementById('expl_action');
+  const action = tx.action || 'N/A';
+  actionEl.textContent = action;
+  actionEl.className = 'font-semibold ' + (
+    action === 'BLOCK' ? 'text-red-600' :
+    action === 'DELAY' ? 'text-yellow-600' : 'text-green-600'
+  );
+
+  document.getElementById('expl_risk').textContent = `Risk ${Number(tx.risk_score ?? 0).toFixed(2)}`;
+
+  const reasonsEl = document.getElementById('expl_reasons');
+  reasonsEl.innerHTML = '';
+  const reasonItems = Array.isArray(reasonsRaw) ? reasonsRaw : [];
+  if (reasonItems.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'text-gray-500 italic';
+    li.textContent = 'No explainability data available. This may be an older transaction or the explainability column is not yet created.';
+    reasonsEl.appendChild(li);
+  } else {
+    reasonItems.forEach(r => {
+      const text = typeof r === 'string' ? r : (r.reason || JSON.stringify(r));
+      const li = document.createElement('li');
+      li.textContent = text;
+      reasonsEl.appendChild(li);
+    });
+  }
+
+  const modelsEl = document.getElementById('expl_models');
+  modelsEl.innerHTML = '';
+  // Filter out meta fields and enforce display order
+  const filtered = { ...(modelScores || {}) };
+  ['confidence','model_disagreement','confidence_level','disagreement','final_risk_score'].forEach(k => { if (k in filtered) delete filtered[k]; });
+  const order = ['iforest','random_forest','xgboost','ensemble'];
+  const orderedEntries = [];
+  order.forEach(k => { if (k in filtered) orderedEntries.push([k, filtered[k]]); });
+  // Append any other scores not in the order
+  Object.entries(filtered).forEach(([k,v]) => { if (!order.includes(k)) orderedEntries.push([k,v]); });
+
+  if (orderedEntries.length === 0) {
+    const div = document.createElement('div');
+    div.className = 'text-gray-500 italic';
+    div.textContent = 'No model scores available. Run the migration to add the explainability column.';
+    modelsEl.appendChild(div);
+  } else {
+    orderedEntries.forEach(([k, v]) => {
+      const div = document.createElement('div');
+      div.innerHTML = `<span class="font-semibold text-gray-900">${k.replace('_',' ')}:</span> <span class="font-semibold text-gray-800">${Number(v ?? 0).toFixed(3)}</span>`;
+      div.className = 'mb-1';
+      modelsEl.appendChild(div);
+    });
+  }
+
+  modal.classList.remove('hidden');
+}
+
+/* ---------- quick action ---------- */
+async function quickAction(tx_id, action) {
+  const res = await fetch('/admin/action', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ tx_id, action })
+  });
+  
+  const result = await res.json();
+
+  const logs = document.getElementById('admin_logs');
+  const log = document.createElement('div');
+  log.className = 'admin-log-item';
+
+  const badgeClass = action === 'BLOCK' ? 'badge-block' : (action === 'DELAY' ? 'badge-delay' : 'badge-allow');
+  log.innerHTML = `
+    <div class="flex justify-between items-center">
+      <div class="text-xs font-mono font-semibold">${tx_id}</div>
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] text-gray-500">${new Date().toLocaleTimeString()}</span>
+        <span class="action-badge ${badgeClass}">${action}</span>
+      </div>
+    </div>
+  `;
+
+  logs.prepend(log);
+  return result;
+}
+
+/* ---------- clear details when TX ID input changes ---------- */
+document.getElementById('qa_txid').addEventListener('input', () => {
+  document.getElementById('qa_details').classList.add('hidden');
+  document.getElementById('qa_btn').disabled = true;
+  document.getElementById('qa_result').textContent = '';
+});
+
+/* ---------- fetch transaction details ---------- */
+document.getElementById('qa_fetch_btn').onclick = async () => {
+  const btn = document.getElementById('qa_fetch_btn');
+  const tx_id = document.getElementById('qa_txid').value.trim();
+  
+  if (!tx_id) {
+    document.getElementById('qa_result').textContent = 'Please enter TX ID';
+    return;
+  }
+
+  // Show loading state
+  const originalText = btn.textContent;
+  btn.textContent = 'Getting details...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`/recent-transactions?limit=1000`);
+    const j = await res.json();
+    const tx = (j.transactions || []).find(t => t.tx_id === tx_id);
+
+    if (!tx) {
+      showToast('error', 'Transaction not found');
+      document.getElementById('qa_result').textContent = 'Transaction not found';
+      return;
+    }
+
+    // Display transaction details
+    document.getElementById('qa_detail_user').textContent = tx.user_id || 'N/A';
+    document.getElementById('qa_detail_amount').textContent = `₹${Number(tx.amount || 0).toFixed(2)}`;
+    document.getElementById('qa_detail_action').textContent = tx.action || 'PENDING';
+    document.getElementById('qa_detail_risk').textContent = Number(tx.risk_score || 0).toFixed(2);
+    
+    // Show explainability reasons if present
+    const reasons = tx.explainability?.reasons;
+    if (Array.isArray(reasons) && reasons.length) {
+      document.getElementById('qa_detail_reason').textContent = reasons.join('; ');
+    } else {
+      let reason = 'N/A';
+      if (tx.block_reason) {
+        reason = tx.block_reason;
+      } else if (tx.action === 'BLOCK') {
+        reason = `High risk score (${Number(tx.risk_score || 0).toFixed(2)})`;
+      } else if (tx.action === 'DELAY') {
+        reason = 'Verification pending';
+      } else if (tx.action === 'ALLOW') {
+        reason = 'Cleared';
+      }
+      document.getElementById('qa_detail_reason').textContent = reason;
+    }
+    
+    document.getElementById('qa_details').classList.remove('hidden');
+    document.getElementById('qa_btn').disabled = false;
+    document.getElementById('qa_result').textContent = 'Details loaded. Choose action below.';
+  } catch (e) {
+    document.getElementById('qa_result').textContent = 'Error: ' + e.message;
+  } finally {
+    // Restore button state
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+};
+
+/* ---------- fill TX ID from transaction row (no auto-fetch) ---------- */
+function fillTxIdOnly(tx_id) {
+  const input = document.getElementById('qa_txid');
+  input.value = tx_id;
+  // Clear details panel
+  document.getElementById('qa_details').classList.add('hidden');
+  document.getElementById('qa_btn').disabled = true;
+  document.getElementById('qa_result').textContent = '';
+}
+
+/* ---------- fill TX ID and fetch details (View button) ---------- */
+function fillAndFetchTx(tx_id) {
+  // Fill TX ID
+  fillTxIdOnly(tx_id);
+  // Auto-fetch details
+  document.getElementById('qa_fetch_btn').click();
+}
+
+
+/* ---------- confirmation modal logic ---------- */
+let pendingAction = null;
+
+function showConfirmation(tx_id, action) {
+  console.log('showConfirmation called:', tx_id, action);
+  pendingAction = { tx_id, action };
+  document.getElementById('confirm_tx_id').textContent = tx_id;
+  document.getElementById('confirm_action').textContent = action;
+  
+  // Color code the action
+  const actionEl = document.getElementById('confirm_action');
+  actionEl.className = 'font-bold ' + (
+    action === 'BLOCK' ? 'text-red-600' :
+    action === 'DELAY' ? 'text-yellow-600' : 'text-green-600'
+  );
+  
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+
+function hideConfirmation() {
+  document.getElementById('confirmModal').classList.add('hidden');
+  pendingAction = null;
+  
+  // Restore Apply Action button state
+  const applyBtn = document.getElementById('qa_btn');
+  if (applyBtn) {
+    applyBtn.textContent = 'Apply Action';
+    applyBtn.disabled = false;
+  }
+}
+
+// Setup modal buttons in DOMContentLoaded
+function setupModalButtons() {
+  const cancelBtn = document.getElementById('confirm_cancel');
+  const submitBtn = document.getElementById('confirm_submit');
+  const explainClose = document.getElementById('explainClose');
+  const explainModal = document.getElementById('explainModal');
+  
+  if (cancelBtn) {
+    cancelBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      hideConfirmation();
+    };
+  }
+  
+  if (submitBtn) {
+    submitBtn.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (!pendingAction) {
+        alert('No action pending');
+        return;
+      }
+      
+      const tx_id = pendingAction.tx_id;
+      const action = pendingAction.action;
+      const prevAction = getPrevAction(tx_id) || 'ALLOW';
+      
+      // Show loading state on modal button
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Applying action...';
+      submitBtn.disabled = true;
+      
+      // Apply Action button is already in loading state, no need to change it again
+      
+      hideConfirmation();
+      
+      try {
+        console.log('Submitting action:', tx_id, action);
+        
+        const response = await fetch('/admin/action', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ tx_id, action })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          showToast('error', result.detail || 'Action failed');
+          document.getElementById('qa_result').textContent = 'Error: ' + result.detail;
+          return;
+        }
+        
+        console.log('Action result:', result);
+        // Show success toast and undo option
+        showToast('success', `${action} action applied for TX ${tx_id.substring(0, 8)}...`);
+        const prev = result.updated?.previous_action || result.updated?.prev_action || prevAction;
+        if (prev) {
+          showUndoToast(tx_id, action, prev);
+        }
+        document.getElementById('qa_result').textContent = '✓ Action applied successfully!';
+        
+        // Add to admin logs
+        addAdminLog({
+          tx_id: tx_id,
+          user_id: result.updated?.user_id || 'unknown',
+          action: action,
+          time: new Date().toISOString()
+        });
+        
+        // Refresh transactions list
+        fetchRecent();
+        
+        // Clear form after successful action
+        document.getElementById('qa_txid').value = '';
+        document.getElementById('qa_action').value = 'ALLOW';
+        document.getElementById('qa_details').classList.add('hidden');
+        
+      } catch (e) {
+        console.error('Error:', e);
+        document.getElementById('qa_result').textContent = 'Error: ' + e.message;
+      } finally {
+        // Restore modal button state
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+        
+        // Restore Apply Action button state
+        const applyBtn = document.getElementById('qa_btn');
+        if (applyBtn) {
+          applyBtn.textContent = 'Apply Action';
+          applyBtn.disabled = false;
+        }
+      }
+    };
+  }
+
+  if (explainClose) {
+    explainClose.onclick = (e) => {
+      e.preventDefault();
+      hideExplain();
+    };
+  }
+
+  if (explainModal) {
+    explainModal.onclick = (e) => {
+      if (e.target.id === 'explainModal') hideExplain();
+    };
+  }
+}
+
+/* ---------- setup modal close button ---------- */
+function setupModalCloseBtn() {
+  const modal = document.getElementById('confirmModal');
+  if (modal) {
+    modal.onclick = (e) => {
+      if (e.target.id === 'confirmModal') {
+        hideConfirmation();
+      }
+    };
+  }
+}
+
+/* ---------- websocket live updates ---------- */
+function setupWS() {
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss':'ws'}://${location.host}/ws`);
+
+  ws.onmessage = ev => {
+    const msg = JSON.parse(ev.data);
+    if (!msg.data) return;
+
+    if (msg.type === 'tx_inserted') {
+      adminTxCache.unshift(msg.data);
+      adminTxCache = adminTxCache.slice(0, 30);
+      redrawAdminRecent();
+    }
+
+    if (msg.type === 'tx_updated') {
+      const idx = adminTxCache.findIndex(t => t.tx_id === msg.data.tx_id);
+      if (idx !== -1) {
+        adminTxCache[idx] = msg.data;
+        redrawAdminRecent();
+      }
+    }
+  };
+
+  ws.onclose = () => setTimeout(setupWS, 2000);
+}
+
+  function addAdminLog(log) {
+    const el = document.getElementById('admin_logs');
+    if (!el) return;
+
+    const div = document.createElement('div');
+    div.className = 'admin-log-item';
+
+    const badgeClass = log.action === 'BLOCK' ? 'badge-block' : (log.action === 'DELAY' ? 'badge-delay' : 'badge-allow');
+    div.innerHTML = `
+      <div class="flex justify-between items-center">
+        <div>
+          <div class="font-mono text-sm font-semibold">${log.tx_id}</div>
+          <div class="text-xs text-gray-500 mt-1">
+            User: <span class="font-semibold">${log.user_id || 'unknown'}</span>
+            • ${new Date(log.time).toLocaleTimeString()}
+          </div>
+        </div>
+        <span class="action-badge ${badgeClass}">${log.action}</span>
+      </div>
+    `;
+
+    el.prepend(div);
+  }
+
+
+fetchRecent();
+setupWS();
+
+// Chatbot setup
+let chatHistory = [];
+document.getElementById('chatbotSend')?.addEventListener('click', async () => {
+  const chatbotInput = document.getElementById('chatbotInput');
+  const chatbotSend = document.getElementById('chatbotSend');
+  const message = chatbotInput.value.trim();
+  if (!message) return;
+  
+  // Add user message
+  const userDiv = document.createElement('div');
+  userDiv.style.cssText = 'align-self: flex-end; max-width: 70%; padding: 8px 12px; background: #667eea; color: white; border-radius: 8px; word-wrap: break-word;';
+  userDiv.textContent = message;
+  document.getElementById('chatbotMessages').appendChild(userDiv);
+  
+  chatHistory.push({ role: 'user', content: message });
+  chatbotInput.value = '';
+  chatbotSend.disabled = true;
+  chatbotInput.disabled = true;
+  
+  // Show typing indicator
+  const typingDiv = document.createElement('div');
+  typingDiv.id = 'typingIndicator';
+  typingDiv.style.cssText = 'align-self: flex-start; display: flex; gap: 4px; padding: 8px 12px; background: #e5e7eb; border-radius: 8px;';
+  typingDiv.innerHTML = '<span style="width: 8px; height: 8px; background: #6b7280; border-radius: 50%; animation: pulse 1.5s infinite;"></span><span style="width: 8px; height: 8px; background: #6b7280; border-radius: 50%; animation: pulse 1.5s infinite 0.3s;"></span><span style="width: 8px; height: 8px; background: #6b7280; border-radius: 50%; animation: pulse 1.5s infinite 0.6s;"></span>';
+  document.getElementById('chatbotMessages').appendChild(typingDiv);
+  document.getElementById('chatbotMessages').scrollTop = document.getElementById('chatbotMessages').scrollHeight;
+  
+  try {
+    const response = await fetch('/api/chatbot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: message,
+        time_range: '24h',
+        history: chatHistory.slice(-10)
+      })
+    });
+    
+    if (!response.ok) throw new Error('Chatbot request failed');
+    
+    const data = await response.json();
+    typingDiv.remove();
+    
+    // Add bot response
+    const botDiv = document.createElement('div');
+    botDiv.style.cssText = 'align-self: flex-start; max-width: 70%; padding: 8px 12px; background: #f3f4f6; color: #1f2937; border-radius: 8px; word-wrap: break-word; white-space: pre-wrap;';
+    botDiv.textContent = data.response;
+    document.getElementById('chatbotMessages').appendChild(botDiv);
+    
+    chatHistory.push({ role: 'assistant', content: data.response });
+  } catch (error) {
+    console.error('Chatbot error:', error);
+    typingDiv.remove();
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'align-self: flex-start; max-width: 70%; padding: 8px 12px; background: #fee2e2; color: #991b1b; border-radius: 8px;';
+    errorDiv.textContent = 'Sorry, I encountered an error. Please try again.';
+    document.getElementById('chatbotMessages').appendChild(errorDiv);
+  } finally {
+    chatbotSend.disabled = false;
+    chatbotInput.disabled = false;
+    chatbotInput.focus();
+    document.getElementById('chatbotMessages').scrollTop = document.getElementById('chatbotMessages').scrollHeight;
+  }
+});
+
+// Allow Enter key to send
+document.getElementById('chatbotInput')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById('chatbotSend')?.click();
+  }
+});
+
+document.getElementById('adminFilter')
+  ?.addEventListener('change', redrawAdminRecent);
+
+document.getElementById('timeFilter')
+  ?.addEventListener('change', fetchRecent);
+</script>
+</body>
+</html>
