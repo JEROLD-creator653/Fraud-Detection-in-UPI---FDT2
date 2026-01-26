@@ -3,6 +3,7 @@ import os
 import yaml
 import json
 import asyncio
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any
 
@@ -90,12 +91,17 @@ ADMIN_USERNAME = cfg.get("admin_username", DEFAULT_CFG["admin_username"])
 ADMIN_PASSWORD_HASH = cfg.get("admin_password_hash", DEFAULT_CFG["admin_password_hash"])
 
 # --- FastAPI app and templates ---
+# Use absolute paths for templates and static files
+BASE_DIR = Path(__file__).resolve().parent.parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+STATIC_DIR = BASE_DIR / "static"
+
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 # serve static if directory exists
-if os.path.isdir("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # --- websockets manager ---
 class WSManager:
