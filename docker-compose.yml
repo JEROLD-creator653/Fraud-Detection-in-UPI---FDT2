@@ -12,7 +12,7 @@ services:
       POSTGRES_DB: fdt_db
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./backend/init_schema.sql:/docker-entrypoint-initdb.d/init_schema.sql
