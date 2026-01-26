@@ -45,6 +45,32 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# Startup event to initialize database schema
+@app.on_event("startup")
+def startup_event():
+    """Initialize database schema on startup"""
+    try:
+        conn = get_db_conn()
+        cur = conn.cursor()
+        
+        # Add daily_limit column if it doesn't exist
+        cur.execute(
+            """
+            ALTER TABLE users 
+            ADD COLUMN IF NOT EXISTS daily_limit DECIMAL(15, 2) DEFAULT 10000.00
+            """
+        )
+        
+        conn.commit()
+        print("✓ Database schema initialized successfully")
+    except Exception as e:
+        print(f"⚠ Warning: Could not ensure database schema: {e}")
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
+
 # ============================================================================
 # DATABASE HELPERS
 # ============================================================================
@@ -92,6 +118,9 @@ class UserDecision(BaseModel):
 class PushToken(BaseModel):
     fcm_token: str
     device_id: Optional[str] = None
+
+class TransactionLimitUpdate(BaseModel):
+    daily_limit: float
 
 # ============================================================================
 # AUTHENTICATION HELPERS
@@ -573,6 +602,77 @@ async def register_push_token(token_data: PushToken, user_id: str = Depends(get_
             conn.close()
     
     return await run_in_threadpool(_register_token)
+
+# ============================================================================
+# API ENDPOINTS - TRANSACTION LIMIT
+# ============================================================================
+
+@app.get("/api/user/transaction-limit")
+async def get_transaction_limit(user_id: str = Depends(get_current_user)):
+    """Get user's daily transaction limit"""
+    def _get_limit():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Get daily limit from users table
+            cur.execute(
+                "SELECT daily_limit FROM users WHERE user_id = %s",
+                (user_id,)
+            )
+            result = cur.fetchone()
+            
+            if not result:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            return {
+                "status": "success",
+                "daily_limit": float(result['daily_limit']) if result['daily_limit'] else 10000.00
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_get_limit)
+
+@app.post("/api/user/transaction-limit")
+async def set_transaction_limit(limit_data: TransactionLimitUpdate, user_id: str = Depends(get_current_user)):
+    """Set user's daily transaction limit"""
+    def _set_limit():
+        daily_limit = limit_data.daily_limit
+        
+        if not daily_limit or daily_limit <= 0:
+            raise HTTPException(status_code=400, detail="Daily limit must be greater than 0")
+        
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Update daily limit
+            cur.execute(
+                """
+                UPDATE users 
+                SET daily_limit = %s, updated_at = NOW()
+                WHERE user_id = %s
+                RETURNING user_id, daily_limit
+                """,
+                (float(daily_limit), user_id)
+            )
+            
+            result = cur.fetchone()
+            conn.commit()
+            
+            if not result:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            return {
+                "status": "success",
+                "message": f"Daily transaction limit updated to ₹{daily_limit}",
+                "daily_limit": float(result['daily_limit'])
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_set_limit)
 
 # ============================================================================
 # API ENDPOINTS - HEALTH & INFO

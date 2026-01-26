@@ -154,21 +154,6 @@ const Dashboard = ({ user, onLogout }) => {
           </div>
         </div>
 
-        {/* Send Money Button */}
-        <Link
-          to="/send-money"
-          className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-6 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 border border-white/30 mb-6 flex items-center justify-center"
-          data-testid="send-money-button"
-        >
-          <svg className="w-8 h-8 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <p className="font-bold text-xl">Send Money</p>
-            <p className="text-sm opacity-90">Make a secure payment</p>
-          </div>
-        </Link>
-
         {/* Fraud Detection Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Link

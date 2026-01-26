@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUserTransactions, submitUserDecision } from '../api';
 import { useNotifications } from './NotificationSystem';
+import cacheManager from '../utils/cacheManager';
 
 const TransactionHistory = ({ user }) => {
   const navigate = useNavigate();
@@ -117,30 +118,45 @@ const TransactionHistory = ({ user }) => {
     setExpandedTransaction(expandedTransaction === txId ? null : txId);
   };
 
-  const handleQuickAction = async (txId, decision) => {
-    setProcessingAction(`${txId}-${decision}`);
-    try {
-      await submitUserDecision({ tx_id: txId, decision });
-      addNotification({
-        type: 'transaction_resolved',
-        title: `Transaction ${decision === 'confirm' ? 'Confirmed' : 'Cancelled'}`,
-        message: `Transaction has been ${decision}ed successfully.`,
-        category: 'success'
-      });
-      // Refresh the transactions list
-      loadTransactions();
-      setExpandedTransaction(null);
-    } catch (error) {
-      addNotification({
-        type: 'error',
-        title: 'Action Failed',
-        message: 'Unable to process your decision. Please try again.',
-        category: 'error'
-      });
-    } finally {
-      setProcessingAction(null);
-    }
-  };
+   const handleQuickAction = async (txId, decision) => {
+     setProcessingAction(`${txId}-${decision}`);
+     try {
+       const response = await submitUserDecision({ tx_id: txId, decision });
+       
+       // Clear transaction cache to ensure fresh data on next load
+       cacheManager.invalidateCategory('transactions');
+       cacheManager.invalidateCategory('dashboard');
+       
+       // Update the transaction locally immediately with response from backend
+       const updatedAction = response.transaction?.action || (decision === 'confirm' ? 'ALLOW' : 'BLOCK');
+       
+       setTransactions(prevTransactions =>
+         prevTransactions.map(tx =>
+           tx.tx_id === txId
+             ? { ...tx, action: updatedAction }
+             : tx
+         )
+       );
+       
+       addNotification({
+         type: 'transaction_resolved',
+         title: `Transaction ${decision === 'confirm' ? 'Confirmed' : 'Rejected'}`,
+         message: `Transaction has been processed successfully.`,
+         category: 'success'
+       });
+       setExpandedTransaction(null);
+     } catch (error) {
+       console.error('Decision error:', error);
+       addNotification({
+         type: 'error',
+         title: 'Action Failed',
+         message: 'Unable to process your decision. Please try again.',
+         category: 'error'
+       });
+     } finally {
+       setProcessingAction(null);
+     }
+   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 pb-6" data-testid="transaction-history-screen">
