@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
+import SendMoneyLogin from './components/SendMoneyLogin';
 import RegisterScreen from './components/RegisterScreen';
 import Dashboard from './components/Dashboard';
+import SendMoney from './components/SendMoney';
 import TransactionHistory from './components/TransactionHistory';
 import FraudAlertEnhanced from './components/FraudAlertEnhanced';
 import RiskAnalysis from './components/RiskAnalysis';
@@ -58,6 +60,16 @@ function AppContent() {
             }
           />
           <Route
+            path="/send-money-login"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/send-money" />
+              ) : (
+                <SendMoneyLogin onLogin={handleLogin} />
+              )
+            }
+          />
+          <Route
             path="/register"
             element={
               isAuthenticated ? (
@@ -67,7 +79,7 @@ function AppContent() {
               )
             }
           />
-          <Route
+<Route
             path="/dashboard"
             element={
               isAuthenticated ? (
@@ -78,15 +90,25 @@ function AppContent() {
             }
            />
            <Route
-            path="/transactions"
-            element={
-              isAuthenticated ? (
-                <TransactionHistory user={user} />
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
-          />
+             path="/send-money"
+             element={
+               isAuthenticated ? (
+                 <SendMoney user={user} />
+               ) : (
+                 <Navigate to="/send-money-login" />
+               )
+             }
+           />
+           <Route
+             path="/transactions"
+             element={
+               isAuthenticated ? (
+                 <TransactionHistory user={user} />
+               ) : (
+                 <Navigate to="/login" />
+               )
+             }
+           />
           <Route
             path="/fraud-alert/:txId"
             element={

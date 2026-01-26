@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createTransaction } from '../api';
+import { createTransaction, searchUsers } from '../api';
 import { useNotifications } from './NotificationSystem';
 import cacheManager from '../utils/cacheManager';
+import RecipientDropdown from './RecipientDropdown';
+import TransactionResult from './TransactionResult';
 
 const SendMoney = ({ user, onBack }) => {
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(false);
+  const [transactionResult, setTransactionResult] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [recipientUser, setRecipientUser] = useState(null);
+  const amountRef = useRef(null);
   const [formData, setFormData] = useState({
     recipient_vpa: '',
     amount: '',
@@ -22,6 +29,59 @@ const SendMoney = ({ user, onBack }) => {
       [name]: value
     }));
     setError('');
+    setRecipientUser(null);
+    setShowDropdown(false);
+  };
+
+  const handleRecipientChange = async (value) => {
+    setFormData(prev => ({
+      ...prev,
+      recipient_vpa: value
+    }));
+    setError('');
+    setRecipientUser(null);
+    
+    if (value.length >= 3) {
+      try {
+        const response = await searchUsers(value);
+        if (response.status === 'success') {
+          setSearchResults(response.results);
+          setShowDropdown(true);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+      }
+    } else {
+      setSearchResults([]);
+      setShowDropdown(false);
+    }
+  };
+
+  const handleRecipientSelect = (user) => {
+    setRecipientUser(user);
+    setFormData(prev => ({
+      ...prev,
+      recipient_vpa: user.upi_id
+    }));
+    setShowDropdown(false);
+  };
+
+  const formatAmount = (value) => {
+    const cleaned = value.replace(/[^\d.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length > 2) return value;
+    const integerPart = parts[0] || '';
+    const decimalPart = parts[1] || '';
+    return decimalPart.length > 2 ? integerPart + '.' + decimalPart.slice(0, 2) : cleaned;
+  };
+
+  const handleAmountChange = (e) => {
+    const formatted = formatAmount(e.target.value);
+    setFormData(prev => ({
+      ...prev,
+      amount: formatted
+    }));
+    setError('');
   };
 
   const validateForm = () => {
@@ -29,22 +89,18 @@ const SendMoney = ({ user, onBack }) => {
       setError('Please enter recipient UPI ID');
       return false;
     }
-    if (!formData.recipient_vpa.includes('@')) {
-      setError('Invalid UPI ID format (e.g., user@upi)');
-      return false;
-    }
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       setError('Please enter a valid amount');
       return false;
     }
-    if (parseFloat(formData.amount) > 100000) {
-      setError('Amount cannot exceed ₹1,00,000');
+    if (parseFloat(formData.amount) > parseFloat(user.balance)) {
+      setError('Insufficient balance');
       return false;
     }
     return true;
   };
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -53,7 +109,7 @@ const SendMoney = ({ user, onBack }) => {
 
     setLoading(true);
     setError('');
-
+    
     try {
       const response = await createTransaction({
         recipient_vpa: formData.recipient_vpa,
@@ -61,49 +117,19 @@ const SendMoney = ({ user, onBack }) => {
         remarks: formData.remarks || 'Payment'
       });
 
-      const { transaction, requires_confirmation, risk_level } = response;
+      // Set transaction result
+      setTransactionResult({
+        status: response.status,
+        transaction: response.transaction,
+        requiresConfirmation: response.requires_confirmation,
+        riskLevel: response.risk_level,
+        dailyLimitExceeded: response.daily_limit_exceeded,
+        receiverUserId: response.receiver_user_id
+      });
 
-      // Clear cache so dashboard refreshes with new data
+      // Clear cache
       cacheManager.invalidateCategory('dashboard');
       cacheManager.invalidateCategory('transactions');
-
-      // Show notifications based on transaction action
-      if (transaction.action === 'BLOCK') {
-        addNotification({
-          type: 'error',
-          title: 'Transaction Blocked',
-          message: `Your transaction of ₹${transaction.amount.toFixed(2)} to ${transaction.recipient_vpa} was blocked due to high fraud risk (${(transaction.risk_score * 100).toFixed(1)}%).`,
-          category: 'fraud'
-        });
-      } else if (transaction.action === 'DELAY') {
-        addNotification({
-          type: 'warning',
-          title: 'Transaction Pending Review',
-          message: `Your transaction of ₹${transaction.amount.toFixed(2)} to ${transaction.recipient_vpa} has been delayed for security review. Risk score: ${(transaction.risk_score * 100).toFixed(1)}%`,
-          category: 'fraud',
-          action: 'review',
-          actionText: 'Review Now',
-          actionUrl: `/fraud-alert/${transaction.tx_id}`
-        });
-      } else {
-        addNotification({
-          type: 'success',
-          title: 'Transaction Successful',
-          message: `₹${transaction.amount.toFixed(2)} sent to ${transaction.recipient_vpa} successfully!`,
-          category: 'transaction'
-        });
-      }
-
-      // Navigate to appropriate page
-      if (requires_confirmation) {
-        setTimeout(() => {
-          navigate(`/fraud-alert/${transaction.tx_id}`);
-        }, 1500);
-      } else {
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1500);
-      }
 
     } catch (err) {
       console.error('Transaction failed:', err);
@@ -129,12 +155,23 @@ const SendMoney = ({ user, onBack }) => {
     }).format(amount);
   };
 
+  // Show transaction result if available
+  if (transactionResult) {
+    return (
+      <TransactionResult 
+        result={transactionResult}
+        onBack={() => setTransactionResult(null)}
+        senderUser={user}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900">
       {/* Animated background */}
       <div className="fixed inset-0 -z-10">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500 rounded-full filter blur-3xl opacity-20 animate-pulse"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500 rounded-full filter blur-3xl opacity-20 animate-pulse delay-1000"></div>
+        <div className="absolute top-0 left-0 w-96 h-96 bg-green-500 rounded-full filter blur-3xl opacity-20 animate-pulse"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-teal-500 rounded-full filter blur-3xl opacity-20 animate-pulse delay-1000"></div>
       </div>
 
       {/* Header */}
@@ -167,33 +204,82 @@ const SendMoney = ({ user, onBack }) => {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Recipient UPI ID */}
             <div className="bg-white/10 backdrop-blur-xl rounded-xl p-5 border border-white/20">
-              <label className="text-white/80 text-sm mb-2 block">Recipient UPI ID</label>
-              <input
-                type="text"
-                name="recipient_vpa"
-                value={formData.recipient_vpa}
-                onChange={handleChange}
-                placeholder="example@upi"
-                className="w-full bg-white/10 text-white placeholder-white/40 rounded-lg px-4 py-3 border border-white/20 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400/50"
-                disabled={loading}
-              />
+              <label className="text-white/80 text-sm mb-2 block">Recipient</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  name="recipient_vpa"
+                  value={formData.recipient_vpa}
+                  onChange={(e) => handleRecipientChange(e.target.value)}
+                  placeholder="Phone number or UPI ID"
+                  className="w-full bg-white/10 text-white placeholder-white/40 rounded-lg px-4 py-3 border border-white/20 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400/50"
+                  disabled={loading}
+                  autoComplete="off"
+                />
+                
+                <RecipientDropdown
+                  show={showDropdown}
+                  results={searchResults}
+                  onSelect={handleRecipientSelect}
+                  onClose={() => setShowDropdown(false)}
+                />
+              </div>
+              
+              {/* Show selected recipient info */}
+              {recipientUser && (
+                <div className="mt-3 bg-green-500/20 border border-green-500/30 px-3 py-2 rounded-lg">
+                  <div className="flex items-center">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <div>
+                      <div className="text-white font-semibold">{recipientUser.name}</div>
+                      <div className="text-green-300 text-sm">{recipientUser.upi_id}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Amount */}
             <div className="bg-white/10 backdrop-blur-xl rounded-xl p-5 border border-white/20">
               <label className="text-white/80 text-sm mb-2 block">Amount (₹)</label>
               <input
-                type="number"
+                ref={amountRef}
+                type="text"
                 name="amount"
                 value={formData.amount}
-                onChange={handleChange}
+                onChange={handleAmountChange}
                 placeholder="0.00"
-                step="0.01"
-                min="1"
-                max="100000"
                 className="w-full bg-white/10 text-white placeholder-white/40 rounded-lg px-4 py-3 border border-white/20 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400/50 text-2xl font-semibold"
                 disabled={loading}
               />
+              <div className="mt-3 flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, amount: '500' }))}
+                  className="px-3 py-1 bg-white/20 text-white/80 rounded-lg hover:bg-white/30 text-sm"
+                  disabled={loading}
+                >
+                  ₹500
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, amount: '1000' }))}
+                  className="px-3 py-1 bg-white/20 text-white/80 rounded-lg hover:bg-white/30 text-sm"
+                  disabled={loading}
+                >
+                  ₹1,000
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, amount: '5000' }))}
+                  className="px-3 py-1 bg-white/20 text-white/80 rounded-lg hover:bg-white/30 text-sm"
+                  disabled={loading}
+                >
+                  ₹5,000
+                </button>
+              </div>
             </div>
 
             {/* Remarks */}
