@@ -95,6 +95,27 @@ export const submitUserDecision = async (decisionData) => {
   return response.data;
 };
 
+// Send Money specific APIs
+export const searchUsers = async (phone) => {
+  const response = await api.get('/api/users/search', { params: { phone } });
+  return response.data;
+};
+
+export const confirmTransaction = async (txId) => {
+  const response = await api.post('/api/transaction/confirm', { tx_id: txId });
+  return response.data;
+};
+
+export const cancelTransaction = async (txId) => {
+  const response = await api.post('/api/transaction/cancel', { tx_id: txId });
+  return response.data;
+};
+
+export const getTransaction = async (txId) => {
+  const response = await api.get(`/api/transaction/${txId}`);
+  return response.data;
+};
+
 // Push notification APIs
 export const registerPushToken = async (fcmToken, deviceId) => {
   const response = await api.post('/api/push-token', { fcm_token: fcmToken, device_id: deviceId });
