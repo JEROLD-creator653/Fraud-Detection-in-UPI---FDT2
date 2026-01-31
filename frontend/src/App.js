@@ -2,16 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
-import SendMoneyLogin from './components/SendMoneyLogin';
 import RegisterScreen from './components/RegisterScreen';
 import Dashboard from './components/Dashboard';
 import SendMoney from './components/SendMoney';
 import TransactionHistory from './components/TransactionHistory';
 import FraudAlertEnhanced from './components/FraudAlertEnhanced';
 import RiskAnalysis from './components/RiskAnalysis';
-import SecuritySettings from './components/SecuritySettings';
 import NotificationPanel from './components/NotificationPanel';
 import { NotificationProvider } from './components/NotificationSystem';
+import cacheManager from './utils/cacheManager';
 
 function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +27,9 @@ function AppContent() {
   }, []);
 
   const handleLogin = (userData, token) => {
+    // Clear all cache when logging in to prevent stale data
+    cacheManager.clear();
+    
     localStorage.setItem('fdt_token', token);
     localStorage.setItem('fdt_user', JSON.stringify(userData));
     setUser(userData);
@@ -35,6 +37,9 @@ function AppContent() {
   };
 
   const handleLogout = () => {
+    // Clear all cache when logging out
+    cacheManager.clear();
+    
     localStorage.removeItem('fdt_token');
     localStorage.removeItem('fdt_user');
     setUser(null);
@@ -59,16 +64,16 @@ function AppContent() {
               )
             }
           />
-          <Route
-            path="/send-money-login"
-            element={
-              isAuthenticated ? (
-                <Navigate to="/send-money" />
-              ) : (
-                <SendMoneyLogin onLogin={handleLogin} />
-              )
-            }
-          />
+           <Route
+             path="/send-money-login"
+             element={
+               isAuthenticated ? (
+                 <Navigate to="/send-money" />
+               ) : (
+                 <Navigate to="/login" />
+               )
+             }
+           />
           <Route
             path="/register"
             element={
@@ -89,16 +94,16 @@ function AppContent() {
               )
             }
            />
-           <Route
-             path="/send-money"
-             element={
-               isAuthenticated ? (
-                 <SendMoney user={user} />
-               ) : (
-                 <Navigate to="/send-money-login" />
-               )
-             }
-           />
+            <Route
+              path="/send-money"
+              element={
+                isAuthenticated ? (
+                  <SendMoney user={user} setUser={setUser} onLogout={handleLogout} />
+                ) : (
+                  <Navigate to="/send-money-login" />
+                )
+              }
+            />
            <Route
              path="/transactions"
              element={

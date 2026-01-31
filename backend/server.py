@@ -398,6 +398,7 @@ async def login_user(credentials: UserLogin):
             cur = conn.cursor()
             
             # Get user by phone
+            print(f"DEBUG: Attempting login with phone: {credentials.phone}")
             cur.execute(
                 "SELECT user_id, name, phone, email, password_hash, balance FROM users WHERE phone = %s AND is_active = TRUE",
                 (credentials.phone,)
@@ -405,11 +406,17 @@ async def login_user(credentials: UserLogin):
             user = cur.fetchone()
             
             if not user:
+                print(f"DEBUG: No user found for phone {credentials.phone}")
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
+            
+            print(f"DEBUG: Found user: {user['name']} (ID: {user['user_id']}, Phone: {user['phone']})")
             
             # Verify password
             if not bcrypt.verify(credentials.password, user["password_hash"]):
+                print(f"DEBUG: Password verification failed for {user['name']}")
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
+            
+            print(f"DEBUG: Password verified successfully for {user['name']}")
             
             # Create token
             token = create_access_token(user["user_id"])
@@ -417,6 +424,8 @@ async def login_user(credentials: UserLogin):
             # Remove password hash from response
             user_data = dict(user)
             del user_data["password_hash"]
+            
+            print(f"DEBUG: Returning user data: {user_data}")
             
             return {
                 "status": "success",
