@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getUserTransactions, submitUserDecision, confirmTransaction, cancelTransaction } from '../api';
 import { useNotifications } from './NotificationSystem';
 import cacheManager from '../utils/cacheManager';
+import { exportToCSV, exportToJSON, exportToDetailedReport } from '../utils/exportUtils';
 
 const TransactionHistory = ({ user }) => {
   const navigate = useNavigate();
@@ -262,17 +263,58 @@ const handleQuickAction = async (txId, decision) => {
 
       {/* Header */}
       <div className="bg-black/20 backdrop-blur-xl border-b border-white/10 text-white p-6 pb-8">
-        <div className="flex items-center mb-4">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="mr-4 text-purple-300 hover:text-white transition-colors"
-            data-testid="back-button"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h1 className="text-2xl font-bold">Security Monitor</h1>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="mr-4 text-purple-300 hover:text-white transition-colors"
+              data-testid="back-button"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h1 className="text-2xl font-bold">Security Monitor</h1>
+          </div>
+          
+          {/* Export Buttons */}
+          {transactions.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => exportToCSV(filteredTransactions.length > 0 ? filteredTransactions : transactions, 'FDT_Transactions')}
+                className="flex items-center space-x-2 px-3 py-2 bg-green-600/80 hover:bg-green-600 text-white text-sm rounded-lg transition-colors"
+                title="Export as CSV"
+                data-testid="export-csv-button"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>CSV</span>
+              </button>
+              <button
+                onClick={() => exportToJSON(filteredTransactions.length > 0 ? filteredTransactions : transactions, 'FDT_Transactions')}
+                className="flex items-center space-x-2 px-3 py-2 bg-blue-600/80 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
+                title="Export as JSON"
+                data-testid="export-json-button"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>JSON</span>
+              </button>
+              <button
+                onClick={() => exportToDetailedReport(filteredTransactions.length > 0 ? filteredTransactions : transactions, 'FDT_Report')}
+                className="flex items-center space-x-2 px-3 py-2 bg-purple-600/80 hover:bg-purple-600 text-white text-sm rounded-lg transition-colors"
+                title="Export detailed report as HTML"
+                data-testid="export-report-button"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Report</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
