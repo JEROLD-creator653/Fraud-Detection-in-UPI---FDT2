@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { loginUser } from '../api';
 import cacheManager from '../utils/cacheManager';
+import errorHandler from '../utils/errorHandler';
 
 const LoginScreen = ({ onLogin }) => {
   const navigate = useNavigate();
@@ -20,28 +21,56 @@ const LoginScreen = ({ onLogin }) => {
     setError('');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+   const handleSubmit = async (e) => {
+     e.preventDefault();
+     setError('');
+     
+     // Basic validation
+     const validation = errorHandler.validateForm(
+       formData,
+       {
+         phone: {
+           required: true,
+           label: 'Phone Number',
+           custom: (value) => {
+             const cleanPhone = value.replace(/\D/g, '');
+             return cleanPhone.length === 10;
+           },
+           message: 'Please enter a valid 10-digit phone number'
+         },
+         password: {
+           required: true,
+           label: 'Password',
+           minLength: 3
+         }
+       }
+     );
 
-    try {
-      const response = await loginUser(formData);
-      
-      if (response.status === 'success') {
-        // Set current user in cache manager to clear user-specific cache
-        cacheManager.setCurrentUser(response.user.user_id);
-        
-        onLogin(response.user, response.token);
-        // Always navigate to dashboard after login
-        navigate('/dashboard');
-      }
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
+     if (!validation.isValid) {
+       setError(Object.values(validation.errors)[0]);
+       return;
+     }
+
+     setLoading(true);
+
+     try {
+       const response = await loginUser(formData);
+       
+       if (response.status === 'success') {
+         // Set current user in cache manager to clear user-specific cache
+         cacheManager.setCurrentUser(response.user.user_id);
+         
+         onLogin(response.user, response.token);
+         // Always navigate to dashboard after login
+         navigate('/dashboard');
+       }
+     } catch (err) {
+       const errorInfo = errorHandler.handleAPIError(err, 'User Login');
+       setError(errorInfo.message);
+     } finally {
+       setLoading(false);
+     }
+   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
