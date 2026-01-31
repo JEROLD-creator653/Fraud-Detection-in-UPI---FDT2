@@ -4,6 +4,7 @@ import { createTransaction, searchUsers } from '../api';
 import { useNotifications } from './NotificationSystem';
 import cacheManager from '../utils/cacheManager';
 import favoritesManager from '../utils/favoritesManager';
+import errorHandler from '../utils/errorHandler';
 import RecipientDropdown from './RecipientDropdown';
 import TransactionResult from './TransactionResult';
 import FavoritesModal from './FavoritesModal';
@@ -44,21 +45,25 @@ const SendMoney = ({ user, setUser, onBack, onLogout }) => {
     setError('');
     setRecipientUser(null);
     
-    if (value.length >= 3) {
-      try {
-        const response = await searchUsers(value);
-        if (response.status === 'success') {
-          setSearchResults(response.results);
-          setShowDropdown(true);
-        }
-      } catch (error) {
-        console.error('Search error:', error);
-      }
-    } else {
-      setSearchResults([]);
-      setShowDropdown(false);
-    }
-  };
+     if (value.length >= 3) {
+       try {
+         const response = await searchUsers(value);
+         if (response.status === 'success') {
+           setSearchResults(response.results);
+           setShowDropdown(true);
+         } else {
+           setSearchResults([]);
+         }
+       } catch (error) {
+         // Silent fail for search - don't show error as user is still typing
+         errorHandler.logError(error, 'Search Users');
+         setSearchResults([]);
+       }
+     } else {
+       setSearchResults([]);
+       setShowDropdown(false);
+     }
+   };
 
   const handleRecipientSelect = (user) => {
     setRecipientUser(user);
@@ -88,18 +93,46 @@ const SendMoney = ({ user, setUser, onBack, onLogout }) => {
   };
 
   const validateForm = () => {
+    // Validate recipient
     if (!formData.recipient_vpa) {
-      setError('Please enter recipient UPI ID');
+      setError('Please enter a recipient UPI ID or phone number');
       return false;
     }
+
+    // Check if it's a phone number or UPI ID and validate accordingly
+    const isPhoneNumber = /^\d{10}$/.test(formData.recipient_vpa.replace(/\D/g, ''));
+    const isUPI = formData.recipient_vpa.includes('@');
+
+    if (!isPhoneNumber && !isUPI) {
+      const { error } = errorHandler.validatePhoneNumber(formData.recipient_vpa);
+      if (!error) {
+        const upiValidation = errorHandler.validateUPI(formData.recipient_vpa);
+        if (!upiValidation.isValid) {
+          setError(upiValidation.error);
+          return false;
+        }
+      }
+    }
+
+    // Validate amount
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      setError('Please enter a valid amount');
+      setError('Please enter a valid amount greater than ₹0');
       return false;
     }
-    if (parseFloat(formData.amount) > parseFloat(user.balance)) {
-      setError('Insufficient balance');
+
+    // Validate amount against balance
+    const amountValidation = errorHandler.validateAmount(
+      formData.amount,
+      user.balance,
+      1,
+      100000
+    );
+    
+    if (!amountValidation.isValid) {
+      setError(amountValidation.error);
       return false;
     }
+
     return true;
   };
 
@@ -142,18 +175,18 @@ const handleSubmit = async (e) => {
        cacheManager.invalidateCategory('dashboard');
        cacheManager.invalidateCategory('transactions');
 
-     } catch (err) {
-       console.error('Transaction failed:', err);
-       const errorMessage = err.response?.data?.detail || 'Transaction failed. Please try again.';
-       setError(errorMessage);
-       
-       addNotification({
-         type: 'error',
-         title: 'Transaction Failed',
-         message: errorMessage,
-         category: 'error'
-       });
-     } finally {
+      } catch (err) {
+        // Use error handler for comprehensive error management
+        const errorInfo = errorHandler.handleAPIError(err, 'Create Transaction');
+        setError(errorInfo.message);
+        
+        addNotification({
+          type: 'error',
+          title: errorInfo.title,
+          message: errorInfo.message,
+          category: 'error'
+        });
+      } finally {
        setLoading(false);
       }
     };
