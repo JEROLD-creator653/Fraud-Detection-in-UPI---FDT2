@@ -6,7 +6,7 @@ import cacheManager from '../utils/cacheManager';
 import RecipientDropdown from './RecipientDropdown';
 import TransactionResult from './TransactionResult';
 
-const SendMoney = ({ user, onBack }) => {
+const SendMoney = ({ user, setUser, onBack, onLogout }) => {
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(false);
@@ -101,51 +101,59 @@ const SendMoney = ({ user, onBack }) => {
   };
 
 const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+     e.preventDefault();
+     
+     if (!validateForm()) {
+       return;
+     }
 
-    setLoading(true);
-    setError('');
-    
-    try {
-      const response = await createTransaction({
-        recipient_vpa: formData.recipient_vpa,
-        amount: parseFloat(formData.amount),
-        remarks: formData.remarks || 'Payment'
-      });
+     setLoading(true);
+     setError('');
+     
+     try {
+       const response = await createTransaction({
+         recipient_vpa: formData.recipient_vpa,
+         amount: parseFloat(formData.amount),
+         remarks: formData.remarks || 'Payment'
+       });
 
-      // Set transaction result
-      setTransactionResult({
-        status: response.status,
-        transaction: response.transaction,
-        requiresConfirmation: response.requires_confirmation,
-        riskLevel: response.risk_level,
-        dailyLimitExceeded: response.daily_limit_exceeded,
-        receiverUserId: response.receiver_user_id
-      });
+       // Update user balance if transaction was successful or pending
+       if (response.status === 'success') {
+         const newBalance = user.balance - parseFloat(formData.amount);
+         const updatedUser = { ...user, balance: newBalance };
+         setUser(updatedUser);
+         localStorage.setItem('fdt_user', JSON.stringify(updatedUser));
+       }
 
-      // Clear cache
-      cacheManager.invalidateCategory('dashboard');
-      cacheManager.invalidateCategory('transactions');
+       // Set transaction result
+       setTransactionResult({
+         status: response.status,
+         transaction: response.transaction,
+         requiresConfirmation: response.requires_confirmation,
+         riskLevel: response.risk_level,
+         dailyLimitExceeded: response.daily_limit_exceeded,
+         receiverUserId: response.receiver_user_id
+       });
 
-    } catch (err) {
-      console.error('Transaction failed:', err);
-      const errorMessage = err.response?.data?.detail || 'Transaction failed. Please try again.';
-      setError(errorMessage);
-      
-      addNotification({
-        type: 'error',
-        title: 'Transaction Failed',
-        message: errorMessage,
-        category: 'error'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+       // Clear cache
+       cacheManager.invalidateCategory('dashboard');
+       cacheManager.invalidateCategory('transactions');
+
+     } catch (err) {
+       console.error('Transaction failed:', err);
+       const errorMessage = err.response?.data?.detail || 'Transaction failed. Please try again.';
+       setError(errorMessage);
+       
+       addNotification({
+         type: 'error',
+         title: 'Transaction Failed',
+         message: errorMessage,
+         category: 'error'
+       });
+     } finally {
+       setLoading(false);
+     }
+   };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -174,20 +182,36 @@ const handleSubmit = async (e) => {
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-teal-500 rounded-full filter blur-3xl opacity-20 animate-pulse delay-1000"></div>
       </div>
 
-      {/* Header */}
-      <div className="bg-black/20 backdrop-blur-xl border-b border-white/10 text-white p-6">
-        <div className="flex items-center">
-          <button
-            onClick={onBack}
-            className="mr-4 p-2 hover:bg-white/10 rounded-lg transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h1 className="text-2xl font-bold">Send Money</h1>
-        </div>
-      </div>
+       {/* Header */}
+       <div className="bg-black/20 backdrop-blur-xl border-b border-white/10 text-white p-6">
+         <div className="flex items-center justify-between">
+           <div className="flex items-center">
+            <button
+              onClick={() => {
+                if (onLogout) onLogout();
+                navigate('/login');
+              }}
+              className="mr-4 p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+           <h1 className="text-2xl font-bold">Send Money</h1>
+           </div>
+           
+           {/* Switch to Fraud Detection */}
+           <button
+             onClick={() => navigate('/dashboard')}
+             className="flex items-center space-x-2 px-4 py-2 bg-purple-600/80 hover:bg-purple-600 text-white rounded-lg transition-colors"
+           >
+             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m7 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+             </svg>
+             <span className="text-sm font-medium">Fraud Detection</span>
+           </button>
+         </div>
+       </div>
 
       {/* Form */}
       <div className="p-6">
@@ -202,10 +226,10 @@ const handleSubmit = async (e) => {
 
           {/* Transaction Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Recipient UPI ID */}
-            <div className="bg-white/10 backdrop-blur-xl rounded-xl p-5 border border-white/20">
-              <label className="text-white/80 text-sm mb-2 block">Recipient</label>
-              <div className="relative">
+             {/* Recipient UPI ID */}
+             <div className="bg-white/10 backdrop-blur-xl rounded-xl p-5 border border-white/20 relative z-10">
+               <label className="text-white/80 text-sm mb-2 block">Recipient</label>
+               <div className="relative">
                 <input
                   type="text"
                   name="recipient_vpa"

@@ -85,7 +85,7 @@ class TransactionSimulator:
         self.url = url
         self.mode = mode  # 'user' or 'admin'
         self.auth_token = auth_token
-        self.backend_url = backend_url if backend_url else "http://localhost:8001"
+        self.backend_url = backend_url if backend_url else "http://localhost/8001"
         self.user_tokens: Dict[str, str] = {}  # Cache of user_id -> token
         self.current_user_index = 0
         self.stats = {

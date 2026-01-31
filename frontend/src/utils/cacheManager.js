@@ -1,6 +1,7 @@
 class CacheManager {
   constructor() {
     this.cache = new Map();
+    this.currentUserId = null;
     this.cacheConfig = {
       transactions: {
         ttl: 5 * 60 * 1000, // 5 minutes
@@ -19,6 +20,25 @@ class CacheManager {
         maxSize: 200
       }
     };
+  }
+
+  setCurrentUser(userId) {
+    // If user changed, clear all user-specific cache
+    if (this.currentUserId && this.currentUserId !== userId) {
+      this.clearUserCache();
+    }
+    this.currentUserId = userId;
+  }
+
+  clearUserCache() {
+    const keysToDelete = [];
+    for (const [key, item] of this.cache.entries()) {
+      // Clear dashboard and transaction cache which are user-specific
+      if (['dashboard', 'transactions', 'userProfile'].includes(item.category)) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach(key => this.cache.delete(key));
   }
 
   set(key, data, category = 'default') {
@@ -88,6 +108,7 @@ class CacheManager {
 
   clear() {
     this.cache.clear();
+    this.currentUserId = null;
   }
 
   getStats() {

@@ -21,11 +21,11 @@ const RecipientDropdown = ({ show, results, onSelect, onClose }) => {
     return null;
   }
 
-  return (
-    <div
-      ref={dropdownRef}
-      className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-64 overflow-y-auto"
-    >
+   return (
+     <div
+       ref={dropdownRef}
+       className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-2xl border border-gray-200 z-[100] max-h-64 overflow-y-auto"
+     >
       <div className="py-1">
         {results.map((user, index) => (
           <button
