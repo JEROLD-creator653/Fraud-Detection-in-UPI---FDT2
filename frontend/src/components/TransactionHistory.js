@@ -8,11 +8,26 @@ const TransactionHistory = ({ user }) => {
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
   const [transactions, setTransactions] = useState([]);
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [error, setError] = useState('');
   const [expandedTransaction, setExpandedTransaction] = useState(null);
   const [processingAction, setProcessingAction] = useState(null);
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState('all'); // all, today, week, month
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [riskFilter, setRiskFilter] = useState('all'); // all, low, medium, high
+  const [sortBy, setSortBy] = useState('newest'); // newest, oldest, amount-high, amount-low
+
+  // Apply all filters and search when transactions or filters change
+  useEffect(() => {
+    applyFiltersAndSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, filter, searchQuery, dateFilter, amountMin, amountMax, riskFilter, sortBy]);
 
   useEffect(() => {
     loadTransactions();
@@ -65,15 +80,87 @@ const TransactionHistory = ({ user }) => {
     );
   };
 
-  const getRiskIndicator = (riskScore) => {
+  const getRiskLevel = (riskScore) => {
     const score = parseFloat(riskScore) * 100;
-    if (score >= 60) {
-      return <span className="text-red-600 text-xs">🔴 High Risk</span>;
-    } else if (score >= 30) {
-      return <span className="text-yellow-600 text-xs">🟡 Medium Risk</span>;
-    } else {
-      return <span className="text-green-600 text-xs">🟢 Low Risk</span>;
+    if (score >= 60) return 'high';
+    if (score >= 30) return 'medium';
+    return 'low';
+  };
+
+  const applyFiltersAndSearch = () => {
+    let result = [...transactions];
+
+    // Filter by status
+    if (filter !== 'all') {
+      result = result.filter(tx => tx.action.toLowerCase() === filter.toLowerCase());
     }
+
+    // Search by recipient or transaction ID
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(tx =>
+        tx.recipient_vpa.toLowerCase().includes(query) ||
+        tx.tx_id.toLowerCase().includes(query) ||
+        (tx.remarks && tx.remarks.toLowerCase().includes(query))
+      );
+    }
+
+    // Filter by date range
+    const now = new Date();
+    const txDate = (tx) => new Date(tx.created_at);
+    
+    if (dateFilter === 'today') {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      result = result.filter(tx => txDate(tx) >= today);
+    } else if (dateFilter === 'week') {
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      result = result.filter(tx => txDate(tx) >= weekAgo);
+    } else if (dateFilter === 'month') {
+      const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      result = result.filter(tx => txDate(tx) >= monthAgo);
+    }
+
+    // Filter by amount range
+    if (amountMin) {
+      const min = parseFloat(amountMin);
+      result = result.filter(tx => tx.amount >= min);
+    }
+    if (amountMax) {
+      const max = parseFloat(amountMax);
+      result = result.filter(tx => tx.amount <= max);
+    }
+
+    // Filter by risk level
+    if (riskFilter !== 'all') {
+      result = result.filter(tx => getRiskLevel(tx.risk_score) === riskFilter);
+    }
+
+    // Sort
+    if (sortBy === 'newest') {
+      result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } else if (sortBy === 'oldest') {
+      result.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    } else if (sortBy === 'amount-high') {
+      result.sort((a, b) => b.amount - a.amount);
+    } else if (sortBy === 'amount-low') {
+      result.sort((a, b) => a.amount - b.amount);
+    }
+
+    setFilteredTransactions(result);
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setDateFilter('all');
+    setAmountMin('');
+    setAmountMax('');
+    setRiskFilter('all');
+    setSortBy('newest');
+    setFilter('all');
+  };
+
+  const hasActiveFilters = () => {
+    return searchQuery || dateFilter !== 'all' || amountMin || amountMax || riskFilter !== 'all' || sortBy !== 'newest' || filter !== 'all';
   };
 
   const getExplanation = (action, riskScore, reasons) => {
@@ -190,7 +277,122 @@ const handleQuickAction = async (txId, decision) => {
       </div>
 
       <div className="px-6 -mt-4">
-        {/* Filter Tabs */}
+        {/* Search Bar */}
+        <div className="mb-6 relative">
+          <input
+            type="text"
+            placeholder="Search by recipient, transaction ID, or remarks..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-4 py-3 pl-12 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+            data-testid="search-input"
+          />
+          <svg className="absolute left-4 top-3.5 w-5 h-5 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+
+        {/* Advanced Filters Panel */}
+        <div className="bg-white/10 backdrop-blur-xl rounded-xl shadow-lg p-4 mb-6 border border-white/20">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white font-semibold">Advanced Filters</h3>
+            {hasActiveFilters() && (
+              <button
+                onClick={clearFilters}
+                className="text-sm text-purple-300 hover:text-white transition"
+                data-testid="clear-filters-button"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Date Filter */}
+            <div>
+              <label className="block text-xs font-semibold text-purple-300 mb-2">Date Range</label>
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                data-testid="date-filter"
+              >
+                <option value="all" className="text-gray-900">All Time</option>
+                <option value="today" className="text-gray-900">Today</option>
+                <option value="week" className="text-gray-900">Last 7 Days</option>
+                <option value="month" className="text-gray-900">Last 30 Days</option>
+              </select>
+            </div>
+
+            {/* Amount Min */}
+            <div>
+              <label className="block text-xs font-semibold text-purple-300 mb-2">Min Amount</label>
+              <input
+                type="number"
+                placeholder="₹0"
+                value={amountMin}
+                onChange={(e) => setAmountMin(e.target.value)}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                data-testid="amount-min-filter"
+              />
+            </div>
+
+            {/* Amount Max */}
+            <div>
+              <label className="block text-xs font-semibold text-purple-300 mb-2">Max Amount</label>
+              <input
+                type="number"
+                placeholder="₹1,00,000"
+                value={amountMax}
+                onChange={(e) => setAmountMax(e.target.value)}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                data-testid="amount-max-filter"
+              />
+            </div>
+
+            {/* Risk Level Filter */}
+            <div>
+              <label className="block text-xs font-semibold text-purple-300 mb-2">Risk Level</label>
+              <select
+                value={riskFilter}
+                onChange={(e) => setRiskFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                data-testid="risk-filter"
+              >
+                <option value="all" className="text-gray-900">All Risks</option>
+                <option value="low" className="text-gray-900">Low Risk</option>
+                <option value="medium" className="text-gray-900">Medium Risk</option>
+                <option value="high" className="text-gray-900">High Risk</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Sort Options */}
+          <div className="mt-4 pt-4 border-t border-white/20">
+            <label className="block text-xs font-semibold text-purple-300 mb-2">Sort By</label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'newest', label: 'Newest First' },
+                { value: 'oldest', label: 'Oldest First' },
+                { value: 'amount-high', label: 'Amount (High to Low)' },
+                { value: 'amount-low', label: 'Amount (Low to High)' }
+              ].map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setSortBy(option.value)}
+                  className={`px-3 py-1 text-xs rounded-lg transition ${
+                    sortBy === option.value
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white/10 text-purple-300 hover:bg-white/20'
+                  }`}
+                  data-testid={`sort-${option.value}`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
         <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-lg p-2 mb-6 flex space-x-2 border border-white/20" data-testid="filter-tabs">
           <button
             onClick={() => setFilter('all')}
@@ -238,6 +440,13 @@ const handleQuickAction = async (txId, decision) => {
           </button>
         </div>
 
+        {/* Results Summary */}
+        {filteredTransactions.length !== transactions.length && hasActiveFilters() && (
+          <div className="mb-4 p-4 bg-blue-500/20 border border-blue-400/30 rounded-lg text-blue-300 text-sm">
+            Found {filteredTransactions.length} of {transactions.length} transactions
+          </div>
+        )}
+
         {/* Transactions List */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -247,19 +456,35 @@ const handleQuickAction = async (txId, decision) => {
           <div className="bg-red-500/20 border border-red-500/30 text-red-200 p-4 rounded-lg backdrop-blur-sm">
             {error}
           </div>
-        ) : transactions.length === 0 ? (
-          <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-lg p-8 text-center border border-white/20">
-            <svg className="w-20 h-20 mx-auto mb-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <p className="text-purple-200 font-semibold">No security events</p>
-            <p className="text-sm text-purple-300 mt-2">
-              {filter !== 'all' ? `No ${filter} events found` : 'All transactions are secure'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3" data-testid="transactions-list">
-            {transactions.map((tx) => {
+         ) : transactions.length === 0 ? (
+           <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-lg p-8 text-center border border-white/20">
+             <svg className="w-20 h-20 mx-auto mb-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+             </svg>
+             <p className="text-purple-200 font-semibold">No security events</p>
+             <p className="text-sm text-purple-300 mt-2">
+               {filter !== 'all' ? `No ${filter} events found` : 'All transactions are secure'}
+             </p>
+           </div>
+         ) : filteredTransactions.length === 0 ? (
+           <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-lg p-8 text-center border border-white/20">
+             <svg className="w-20 h-20 mx-auto mb-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+             </svg>
+             <p className="text-purple-200 font-semibold">No matching transactions</p>
+             <p className="text-sm text-purple-300 mt-2">Try adjusting your filters</p>
+             {hasActiveFilters() && (
+               <button
+                 onClick={clearFilters}
+                 className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+               >
+                 Clear Filters
+               </button>
+             )}
+           </div>
+         ) : (
+           <div className="space-y-3" data-testid="transactions-list">
+             {filteredTransactions.map((tx) => {
               const explanation = getExplanation(tx.action, tx.risk_score, tx.fraud_reasons);
               const isExpanded = expandedTransaction === tx.tx_id;
               
@@ -288,8 +513,14 @@ const handleQuickAction = async (txId, decision) => {
 
                     <div className="flex justify-between items-center pt-3 border-t border-white/20">
                       <div className="flex items-center space-x-3">
-                        {getStatusBadge(tx.action)}
-                        {getRiskIndicator(tx.risk_score)}
+                         {getStatusBadge(tx.action)}
+                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                           getRiskLevel(tx.risk_score) === 'high' ? 'bg-red-100 text-red-800' :
+                           getRiskLevel(tx.risk_score) === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                           'bg-green-100 text-green-800'
+                         }`}>
+                           {getRiskLevel(tx.risk_score).charAt(0).toUpperCase() + getRiskLevel(tx.risk_score).slice(1)} Risk
+                         </span>
                       </div>
                       <div className="flex items-center space-x-2 text-xs text-purple-300">
                         <span>ID: {tx.tx_id.substring(0, 12)}...</span>
