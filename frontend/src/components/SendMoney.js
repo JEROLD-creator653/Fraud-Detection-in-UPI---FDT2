@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { createTransaction, searchUsers } from '../api';
 import { useNotifications } from './NotificationSystem';
 import cacheManager from '../utils/cacheManager';
+import favoritesManager from '../utils/favoritesManager';
 import RecipientDropdown from './RecipientDropdown';
 import TransactionResult from './TransactionResult';
+import FavoritesModal from './FavoritesModal';
 
 const SendMoney = ({ user, setUser, onBack, onLogout }) => {
   const navigate = useNavigate();
@@ -13,6 +15,7 @@ const SendMoney = ({ user, setUser, onBack, onLogout }) => {
   const [transactionResult, setTransactionResult] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [recipientUser, setRecipientUser] = useState(null);
   const amountRef = useRef(null);
   const [formData, setFormData] = useState({
@@ -152,10 +155,43 @@ const handleSubmit = async (e) => {
        });
      } finally {
        setLoading(false);
-     }
-   };
+      }
+    };
 
-  const formatCurrency = (amount) => {
+  const handleSelectFavorite = (favorite) => {
+    setFormData(prev => ({
+      ...prev,
+      recipient_vpa: favorite.vpa,
+      amount: favorite.amount ? favorite.amount.toString() : '',
+      remarks: favorite.remarks || ''
+    }));
+    setRecipientUser(null);
+    if (amountRef.current && favorite.amount) {
+      amountRef.current.focus();
+    }
+  };
+
+  const handleAddFavorite = () => {
+    if (formData.recipient_vpa) {
+      const newFavorite = {
+        name: recipientUser?.name || formData.recipient_vpa,
+        vpa: formData.recipient_vpa,
+        amount: formData.amount ? parseFloat(formData.amount) : null,
+        remarks: formData.remarks || ''
+      };
+      favoritesManager.addFavorite(newFavorite);
+      addNotification({
+        type: 'success',
+        title: 'Recipient Saved',
+        message: 'You can quickly access this recipient from Saved Recipients',
+        category: 'success'
+      });
+    } else {
+      setError('Please enter a recipient UPI ID first');
+    }
+  };
+
+   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
@@ -318,9 +354,35 @@ const handleSubmit = async (e) => {
                 className="w-full bg-white/10 text-white placeholder-white/40 rounded-lg px-4 py-3 border border-white/20 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400/50"
                 disabled={loading}
               />
-            </div>
+             </div>
 
-            {/* Error Message */}
+             {/* Quick Actions */}
+             <div className="grid grid-cols-2 gap-3">
+               <button
+                 type="button"
+                 onClick={() => setShowFavoritesModal(true)}
+                 className="flex items-center justify-center space-x-2 px-4 py-3 bg-yellow-600/80 hover:bg-yellow-600 text-white rounded-lg transition-colors text-sm font-medium"
+                 disabled={loading}
+               >
+                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                   <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                 </svg>
+                 <span>Saved Recipients</span>
+               </button>
+               <button
+                 type="button"
+                 onClick={handleAddFavorite}
+                 className="flex items-center justify-center space-x-2 px-4 py-3 bg-green-600/80 hover:bg-green-600 text-white rounded-lg transition-colors text-sm font-medium"
+                 disabled={loading || !formData.recipient_vpa}
+               >
+                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m0 0h6" />
+                 </svg>
+                 <span>Save Recipient</span>
+               </button>
+             </div>
+
+             {/* Error Message */}
             {error && (
               <div className="bg-red-500/20 backdrop-blur-xl border border-red-500/50 rounded-xl p-4">
                 <div className="flex items-center">
@@ -365,10 +427,18 @@ const handleSubmit = async (e) => {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default SendMoney;
+         </div>
+       </div>
+       
+       {/* Favorites Modal */}
+       <FavoritesModal
+         isOpen={showFavoritesModal}
+         onClose={() => setShowFavoritesModal(false)}
+         onSelectFavorite={handleSelectFavorite}
+         onAddNew={() => setShowFavoritesModal(false)}
+       />
+     </div>
+   );
+ };
+ 
+ export default SendMoney;
