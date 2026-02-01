@@ -21,57 +21,60 @@ const LoginScreen = ({ onLogin }) => {
     setError('');
   };
 
-   const handleSubmit = async (e) => {
-     e.preventDefault();
-     setError('');
-     
-      // Basic validation
-      const validation = errorHandler.validateForm(
-        formData,
-        {
-          phone: {
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      setError('');
+      
+       // Basic validation
+       const validation = errorHandler.validateForm(
+         formData,
+         {
+           phone: {
+             required: true,
+             label: 'Phone Number',
+             custom: (value) => {
+               const cleanPhone = value.replace(/\D/g, '');
+               // Accept 10 digits (local) or 12 digits (with country code +91)
+               return cleanPhone.length === 10 || cleanPhone.length === 12;
+             },
+             message: 'Please enter a valid 10-digit phone number (with or without +91)'
+           },
+          password: {
             required: true,
-            label: 'Phone Number',
-            custom: (value) => {
-              const cleanPhone = value.replace(/\D/g, '');
-              // Accept 10 digits (local) or 12 digits (with country code +91)
-              return cleanPhone.length === 10 || cleanPhone.length === 12;
-            },
-            message: 'Please enter a valid 10-digit phone number (with or without +91)'
-          },
-         password: {
-           required: true,
-           label: 'Password',
-           minLength: 3
-         }
-       }
-     );
+            label: 'Password',
+            minLength: 3
+          }
+        }
+      );
 
-     if (!validation.isValid) {
-       setError(Object.values(validation.errors)[0]);
-       return;
-     }
+      if (!validation.isValid) {
+        setError(Object.values(validation.errors)[0]);
+        return;
+      }
 
-     setLoading(true);
+      setLoading(true);
 
-     try {
-       const response = await loginUser(formData);
-       
-       if (response.status === 'success') {
-         // Set current user in cache manager to clear user-specific cache
-         cacheManager.setCurrentUser(response.user.user_id);
-         
-         onLogin(response.user, response.token);
-         // Always navigate to dashboard after login
-         navigate('/dashboard');
-       }
-     } catch (err) {
-       const errorInfo = errorHandler.handleAPIError(err, 'User Login');
-       setError(errorInfo.message);
-     } finally {
-       setLoading(false);
-     }
-   };
+      try {
+        console.log('🔐 Attempting login with:', { phone: formData.phone });
+        const response = await loginUser(formData);
+        console.log('🎉 Login response:', response);
+        
+        if (response.status === 'success') {
+          // Set current user in cache manager to clear user-specific cache
+          cacheManager.setCurrentUser(response.user.user_id);
+          
+          onLogin(response.user, response.token);
+          // Always navigate to dashboard after login
+          navigate('/dashboard');
+        }
+      } catch (err) {
+        console.error('❌ Login failed:', err);
+        const errorInfo = errorHandler.handleAPIError(err, 'User Login');
+        setError(errorInfo.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">

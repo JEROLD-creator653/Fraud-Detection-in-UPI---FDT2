@@ -16,7 +16,10 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
-from passlib.hash import bcrypt
+from argon2 import PasswordHasher
+
+# Use argon2 directly to avoid passlib bcrypt compatibility issues
+pwd_hasher = PasswordHasher()
 import jwt
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -360,7 +363,7 @@ async def register_user(user_data: UserRegister):
             user_id = f"user_{uuid.uuid4().hex[:8]}"
             
             # Hash password
-            password_hash = bcrypt.hash(user_data.password)
+            password_hash = pwd_hasher.hash(user_data.password)
             
             # Insert user
             cur.execute(
@@ -412,7 +415,9 @@ async def login_user(credentials: UserLogin):
             print(f"DEBUG: Found user: {user['name']} (ID: {user['user_id']}, Phone: {user['phone']})")
             
             # Verify password
-            if not bcrypt.verify(credentials.password, user["password_hash"]):
+            try:
+                pwd_hasher.verify(user["password_hash"], credentials.password)
+            except:
                 print(f"DEBUG: Password verification failed for {user['name']}")
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
             
