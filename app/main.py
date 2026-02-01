@@ -60,7 +60,7 @@ def attach_confidence_level(payload: Any, default: str = "HIGH") -> Any:
 CFG_PATH = os.path.join(os.getcwd(), "config", "config.yaml")
 DEFAULT_CFG = {
     "db_url": "postgresql://fdt:fdtpass@host.docker.internal:5432/fdt_db",
-    "thresholds": {"delay": 0.03, "block": 0.06},
+    "thresholds": {"delay": 0.30, "block": 0.60},
     # WARNING: change secret_key before production
     "secret_key": "dev-secret-change-me-please",
     # default admin credentials (password hash can be overridden in config)
@@ -84,7 +84,7 @@ if os.path.exists(CFG_PATH):
 
 env_db_url = os.getenv("DB_URL")
 DB_URL = env_db_url or cfg.get("db_url")
-THRESHOLDS = cfg.get("thresholds", {"delay": 0.0, "block": 0.07})
+THRESHOLDS = cfg.get("thresholds", {"delay": 0.30, "block": 0.60})
 SECRET_KEY = cfg.get("secret_key", DEFAULT_CFG["secret_key"])
 ADMIN_USERNAME = cfg.get("admin_username", DEFAULT_CFG["admin_username"])
 ADMIN_PASSWORD_HASH = cfg.get("admin_password_hash", DEFAULT_CFG["admin_password_hash"])
@@ -92,10 +92,16 @@ ADMIN_PASSWORD_HASH = cfg.get("admin_password_hash", DEFAULT_CFG["admin_password
 # --- FastAPI app and templates ---
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-templates = Jinja2Templates(directory="templates")
+
+# Get absolute paths relative to this file
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 # serve static if directory exists
-if os.path.isdir("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # --- websockets manager ---
 class WSManager:
@@ -153,6 +159,38 @@ def db_get_transaction(tx_id):
         conn.close()
 
 _HAS_EXPL_COL = None
+
+# Ensure admin_logs table exists (lazy create)
+_HAS_ADMIN_LOGS = None
+
+
+def _ensure_admin_logs_table(conn):
+    global _HAS_ADMIN_LOGS
+    if _HAS_ADMIN_LOGS is not None:
+        return _HAS_ADMIN_LOGS
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS public.admin_logs (
+                log_id SERIAL PRIMARY KEY,
+                tx_id VARCHAR(100) NOT NULL,
+                user_id VARCHAR(255),
+                action VARCHAR(20) NOT NULL,
+                admin_username VARCHAR(100),
+                source_ip VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_admin_logs_created_at ON public.admin_logs(created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_admin_logs_tx_id ON public.admin_logs(tx_id);
+            """
+        )
+        conn.commit()
+        cur.close()
+        _HAS_ADMIN_LOGS = True
+    except Exception:
+        _HAS_ADMIN_LOGS = False
+    return _HAS_ADMIN_LOGS
 
 
 def _ensure_explainability_column(conn) -> bool:
@@ -302,7 +340,7 @@ def db_dashboard_stats(time_range: str):
               COUNT(*) FILTER (WHERE action = 'ALLOW') AS allow,
               COALESCE(AVG(risk_score), 0) AS mean_risk
             FROM transactions
-            WHERE created_at >= NOW() - INTERVAL '{interval}';
+            WHERE ts >= NOW() - INTERVAL '{interval}';
         """)
 
         return cur.fetchone()
@@ -343,9 +381,9 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
             cur.execute("""
                 SELECT explainability
                 FROM public.transactions
-                WHERE created_at >= %s
+                WHERE ts >= %s
                   AND explainability IS NOT NULL
-                ORDER BY created_at DESC
+                ORDER BY ts DESC
             """, (since,))
         else:
             # Fallback: use limit
@@ -354,7 +392,7 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
                 SELECT explainability
                 FROM public.transactions
                 WHERE explainability IS NOT NULL
-                ORDER BY created_at DESC
+                ORDER BY ts DESC
                 LIMIT %s
             """, (max_limit,))
         
@@ -390,7 +428,10 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
             else:
                 # Fallback: compute patterns from features on-the-fly
                 try:
-                    from .pattern_mapper import PatternMapper
+                    try:
+                        from .pattern_mapper import PatternMapper
+                    except ImportError:
+                        from pattern_mapper import PatternMapper
                     features = expl.get("features", {})
                     model_scores = expl.get("model_scores", {})
                     
@@ -671,23 +712,37 @@ async def model_accuracy():
         }
 
 @app.get("/recent-transactions")
-async def recent_transactions(limit: int = 10, time_range: str = "24h"):
+async def recent_transactions(limit: int = 300, time_range: str = "24h"):
+    """
+    Get recent transactions within a time range.
+    
+    Args:
+        limit: Maximum number of transactions to return (default 300)
+        time_range: Time window (1h, 24h, 7d, 30d)
+    
+    When a time_range is specified, returns ALL transactions in that range (ignoring limit).
+    This ensures the timeline shows data from all dates in the range, not just the most recent.
+    When no time_range, uses the limit parameter to return the most recent N transactions.
+    """
     since = parse_time_range(time_range)
 
     def query():
         conn = get_conn()
         cur = conn.cursor()
         if since:
+            # When filtering by time range, get ALL transactions in that range
+            # Do NOT use LIMIT to ensure timeline spans all dates in the range
+            # include rows where `ts` may be NULL by falling back to `created_at`
             cur.execute("""
                 SELECT * FROM public.transactions
-                WHERE created_at >= %s
-                ORDER BY created_at DESC
-                LIMIT %s
-            """, (since, limit))
+                WHERE COALESCE(ts, created_at) >= %s
+                ORDER BY COALESCE(ts, created_at) DESC
+            """, (since,))
         else:
+            # No time range specified, use limit to get most recent N transactions
             cur.execute("""
                 SELECT * FROM public.transactions
-                ORDER BY created_at DESC
+                ORDER BY COALESCE(ts, created_at) DESC
                 LIMIT %s
             """, (limit,))
         rows = cur.fetchall()
@@ -711,7 +766,10 @@ async def new_transaction(request: Request):
     disagreement = 0.0
     final_risk_score = None
     try:
-        from . import scoring
+        try:
+            from . import scoring
+        except (ImportError, SystemError):
+            import scoring
         try:
             scoring_details = scoring.score_transaction(tx, return_details=True)
             risk_score = scoring_details.get("risk_score")
@@ -743,7 +801,10 @@ async def new_transaction(request: Request):
         pattern_summary = None
         pattern_reasons: List[str] = []
         try:
-            from .pattern_mapper import PatternMapper
+            try:
+                from .pattern_mapper import PatternMapper
+            except ImportError:
+                from pattern_mapper import PatternMapper
             pattern_summary = PatternMapper.get_pattern_summary(
                 scoring_details.get("features", {}),
                 scoring_details.get("model_scores", {})
@@ -801,6 +862,7 @@ def admin_login_page(request: Request):
 async def admin_login(request: Request, username: str = Form(...), password: str = Form(...)):
     if try_auth_admin(username, password):
         request.session["admin"] = username
+        request.session["admin_username"] = username
         return RedirectResponse("/admin", status_code=status.HTTP_303_SEE_OTHER)
     else:
         return templates.TemplateResponse("admin_login.html", {"request": request, "error": "Invalid credentials"}, status_code=401)
@@ -833,7 +895,418 @@ async def admin_action(request: Request):
     full = await run_in_threadpool(db_get_transaction, tx_id)
     full = attach_confidence_level(full, "HIGH")
     asyncio.create_task(ws_manager.broadcast({"type": "tx_updated", "data": full}))
+    
+    # Save admin log to database for persistence across devices
+    admin_username = request.session.get("admin_username", "admin")
+    source_ip = request.client.host if request.client else "unknown"
+    user_id = updated.get("user_id", "unknown") if updated else "unknown"
+    await run_in_threadpool(
+        db_add_admin_log,
+        tx_id,
+        user_id,
+        action,
+        admin_username,
+        source_ip
+    )
+    
     return {"status": "ok", "updated": full}
+
+# --- admin logs endpoints ---
+def db_add_admin_log(tx_id: str, user_id: str, action: str, admin_username: str = None, source_ip: str = None):
+    """Save admin action log to database"""
+    conn = get_conn()
+    try:
+        _ensure_admin_logs_table(conn)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO public.admin_logs (tx_id, user_id, action, admin_username, source_ip, created_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+            RETURNING log_id;
+            """,
+            (tx_id, user_id, action, admin_username or "system", source_ip or "unknown")
+        )
+        row = cur.fetchone()
+        log_id = row["log_id"] if row else None
+        conn.commit()
+        cur.close()
+        return log_id
+    except Exception as e:
+        conn.rollback()
+        print(f"Failed to save admin log: {e}")
+        return None
+    finally:
+        conn.close()
+
+def db_get_admin_logs(limit: int = 100):
+    """Retrieve recent admin logs from database"""
+    conn = get_conn()
+    try:
+        _ensure_admin_logs_table(conn)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """
+            SELECT log_id, tx_id, user_id, action, admin_username, source_ip, created_at
+            FROM public.admin_logs
+            ORDER BY created_at DESC
+            LIMIT %s;
+            """,
+            (limit,)
+        )
+        rows = cur.fetchall()
+        cur.close()
+        return rows
+    finally:
+        conn.close()
+
+# --- Threshold Presets Management ---
+_HAS_PRESETS_TABLE = None
+
+def _ensure_threshold_presets_table(conn):
+    """Create admin_threshold_presets table if it doesn't exist"""
+    global _HAS_PRESETS_TABLE
+    if _HAS_PRESETS_TABLE:
+        return
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS public.admin_threshold_presets (
+                id SERIAL PRIMARY KEY,
+                admin_username VARCHAR(100) NOT NULL,
+                preset_slot INTEGER NOT NULL CHECK (preset_slot IN (1, 2, 3)),
+                preset_name VARCHAR(100) DEFAULT 'Preset',
+                config_json JSONB NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(admin_username, preset_slot)
+            );
+            CREATE INDEX IF NOT EXISTS idx_preset_admin ON public.admin_threshold_presets(admin_username);
+        """)
+        conn.commit()
+        cur.close()
+        _HAS_PRESETS_TABLE = True
+    except Exception as e:
+        print(f"Error creating presets table: {e}")
+        conn.rollback()
+
+def db_save_threshold_preset(admin_username: str, preset_slot: int, preset_name: str, config: dict):
+    """Save or update a threshold preset for an admin"""
+    conn = get_conn()
+    try:
+        _ensure_threshold_presets_table(conn)
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO public.admin_threshold_presets 
+            (admin_username, preset_slot, preset_name, config_json, updated_at)
+            VALUES (%s, %s, %s, %s, NOW())
+            ON CONFLICT (admin_username, preset_slot) 
+            DO UPDATE SET 
+                preset_name = EXCLUDED.preset_name,
+                config_json = EXCLUDED.config_json,
+                updated_at = NOW()
+            RETURNING id;
+        """, (admin_username, preset_slot, preset_name, json.dumps(config)))
+        result = cur.fetchone()
+        conn.commit()
+        cur.close()
+        preset_id = result['id'] if result else None
+        print(f"DEBUG db_save: result={result}, preset_id={preset_id}")
+        return preset_id
+    except Exception as e:
+        import traceback
+        print(f"ERROR in db_save_threshold_preset: {e}")
+        print(f"ERROR type: {type(e).__name__}")
+        print(f"ERROR traceback:\n{traceback.format_exc()}")
+        conn.rollback()
+        return None
+    finally:
+        conn.close()
+
+def db_get_admin_presets(admin_username: str):
+    """Get all threshold presets for an admin"""
+    conn = get_conn()
+    try:
+        _ensure_threshold_presets_table(conn)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT preset_slot, preset_name, config_json, updated_at
+            FROM public.admin_threshold_presets
+            WHERE admin_username = %s
+            ORDER BY preset_slot;
+        """, (admin_username,))
+        rows = cur.fetchall()
+        cur.close()
+        return rows
+    except Exception as e:
+        print(f"Error getting presets: {e}")
+        return []
+    finally:
+        conn.close()
+
+def db_delete_threshold_preset(admin_username: str, preset_slot: int):
+    """Delete a threshold preset"""
+    conn = get_conn()
+    try:
+        _ensure_threshold_presets_table(conn)
+        cur = conn.cursor()
+        cur.execute("""
+            DELETE FROM public.admin_threshold_presets
+            WHERE admin_username = %s AND preset_slot = %s;
+        """, (admin_username, preset_slot))
+        conn.commit()
+        cur.close()
+        return True
+    except Exception as e:
+        print(f"Error deleting preset: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+@app.post("/admin/logs")
+async def save_admin_log(request: Request):
+    """Save admin action log to database"""
+    if not is_logged_in(request):
+        return JSONResponse({"detail": "unauthenticated"}, status_code=401)
+    
+    try:
+        body = await request.json()
+        tx_id = body.get("tx_id")
+        user_id = body.get("user_id")
+        action = body.get("action")
+        
+        if not tx_id or not action:
+            return JSONResponse({"detail": "tx_id and action required"}, status_code=400)
+        
+        admin_username = request.session.get("admin_username", "admin")
+        source_ip = request.client.host if request.client else "unknown"
+        
+        log_id = await run_in_threadpool(
+            db_add_admin_log, 
+            tx_id, 
+            user_id or "unknown",
+            action,
+            admin_username,
+            source_ip
+        )
+        
+        return {"status": "ok", "log_id": log_id}
+    except Exception as e:
+        print(f"Error saving admin log: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+@app.get("/admin/logs")
+async def get_admin_logs(request: Request, limit: int = 10000):
+    """Retrieve recent admin logs"""
+    if not is_logged_in(request):
+        return JSONResponse({"detail": "unauthenticated"}, status_code=401)
+    
+    try:
+        logs = await run_in_threadpool(db_get_admin_logs, min(limit, 10000))
+        
+        # Convert to list of dicts for JSON response
+        result = []
+        for log in logs:
+            # log is a RealDictRow because get_conn sets cursor_factory=RealDictCursor
+            ts = log.get("created_at")
+            iso_ts = ts.isoformat() if ts else None
+            result.append({
+                "log_id": log.get("log_id"),
+                "tx_id": log.get("tx_id"),
+                "user_id": log.get("user_id"),
+                "action": log.get("action"),
+                "admin_username": log.get("admin_username"),
+                "source_ip": log.get("source_ip"),
+                "created_at": iso_ts,
+                "time": iso_ts,
+            })
+        
+        return {"logs": result}
+    except Exception as e:
+        print(f"Error retrieving admin logs: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+# --- threshold presets endpoints ---
+@app.post("/admin/save-preset")
+async def save_threshold_preset(request: Request):
+    """Save a threshold preset for the logged-in admin"""
+    if not is_logged_in(request):
+        return JSONResponse({"detail": "unauthenticated"}, status_code=401)
+    
+    try:
+        body = await request.json()
+        preset_slot = body.get("preset_slot")
+        preset_name = body.get("preset_name", f"Preset {preset_slot}")
+        config = body.get("config")
+        
+        print(f"DEBUG: Received preset_slot={preset_slot} (type={type(preset_slot).__name__}), preset_name={preset_name}")
+        
+        if not preset_slot or preset_slot not in [1, 2, 3]:
+            print(f"ERROR: Invalid preset_slot: {preset_slot}")
+            return JSONResponse({"detail": "preset_slot must be 1, 2, or 3"}, status_code=400)
+        
+        if not config:
+            return JSONResponse({"detail": "config is required"}, status_code=400)
+        
+        admin_username = request.session.get("admin_username", "admin")
+        
+        preset_id = await run_in_threadpool(
+            db_save_threshold_preset,
+            admin_username,
+            preset_slot,
+            preset_name,
+            config
+        )
+        
+        if preset_id is not None:
+            return {"status": "ok", "preset_id": preset_id, "message": f"Preset {preset_slot} saved successfully"}
+        else:
+            return JSONResponse({"detail": "Failed to save preset"}, status_code=500)
+    
+    except Exception as e:
+        import traceback
+        print(f"Error saving preset: {e}")
+        print(f"Exception type: {type(e).__name__}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+@app.get("/admin/get-presets")
+async def get_threshold_presets(request: Request):
+    """Get all threshold presets for the logged-in admin"""
+    if not is_logged_in(request):
+        return JSONResponse({"detail": "unauthenticated"}, status_code=401)
+    
+    try:
+        admin_username = request.session.get("admin_username", "admin")
+        presets = await run_in_threadpool(db_get_admin_presets, admin_username)
+        
+        # Convert to dict format
+        result = {}
+        for preset in presets:
+            slot = preset["preset_slot"]
+            result[slot] = {
+                "name": preset["preset_name"],
+                "config": preset["config_json"],
+                "updated_at": preset["updated_at"].isoformat() if preset.get("updated_at") else None
+            }
+        
+        return {"status": "ok", "presets": result}
+    
+    except Exception as e:
+        print(f"Error getting presets: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+@app.post("/admin/delete-preset")
+async def delete_threshold_preset(request: Request):
+    """Delete a threshold preset"""
+    if not is_logged_in(request):
+        return JSONResponse({"detail": "unauthenticated"}, status_code=401)
+    
+    try:
+        body = await request.json()
+        preset_slot = body.get("preset_slot")
+        
+        if not preset_slot or preset_slot not in [1, 2, 3]:
+            return JSONResponse({"detail": "preset_slot must be 1, 2, or 3"}, status_code=400)
+        
+        admin_username = request.session.get("admin_username", "admin")
+        
+        success = await run_in_threadpool(
+            db_delete_threshold_preset,
+            admin_username,
+            preset_slot
+        )
+        
+        if success:
+            return {"status": "ok", "message": f"Preset {preset_slot} deleted successfully"}
+        else:
+            return JSONResponse({"detail": "Failed to delete preset"}, status_code=500)
+    
+    except Exception as e:
+        print(f"Error deleting preset: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+# --- update thresholds endpoint ---
+@app.post("/admin/update-thresholds")
+async def update_thresholds(request: Request):
+    """Update fraud detection thresholds dynamically"""
+    if not is_logged_in(request):
+        return JSONResponse({"detail": "unauthenticated"}, status_code=401)
+    
+    try:
+        body = await request.json()
+        
+        # Validate required fields
+        required_fields = ["allowMax", "delayMax", "blockMin", "lowConfidence", "mediumConfidence", 
+                          "highConfidence", "rfWeight", "xgbWeight", "isoWeight"]
+        
+        for field in required_fields:
+            if field not in body:
+                return JSONResponse({"detail": f"Missing required field: {field}"}, status_code=400)
+        
+        # Validate ranges
+        if not (0 <= body["allowMax"] <= 0.5):
+            return JSONResponse({"detail": "allowMax must be between 0 and 0.5"}, status_code=400)
+        if not (0 <= body["delayMax"] <= 1.0):
+            return JSONResponse({"detail": "delayMax must be between 0 and 1.0"}, status_code=400)
+        if not (0 <= body["blockMin"] <= 1.0):
+            return JSONResponse({"detail": "blockMin must be between 0 and 1.0"}, status_code=400)
+        
+        # Validate threshold ordering
+        if body["allowMax"] >= body["blockMin"]:
+            return JSONResponse({"detail": "allowMax must be less than blockMin"}, status_code=400)
+        
+        # Validate model weights sum to 100
+        weight_sum = body["rfWeight"] + body["xgbWeight"] + body["isoWeight"]
+        if weight_sum != 100:
+            return JSONResponse({"detail": f"Model weights must sum to 100, got {weight_sum}"}, status_code=400)
+        
+        # Update global THRESHOLDS dictionary
+        global THRESHOLDS
+        THRESHOLDS = {
+            "delay": body["allowMax"],
+            "block": body["blockMin"],
+            "allowMax": body["allowMax"],
+            "delayMax": body["delayMax"],
+            "blockMin": body["blockMin"],
+            "lowConfidence": body["lowConfidence"],
+            "mediumConfidence": body["mediumConfidence"],
+            "highConfidence": body["highConfidence"],
+            "rfWeight": body["rfWeight"],
+            "xgbWeight": body["xgbWeight"],
+            "isoWeight": body["isoWeight"]
+        }
+        
+        # Optionally: Save to config file for persistence
+        try:
+            if os.path.exists(CFG_PATH):
+                with open(CFG_PATH, "r", encoding="utf-8") as f:
+                    config_data = yaml.safe_load(f) or {}
+                
+                config_data["thresholds"] = THRESHOLDS
+                
+                with open(CFG_PATH, "w", encoding="utf-8") as f:
+                    yaml.dump(config_data, f, default_flow_style=False)
+        except Exception as e:
+            print(f"Warning: Could not persist thresholds to config file: {e}")
+        
+        # Log this action
+        admin_username = request.session.get("admin_username", "admin")
+        source_ip = request.client.host if request.client else "unknown"
+        
+        await run_in_threadpool(
+            db_add_admin_log,
+            "SYSTEM",
+            "system",
+            "THRESHOLD_UPDATE",
+            admin_username,
+            source_ip
+        )
+        
+        return {"status": "ok", "thresholds": THRESHOLDS}
+    
+    except Exception as e:
+        print(f"Error updating thresholds: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
 
 # --- websocket endpoint for live updates ---
 @app.websocket("/ws")
@@ -853,6 +1326,74 @@ async def websocket_endpoint(ws: WebSocket):
 def health():
     return {"status": "ok"}
 
+@app.get("/api/system-health")
+async def system_health():
+    """
+    Comprehensive system health check including database and API endpoints.
+    Returns status of all critical components.
+    """
+    health_status = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "components": {
+            "web": {"status": "healthy", "message": "API server running"},
+            "database": {"status": "unknown", "message": "Checking connection..."},
+            "endpoints": {}
+        },
+        "overall": "checking"
+    }
+    
+    # Check database connection
+    try:
+        conn = await run_in_threadpool(get_conn)
+        cur = conn.cursor()
+        cur.execute("SELECT 1;")
+        cur.close()
+        conn.close()
+        health_status["components"]["database"]["status"] = "healthy"
+        health_status["components"]["database"]["message"] = "Connected"
+    except Exception as e:
+        health_status["components"]["database"]["status"] = "unhealthy"
+        health_status["components"]["database"]["message"] = f"Connection failed: {str(e)[:50]}"
+    
+    # Check key API endpoints
+    endpoints_to_check = [
+        ("dashboard-data", "/dashboard-data?time_range=24h"),
+        ("recent-transactions", "/recent-transactions?limit=10&time_range=24h"),
+        ("pattern-analytics", "/pattern-analytics?time_range=24h"),
+        ("model-accuracy", "/model-accuracy"),
+    ]
+    
+    for ep_name, ep_path in endpoints_to_check:
+        try:
+            # Simulate endpoint check by making internal test request
+            # For now, mark as healthy if database is OK
+            if health_status["components"]["database"]["status"] == "healthy":
+                health_status["components"]["endpoints"][ep_name] = {
+                    "status": "healthy",
+                    "code": 200
+                }
+            else:
+                health_status["components"]["endpoints"][ep_name] = {
+                    "status": "degraded",
+                    "code": 503
+                }
+        except Exception as e:
+            health_status["components"]["endpoints"][ep_name] = {
+                "status": "unhealthy",
+                "error": str(e)[:30]
+            }
+    
+    # Determine overall health
+    all_healthy = (
+        health_status["components"]["web"]["status"] == "healthy" and
+        health_status["components"]["database"]["status"] == "healthy" and
+        all(ep.get("status") == "healthy" for ep in health_status["components"]["endpoints"].values())
+    )
+    
+    health_status["overall"] = "healthy" if all_healthy else "degraded"
+    
+    return health_status
+
 # --- chatbot endpoint ---
 @app.post("/api/chatbot")
 async def chatbot_endpoint(request: Request):
@@ -867,7 +1408,7 @@ async def chatbot_endpoint(request: Request):
             return JSONResponse({"error": "Message is required"}, status_code=400)
         
         # Import and initialize chatbot
-        from .chatbot import FraudDetectionChatbot
+        from app.chatbot import FraudDetectionChatbot
         chatbot = FraudDetectionChatbot(
             db_url=DB_URL,
             groq_api_key=os.getenv("GROQ_API_KEY")

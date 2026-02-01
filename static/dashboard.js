@@ -13,6 +13,13 @@ let useServerTimeline = false; // prefer server-provided timeline when available
 let lastServerTotal = null;
 // Track when the time range changes so server should be authoritative
 let _rangeChanged = false;
+// Response cache to avoid redundant API calls
+let _responseCache = {
+  'dashboard-data': {},
+  'recent-transactions': {},
+  'pattern-analytics': {},
+  'dashboard-analytics': {}
+};
 // Simple debounce utility for bursty websocket updates (minimal delay for instant feedback)
 const _debounceTimers = {};
 function debounce(key, fn, delay = 50) {
@@ -136,7 +143,13 @@ function confidencePill(level) {
     : lvl === 'MEDIUM'
       ? 'bg-yellow-50 text-yellow-700 border border-yellow-100'
       : 'bg-green-50 text-green-700 border border-green-100';
-  return `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${style}">${lvl}</span>`;
+  return `<span class="inline-flex items-center justify-center px-3 py-0.5 rounded-full text-[10px] font-semibold ${style}" style="min-width: 70px; text-align: center;">${lvl}</span>`;
+}
+
+function actionBadge(action) {
+  const act = (action || 'ALLOW').toUpperCase();
+  const color = act === 'BLOCK' ? '#dc2626' : act === 'DELAY' ? '#eab308' : '#16a34a';
+  return `<span class="inline-flex items-center justify-center px-3 py-1 rounded text-xs font-bold" style="min-width: 70px; color: ${color}; border: 2px solid ${color}; background: transparent;">${act}</span>`;
 }
 
 function getRangeLabel(range) {
@@ -259,33 +272,201 @@ function initCharts() {
   });
 }
 
+// Cached fetch - returns cached response if available and fresh (< 30 seconds old)
+async function cachedFetch(url, cacheName, cacheMaxAge = 30000) {
+  const cacheKey = url.split('?')[0]; // Remove query params from cache key to group by endpoint
+  
+  // Check if we have a cached response that's still fresh
+  if (_responseCache[cacheName] && _responseCache[cacheName][cacheKey]) {
+    const cached = _responseCache[cacheName][cacheKey];
+    const age = Date.now() - cached.timestamp;
+    if (age < cacheMaxAge) {
+      console.log(`Using cached response for ${cacheKey} (${age}ms old)`);
+      return cached.data;
+    }
+  }
+  
+  // Fetch fresh data
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Fetch failed: ${url}`);
+  const data = await res.json();
+  
+  // Cache the response
+  if (!_responseCache[cacheName]) _responseCache[cacheName] = {};
+  _responseCache[cacheName][cacheKey] = { data, timestamp: Date.now() };
+  
+  return data;
+}
+
+// Debounce helper - prevents rapid duplicate function calls
+function debounce(func, delayMs = 500) {
+  let timeoutId = null;
+  return async function(...args) {
+    clearTimeout(timeoutId);
+    return new Promise((resolve) => {
+      timeoutId = setTimeout(async () => {
+        const result = await func.apply(this, args);
+        resolve(result);
+      }, delayMs);
+    });
+  };
+}
+
+function incrementStatById(statId, delta = 1) {
+  const el = document.getElementById(statId);
+  if (!el) return;
+  const current = parseInt(String(el.textContent || '0').replace(/[,\s]/g, ''), 10) || 0;
+  el.textContent = (current + delta).toLocaleString();
+}
+
+// Chart Loading State Management
+function showChartLoading(chartId) {
+  const loadingOverlay = document.getElementById(`${chartId}LoadingOverlay`);
+  const noDataOverlay = document.getElementById(`${chartId}NoDataOverlay`);
+  const canvas = document.getElementById(chartId);
+  if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  if (noDataOverlay) noDataOverlay.style.display = 'none';
+  if (canvas) {
+    canvas.style.opacity = '0';
+    canvas.style.visibility = 'hidden';
+  }
+}
+
+function hideChartLoading(chartId) {
+  const loadingOverlay = document.getElementById(`${chartId}LoadingOverlay`);
+  const canvas = document.getElementById(chartId);
+  if (loadingOverlay) loadingOverlay.style.display = 'none';
+  if (canvas) {
+    canvas.style.opacity = '1';
+    canvas.style.visibility = 'visible';
+  }
+}
+
+function showChartNoData(chartId) {
+  const loadingOverlay = document.getElementById(`${chartId}LoadingOverlay`);
+  const noDataOverlay = document.getElementById(`${chartId}NoDataOverlay`);
+  const canvas = document.getElementById(chartId);
+  
+  console.log(`[showChartNoData] chartId: ${chartId}`, {
+    loadingOverlay: !!loadingOverlay,
+    noDataOverlay: !!noDataOverlay,
+    canvas: !!canvas
+  });
+  
+  if (loadingOverlay) loadingOverlay.style.display = 'none';
+  if (noDataOverlay) {
+    noDataOverlay.style.display = 'flex';
+    console.log(`[showChartNoData] Set ${chartId} no-data overlay to flex`);
+  }
+  if (canvas) {
+    canvas.style.opacity = '0';
+    canvas.style.visibility = 'hidden';
+    console.log(`[showChartNoData] Hid ${chartId} canvas`);
+  }
+}
+
+function showAllChartsLoading() {
+  showChartLoading('timeline');
+  showChartLoading('riskPie');
+  showChartLoading('fraudBar');
+}
+
+function hideAllChartsLoading() {
+  hideChartLoading('timeline');
+  hideChartLoading('riskPie');
+  hideChartLoading('fraudBar');
+}
+
+// Transaction Table Loading State Management
+function showTableLoading() {
+  const tbody = document.getElementById('txTbody');
+  if (!tbody) return;
+  
+  tbody.innerHTML = `
+    <tr id="loadingPlaceholder">
+      <td colspan="8" class="text-center py-8 text-gray-500">
+        <div class="inline-flex items-center gap-2">
+          <div class="animate-spin inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full"></div>
+          <span>Loading transactions...</span>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function hideTableLoading() {
+  const loadingPlaceholder = document.getElementById('loadingPlaceholder');
+  if (loadingPlaceholder) {
+    loadingPlaceholder.remove();
+  }
+}
+
+// Alerts Loading State Management
+function showAlertsLoading() {
+  const container = document.getElementById('alertsList');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div class="flex items-center gap-2 text-gray-500">
+      <div class="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div>
+      <span>Loading alerts...</span>
+    </div>
+  `;
+}
+
+function hideAlertsLoading() {
+  // Will be cleared when updateHighRiskAlerts runs
+}
+
 // Data loading functions
 async function loadDashboardData() {
   try {
-    const res = await fetch(`/dashboard-data?time_range=${currentTimeRange}&_=${Date.now()}`);
-    if (!res.ok) throw new Error('fetch dashboard failed');
-
-    const j = await res.json();
+    const url = `/dashboard-data?time_range=${currentTimeRange}`;
+    console.log(`[loadDashboardData] Fetching from: ${url}`);
+    const j = await cachedFetch(url, 'dashboard-data', 15000); // 15 second cache for stats
     const s = j.stats || {};
+    console.log(`[loadDashboardData] Got stats:`, s);
 
     // Use max(current UI, serverTotal) to avoid overwriting live increments with a slightly stale value
+    const rangeChanged = _rangeChanged;
     const serverTotal = Number(s.totalTransactions || 0);
     lastServerTotal = serverTotal;
     const totalEl = document.getElementById('totalTx');
     if (totalEl) {
       const currentVal = parseInt(String(totalEl.textContent || '0').replace(/[,\s]/g, ''), 10) || 0;
-      if (_rangeChanged) {
+      if (rangeChanged) {
         // When the range changes, trust the server value exactly
         totalEl.textContent = serverTotal.toLocaleString();
-        _rangeChanged = false;
       } else {
         const nextVal = Math.max(currentVal, serverTotal);
         totalEl.textContent = nextVal.toLocaleString();
       }
     }
-    document.getElementById('blockedTx').textContent = Number(s.blocked || 0).toLocaleString();
-    document.getElementById('delayedTx').textContent = Number(s.delayed || 0).toLocaleString();
-    document.getElementById('allowedTx').textContent = Number(s.allowed || 0).toLocaleString();
+    const blockedEl = document.getElementById('blockedTx');
+    const delayedEl = document.getElementById('delayedTx');
+    const allowedEl = document.getElementById('allowedTx');
+
+    if (blockedEl) {
+      const currentVal = parseInt(String(blockedEl.textContent || '0').replace(/[,\s]/g, ''), 10) || 0;
+      const serverVal = Number(s.blocked || 0);
+      blockedEl.textContent = (rangeChanged ? serverVal : Math.max(currentVal, serverVal)).toLocaleString();
+    }
+
+    if (delayedEl) {
+      const currentVal = parseInt(String(delayedEl.textContent || '0').replace(/[,\s]/g, ''), 10) || 0;
+      const serverVal = Number(s.delayed || 0);
+      delayedEl.textContent = (rangeChanged ? serverVal : Math.max(currentVal, serverVal)).toLocaleString();
+    }
+
+    if (allowedEl) {
+      const currentVal = parseInt(String(allowedEl.textContent || '0').replace(/[,\s]/g, ''), 10) || 0;
+      const serverVal = Number(s.allowed || 0);
+      allowedEl.textContent = (rangeChanged ? serverVal : Math.max(currentVal, serverVal)).toLocaleString();
+    }
+
+    if (rangeChanged) {
+      _rangeChanged = false;
+    }
 
     // Update time range label in the first card (the <p> after #totalTx is the static label)
     const totalTxCard = document.getElementById('totalTx')?.closest('.card');
@@ -300,13 +481,8 @@ async function loadDashboardData() {
 
 async function loadPatternAnalytics() {
   try {
-    const res = await fetch(`/pattern-analytics?time_range=${currentTimeRange}&_=${Date.now()}`);
-    if (!res.ok) {
-      console.warn('Pattern analytics fetch failed, leaving existing chart data intact');
-      return;
-    }
-
-    const data = await res.json();
+    const url = `/pattern-analytics?time_range=${currentTimeRange}`;
+    const data = await cachedFetch(url, 'pattern-analytics', 20000);
     
     // Update fraud pattern chart with real aggregated data from backend
     if (fraudBar) {
@@ -319,9 +495,20 @@ async function loadPatternAnalytics() {
         data.model_disagreement || 0
       ];
       fraudBar.update('none');
+      
+      // Check if chart has any data
+      const total = (data.amount_anomaly || 0) + (data.behavioural_anomaly || 0) + 
+                    (data.device_anomaly || 0) + (data.velocity_anomaly || 0) + 
+                    (data.model_consensus || 0) + (data.model_disagreement || 0);
+      if (total === 0) {
+        showChartNoData('fraudBar');
+      } else {
+        hideChartLoading('fraudBar');
+      }
     }
   } catch (e) {
     console.error('loadPatternAnalytics error, leaving existing chart data intact:', e);
+    showChartNoData('fraudBar');
   }
 }
 
@@ -368,16 +555,18 @@ function getLimitForRange(range) {
 async function loadRecentTransactions() {
   try {
     const limit = getLimitForRange(currentTimeRange);
-    const res = await fetch(`/recent-transactions?limit=${limit}&time_range=${currentTimeRange}&_=${Date.now()}`);
-    if (!res.ok) throw new Error('fetch recent failed');
-
-    const j = await res.json();
+    const url = `/recent-transactions?limit=${limit}&time_range=${currentTimeRange}`;
+    console.log(`[loadRecentTransactions] Fetching from: ${url}`);
+    const j = await cachedFetch(url, 'recent-transactions', 20000); // 20 second cache for transactions
     txCache = Array.isArray(j.transactions) ? j.transactions : [];
+    console.log(`[loadRecentTransactions] Loaded ${txCache.length} transactions`);
 
     // Sort and render table
     if (window.sortTable) {
+      console.log('[loadRecentTransactions] Calling window.sortTable');
       window.sortTable(sortState.column);
     } else {
+      console.log('[loadRecentTransactions] window.sortTable not found, calling renderTransactionTable directly');
       renderTransactionTable();
     }
 
@@ -385,6 +574,7 @@ async function loadRecentTransactions() {
     updateHighRiskAlerts(txCache);
     updateTimelineFromCache();
     updateRiskDistributionFromCache();
+    console.log('[loadRecentTransactions] Complete');
   } catch (e) {
     console.error('loadRecentTransactions error', e);
   }
@@ -393,10 +583,8 @@ async function loadRecentTransactions() {
 // Aggregated analytics for charts
 async function loadDashboardAnalytics() {
   try {
-    const res = await fetch(`/dashboard-analytics?time_range=${currentTimeRange}&_=${Date.now()}`);
-    if (!res.ok) throw new Error('fetch analytics failed');
-
-    const data = await res.json();
+    const url = `/dashboard-analytics?time_range=${currentTimeRange}`;
+    const data = await cachedFetch(url, 'dashboard-analytics', 15000);
     
     // DISABLED server timeline - using client-side cache timeline for consistency
     // This prevents dual updates that overwrite each other
@@ -418,6 +606,8 @@ function makeTxRow(tx) {
     const channel = o.channel || 'N/A';
     const risk = Number(o.risk_score ?? o.risk ?? 0).toFixed(2);
     const confidence = confidencePill(o.confidence_level);
+    const action = (o.action || 'ALLOW').toUpperCase();
+    const riskColor = action === 'BLOCK' ? '#dc2626' : action === 'DELAY' ? '#eab308' : '#16a34a';
 
   const tr = document.createElement('tr');
   tr.innerHTML = `
@@ -425,9 +615,9 @@ function makeTxRow(tx) {
     <td class="px-3 py-2">${txid}</td>
     <td class="px-3 py-2">${user}</td>
     <td class="px-3 py-2">₹${Number(amount || 0).toFixed(2)}</td>
-    <td class="px-3 py-2">${type}</td>
+    <td class="px-3 py-2">${actionBadge(type)}</td>
     <td class="px-3 py-2">${channel}</td>
-    <td class="px-3 py-2 font-medium text-gray-700">${risk}</td>
+    <td class="px-3 py-2 font-bold" style="color: ${riskColor};">${risk}</td>
       <td class="px-3 py-2">${confidence}</td>
   `;
   // Tooltip with simplified reason only (no model names / scores)
@@ -435,11 +625,19 @@ function makeTxRow(tx) {
   return tr;
 }
 
-// Render transaction table from cache
+// Render transaction table from cache - OPTIMIZED with document fragment
 function renderTransactionTable() {
   const tbody = document.getElementById('txTbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
+  if (!tbody) {
+    console.error('txTbody not found');
+    return;
+  }
+  
+  // Remove loading placeholder if it exists
+  const loadingPlaceholder = document.getElementById('loadingPlaceholder');
+  if (loadingPlaceholder) {
+    loadingPlaceholder.remove();
+  }
   
   // Apply filter if set
   const filter = document.getElementById('txFilter')?.value || 'ALL';
@@ -447,20 +645,53 @@ function renderTransactionTable() {
     ? txCache 
     : txCache.filter(tx => (tx.action || tx.tx_type || tx.type || '') === filter);
   
-  filteredTx.forEach(tx => tbody.appendChild(makeTxRow(tx)));
+  // Use document fragment to batch DOM updates (much faster than individual appends)
+  const fragment = document.createDocumentFragment();
+  
+  // Limit visible rows to 100 for performance (user can scroll/filter)
+  const maxRows = 100;
+  for (let i = 0; i < Math.min(filteredTx.length, maxRows); i++) {
+    fragment.appendChild(makeTxRow(filteredTx[i]));
+  }
+  
+  // Clear all existing rows
+  tbody.innerHTML = '';
+  
+  if (fragment.childNodes.length > 0) {
+    tbody.appendChild(fragment);
+    console.log(`✓ Rendered ${filteredTx.length} of ${txCache.length} transactions`);
+  } else {
+    // Show "no data" message if no transactions
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="8" class="text-center py-4 text-gray-500">No transactions found</td>';
+    tbody.appendChild(tr);
+    console.log('No transactions to render');
+  }
 }
 
 // Chart update functions
 function updateRiskDistributionFromCache() {
-  if (!riskPie || !Array.isArray(txCache) || txCache.length === 0) {
-    // Clear chart if no data or chart doesn't exist
-    if (riskPie) {
-      riskPie.data.datasets[0].data = [0, 0, 0, 0];
-      riskPie.update('none');
-    }
+  console.log('[updateRiskDistributionFromCache] Called', {
+    riskPie: !!riskPie,
+    txCache: Array.isArray(txCache),
+    txCacheLength: txCache?.length
+  });
+  
+  if (!riskPie || !Array.isArray(txCache)) {
+    console.log('[updateRiskDistributionFromCache] Early return - no chart or cache');
+    return;
+  }
+  
+  if (txCache.length === 0) {
+    console.log('[updateRiskDistributionFromCache] No data - showing no-data overlay');
+    // Show no data overlay when there are no transactions
+    riskPie.data.datasets[0].data = [0, 0, 0, 0];
+    riskPie.update('none');
+    showChartNoData('riskPie');
     return;
   }
 
+  console.log('[updateRiskDistributionFromCache] Processing', txCache.length, 'transactions');
   let low = 0, medium = 0, high = 0, critical = 0;
 
   txCache.forEach(tx => {
@@ -474,6 +705,10 @@ function updateRiskDistributionFromCache() {
   riskPie.data.labels = ['Low', 'Medium', 'High', 'Critical'];
   riskPie.data.datasets[0].data = [low, medium, high, critical];
   riskPie.update('none');
+  
+  // Hide loading/no-data overlay since we have data
+  console.log('[updateRiskDistributionFromCache] Data loaded - hiding overlays');
+  hideChartLoading('riskPie');
 }
 
 function updateTimelineFromCache() {
@@ -572,6 +807,14 @@ function updateTimelineFromCache() {
     timelineChart.data.datasets[1].data = labels.map(l => buckets[l]?.DELAY || 0);
     timelineChart.data.datasets[2].data = labels.map(l => buckets[l]?.ALLOW || 0);
     timelineChart.update('none');
+    
+    // Check if chart has any data
+    const hasData = txCache && txCache.length > 0;
+    if (!hasData) {
+      showChartNoData('timeline');
+    } else {
+      hideChartLoading('timeline');
+    }
   }
 }
 
@@ -644,6 +887,16 @@ function setupWebSocket() {
           }
         } catch (e) {
           console.warn('Inline totalTx update failed, will refresh via API', e);
+        }
+
+        // Immediately reflect the new transaction in action cards
+        try {
+          const action = String(txObj.action || '').toUpperCase();
+          if (action === 'ALLOW') incrementStatById('allowedTx', 1);
+          else if (action === 'DELAY') incrementStatById('delayedTx', 1);
+          else if (action === 'BLOCK') incrementStatById('blockedTx', 1);
+        } catch (e) {
+          console.warn('Inline action card update failed, will refresh via API', e);
         }
 
         // Minimal debounce for backend refreshes (charts already updated from cache)
@@ -777,15 +1030,30 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Initialize charts AFTER dark mode is set
-  initCharts();
+  try {
+    initCharts();
+  } catch (err) {
+    console.error('Chart initialization error:', err);
+    // Continue loading data even if charts fail
+  }
 
-  // Initialize
-  loadDashboardData();
-  loadRecentTransactions();
-  loadDashboardAnalytics(); // server aggregated timeline for full range coverage
-  loadPatternAnalytics();
-  loadModelAccuracy(); // Load model performance metrics
-  setupWebSocket();
+  // Initialize data loading
+  try {
+    loadDashboardData();
+    loadRecentTransactions();
+    loadDashboardAnalytics(); // server aggregated timeline for full range coverage
+    loadPatternAnalytics();
+    loadModelAccuracy(); // Load model performance metrics
+  } catch (err) {
+    console.error('Initial data loading error:', err);
+  }
+
+  try {
+    setupWebSocket();
+  } catch (err) {
+    console.error('WebSocket setup error:', err);
+  }
+
   setInterval(loadDashboardData, 30000);
   setInterval(loadPatternAnalytics, 30000); // Refresh patterns every 30s
 
@@ -794,6 +1062,32 @@ document.addEventListener('DOMContentLoaded', () => {
     currentTimeRange = e.target.value;
     _rangeChanged = true;
     
+    // Show loading state on all charts, table, and alerts immediately
+    showAllChartsLoading();
+    showTableLoading();
+    showAlertsLoading();
+    
+    // Clear chart data immediately
+    if (timelineChart) {
+      timelineChart.data.labels = [];
+      timelineChart.data.datasets.forEach(ds => ds.data = []);
+      timelineChart.update('none');
+    }
+    if (riskPie) {
+      riskPie.data.datasets[0].data = [0, 0, 0, 0];
+      riskPie.update('none');
+    }
+    if (fraudBar) {
+      fraudBar.data.datasets[0].data = [0, 0, 0, 0, 0, 0];
+      fraudBar.update('none');
+    }
+    
+    // Clear response cache for all endpoints to ensure fresh data on range change
+    _responseCache['dashboard-data'] = {};
+    _responseCache['recent-transactions'] = {};
+    _responseCache['dashboard-analytics'] = {};
+    _responseCache['pattern-analytics'] = {};
+    
     // Fetch all data in parallel for fastest response
     await Promise.all([
       loadDashboardData(),
@@ -801,23 +1095,26 @@ document.addEventListener('DOMContentLoaded', () => {
       loadDashboardAnalytics(),
       loadPatternAnalytics()
     ]);
+    
+    // Hide loading state when done
+    hideAllChartsLoading();
   });
 
-  // Export CSV
+  // Export - Show Modal
   document.getElementById('exportBtn').addEventListener('click', () => {
-    const rows = [['Time', 'TX ID', 'User', 'Amount', 'Type', 'Channel', 'Risk Score', 'Confidence']];
-    document.querySelectorAll('#txTbody tr').forEach(tr => {
-      const cols = [...tr.querySelectorAll('td')].map(td => td.textContent.trim());
-      rows.push(cols);
-    });
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `transactions_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '_')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const modal = document.getElementById('exportModal');
+    modal.style.display = 'flex';
+    // Set default dates
+    const now = new Date();
+    const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    document.getElementById('exportEndDate').value = now.toISOString().slice(0, 16);
+    document.getElementById('exportStartDate').value = start.toISOString().slice(0, 16);
+  });
+
+  // Handle custom date range visibility
+  document.getElementById('exportTimeRange').addEventListener('change', (e) => {
+    const customRange = document.getElementById('customDateRange');
+    customRange.style.display = e.target.value === 'custom' ? 'block' : 'none';
   });
 
   // Transaction filter
@@ -958,5 +1255,173 @@ function updateDarkModeButton(isDarkMode) {
     btn.textContent = '🌙 Dark';
     btn.style.background = 'linear-gradient(to right, #4f46e5, #3b82f6)';
     btn.style.color = '#ffffff';
+  }
+}
+
+// Export functionality with time range and format selection
+async function performExport() {
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const formatDateTime = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value).trim();
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} | ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  };
+  const clean = (value) => (value === null || value === undefined) ? '' : String(value).replace(/\s+/g, ' ').trim();
+  const num = (value, digits = 2) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(digits) : '';
+  };
+
+  // Get export button and show loading state
+  const exportSubmitBtn = document.getElementById('exportSubmitBtn');
+  const exportSubmitText = exportSubmitBtn ? exportSubmitBtn.querySelector('.export-submit-text') : null;
+  const exportSubmitLoading = exportSubmitBtn ? exportSubmitBtn.querySelector('.export-submit-loading') : null;
+
+  try {
+    // Show loading state
+    if (exportSubmitBtn) exportSubmitBtn.disabled = true;
+    if (exportSubmitText) exportSubmitText.style.display = 'none';
+    if (exportSubmitLoading) exportSubmitLoading.style.display = 'flex';
+
+    // Get selected options
+    const timeRange = document.getElementById('exportTimeRange').value;
+    const format = document.getElementById('exportFormat').value;
+    
+    // Calculate date range
+    const endDate = new Date();
+    let startDate = new Date(endDate.getTime());
+    
+    if (timeRange === '24h') {
+      startDate.setHours(startDate.getHours() - 24);
+    } else if (timeRange === '7d') {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (timeRange === '30d') {
+      startDate.setDate(startDate.getDate() - 30);
+    } else if (timeRange === '90d') {
+      startDate.setDate(startDate.getDate() - 90);
+    } else if (timeRange === 'custom') {
+      startDate = new Date(document.getElementById('exportStartDate').value);
+    }
+
+    console.log(`Export range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+    // Fetch ALL transactions from server for the specified time range
+    // The time_range parameter tells the API to ignore limit and return ALL transactions in that period
+    const response = await fetch(`/recent-transactions?limit=99999&time_range=${timeRange}&_=${Date.now()}`);
+    if (!response.ok) throw new Error('Failed to fetch transactions');
+    
+    const data = await response.json();
+    let allTx = data.transactions || [];
+
+    // Filter by date range (extra safety filter for custom ranges)
+    const filteredTx = allTx.filter(tx => {
+      const txDate = new Date(tx.ts || tx.created_at || tx.timestamp);
+      return txDate >= startDate && txDate <= endDate;
+    });
+
+    if (filteredTx.length === 0) {
+      alert('No transactions found for the selected date range');
+      return;
+    }
+
+    // Headers
+    const headers = [
+      'Timestamp',
+      'Transaction ID',
+      'User ID',
+      'Amount',
+      'Action',
+      'Channel',
+      'Risk Score',
+      'Confidence Level',
+      'Recipient VPA',
+      'Device ID',
+      'Location',
+      'Remarks',
+      'Created At'
+    ];
+
+    // Build rows
+    const rows = [headers];
+    filteredTx.forEach(tx => {
+      rows.push([
+        formatDateTime(tx.ts || tx.created_at || tx.timestamp),
+        clean(tx.tx_id || tx.id),
+        clean(tx.user_id || tx.user),
+        num(tx.amount, 2),
+        clean((tx.action || 'ALLOW').toUpperCase()),
+        clean(tx.channel),
+        num(tx.risk_score ?? tx.risk, 4),
+        clean((tx.confidence_level || '').toUpperCase()),
+        clean(tx.recipient_vpa),
+        clean(tx.device_id),
+        clean(tx.location),
+        clean(tx.remarks),
+        formatDateTime(tx.created_at || tx.timestamp)
+    ]);
+  });
+
+    let content, fileName, mimeType;
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '_');
+
+    if (format === 'csv') {
+      const csvBody = rows.map(r => r.map(c => {
+        const escaped = String(c ?? '').replace(/"/g, '""');
+        return `"${escaped}"`;
+      }).join(',')).join('\n');
+      content = `\ufeff${csvBody}`;
+      fileName = `transactions_${timestamp}.csv`;
+      mimeType = 'text/csv;charset=utf-8;';
+    } else if (format === 'json') {
+      const jsonData = rows.slice(1).map(row => {
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = row[i]);
+        return obj;
+      });
+      content = JSON.stringify(jsonData, null, 2);
+      fileName = `transactions_${timestamp}.json`;
+      mimeType = 'application/json;charset=utf-8;';
+    } else if (format === 'txt') {
+      const txtBody = rows.map(r => r.join('\t')).join('\n');
+      content = txtBody;
+      fileName = `transactions_${timestamp}.txt`;
+      mimeType = 'text/plain;charset=utf-8;';
+    } else if (format === 'xlsx') {
+      const csvBody = rows.map(r => r.map(c => {
+        const escaped = String(c ?? '').replace(/"/g, '""');
+        return `"${escaped}"`;
+      }).join(',')).join('\n');
+      content = csvBody;
+      fileName = `transactions_${timestamp}.xlsx`;
+      mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8;';
+    }
+
+    // Create and trigger download
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Close modal and show success
+    document.getElementById('exportModal').style.display = 'none';
+    alert(`✅ Exported ${filteredTx.length} transactions as ${format.toUpperCase()}`);
+  } catch (error) {
+    console.error('Export failed:', error);
+    alert(`❌ Export failed: ${error.message}`);
+  } finally {
+    // Reset button state
+    const exportSubmitBtn = document.getElementById('exportSubmitBtn');
+    if (exportSubmitBtn) {
+      const exportSubmitText = exportSubmitBtn.querySelector('.export-submit-text');
+      const exportSubmitLoading = exportSubmitBtn.querySelector('.export-submit-loading');
+      
+      exportSubmitBtn.disabled = false;
+      if (exportSubmitText) exportSubmitText.style.display = 'inline-flex';
+      if (exportSubmitLoading) exportSubmitLoading.style.display = 'none';
+    }
   }
 }

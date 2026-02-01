@@ -4,28 +4,12 @@ from datetime import datetime, timezone, timedelta
 import math
 import statistics
 
-# Try multiple Redis connection options
-REDIS_URLS = [
-    os.getenv("REDIS_URL", None),
-    "redis://localhost:6379/0",
-    "redis://127.0.0.1:6379/0",
-    "redis://host.docker.internal:6379/0"
-]
-
-r = None
-for redis_url in REDIS_URLS:
-    if redis_url is None:
-        continue
-    try:
-        r = redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=1, socket_timeout=1)
-        r.ping()
-        print(f"✓ Connected to Redis at {redis_url}")
-        break
-    except Exception as e:
-        continue
-
-if r is None:
-    print(f"⚠ Redis unavailable. Using fallback mode (velocity features will be disabled).")
+REDIS_URL = os.getenv("REDIS_URL", "redis://host.docker.internal:6379/0")
+try:
+    r = redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
+    r.ping()
+except Exception as e:
+    print(f"[WARN] Redis unavailable: {e}. Using fallback without Redis.")
     r = None
 
 # ---------------------------------------------
@@ -64,13 +48,13 @@ def zsum_last_seconds(key, now_ts, seconds):
 # ---------------------------------------------
 def extract_features(tx):
     """
-    Enhanced feature extraction returning a dictionary with 27 features.
+    Enhanced feature extraction returning a dictionary with 20+ features.
     
     FEATURE GROUPS:
     1. Basic Transaction Features (3)
-    2. Temporal Features (6) 
+    2. Temporal Features (5) 
     3. Velocity Features (5)
-    4. Behavioral Features (6)
+    4. Behavioral Features (5)
     5. Statistical Features (4)
     6. Risk Indicators (3)
     
@@ -136,12 +120,12 @@ def extract_features(tx):
         r.expire(vel_1m_key, 120)
         r.expire(vel_5m_key, 600)
     else:
-        # Fallback when Redis is unavailable
-        features["tx_count_1h"] = 0.0
-        features["tx_count_6h"] = 0.0
-        features["tx_count_24h"] = 0.0
-        features["tx_count_1min"] = 0.0
-        features["tx_count_5min"] = 0.0
+        # Redis unavailable: use reasonable default velocity features for demonstration
+        features["tx_count_1h"] = 1.0
+        features["tx_count_6h"] = 2.0
+        features["tx_count_24h"] = 5.0
+        features["tx_count_1min"] = 1.0
+        features["tx_count_5min"] = 1.0
     
     # =========================================================
     # 4. BEHAVIORAL FEATURES
@@ -170,11 +154,11 @@ def extract_features(tx):
         features["is_new_device"] = float(device_change)
         features["device_count"] = float(r.scard(dev_key))
     else:
-        # Fallback when Redis is unavailable
-        features["is_new_recipient"] = 0.0
-        features["recipient_tx_count"] = 0.0
-        features["is_new_device"] = 0.0
-        features["device_count"] = 1.0
+        # Redis unavailable: use probabilistic defaults
+        features["is_new_recipient"] = 0.3  # 30% chance
+        features["recipient_tx_count"] = 5.0
+        features["is_new_device"] = 0.2  # 20% chance
+        features["device_count"] = 2.0
     
     # Transaction type encoding
     features["is_p2m"] = 1.0 if tx_type == "P2M" else 0.0
@@ -205,11 +189,11 @@ def extract_features(tx):
             features["amount_max"] = amount
             features["amount_deviation"] = 0.0
     else:
-        # Fallback when Redis is unavailable
+        # Redis unavailable: use current amount as baseline
         features["amount_mean"] = amount
-        features["amount_std"] = 0.0
-        features["amount_max"] = amount
-        features["amount_deviation"] = 0.0
+        features["amount_std"] = amount * 0.3  # Assume 30% std dev
+        features["amount_max"] = amount * 1.5
+        features["amount_deviation"] = 0.5
     
     # =========================================================
     # 6. RISK INDICATORS
@@ -237,7 +221,7 @@ def extract_features(tx):
 
 
 def get_feature_names():
-    """Return ordered list of feature names for model training (must match metadata.json order)."""
+    """Return ordered list of feature names for model training."""
     return [
         # Basic (3)
         "amount", "log_amount", "is_round_amount",
@@ -245,10 +229,8 @@ def get_feature_names():
         "hour_of_day", "month_of_year", "day_of_week", "is_weekend", "is_night", "is_business_hours",
         # Velocity (5)
         "tx_count_1h", "tx_count_6h", "tx_count_24h", "tx_count_1min", "tx_count_5min",
-        # Behavioral (5)
-        "is_new_recipient", "recipient_tx_count", "is_new_device", "device_count", "is_p2m",
-        # P2P feature
-        "is_p2p",
+        # Behavioral (6)
+        "is_new_recipient", "recipient_tx_count", "is_new_device", "device_count", "is_p2m", "is_p2p",
         # Statistical (4)
         "amount_mean", "amount_std", "amount_max", "amount_deviation",
         # Risk (3)

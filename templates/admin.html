@@ -63,11 +63,14 @@
     /* Card Styles */
     .admin-card {
       background: white;
-      border-radius: 18px;
+      border-radius: 24px;
       padding: 24px;
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
       transition: all 0.3s ease;
       border: 1px solid #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      min-height: 600px;
     }
     
     body.dark-mode .admin-card {
@@ -76,15 +79,94 @@
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
     }
     
+    /* Quick Action card - scrollable content, fixed height */
+    .admin-card.quick-action-card {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      
+    }
+    
+    .admin-card.quick-action-card > .card-title {
+      flex-shrink: 0;
+      margin-top:32px;
+      margin-bottom: 32px;
+    }
+    
+    .admin-card.quick-action-card .form-label-modern:first-of-type {
+      flex-shrink: 0;
+    }
+    
+    .admin-card.quick-action-card .input-modern {
+      flex-shrink: 0;
+    }
+    
+    .admin-card.quick-action-card .btn-blue-modern {
+      flex-shrink: 0;
+    }
+    
+    /* Scrollable content area */
+    .quick-action-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-right: 8px;
+    }
+    
+    .quick-action-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .quick-action-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .quick-action-content::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    
+    .quick-action-content::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    
+    .admin-card.quick-action-card .action-section {
+      flex-shrink: 0;
+      margin-top: auto;
+    }
+    
     .card-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: #1f2937;
-      margin-bottom: 16px;
+      font-size: 20px;
+      font-weight: 900;
+      color: #050a16;
+      margin-bottom: 32px;
+      letter-spacing: 0px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e5e7eb;
     }
     
     body.dark-mode .card-title {
-      color: #f1f5f9;
+      color: #e2e8f0;
+      border-bottom-color: #334155;
+    }
+    
+    /* Card section headers with text-lg font-bold */
+    .admin-card h3.text-lg {
+      font-size: 16px;
+      font-weight: 900;
+      color: #323f5c;
+      margin-bottom: 8px;
+      letter-spacing: 0px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    
+    body.dark-mode .admin-card h3.text-lg {
+      color: #92a2b7;
+      border-bottom-color: #334155;
     }
     
     /* Form Elements */
@@ -105,7 +187,7 @@
       width: 100%;
       padding: 12px 16px;
       border: 2px solid #e5e7eb;
-      border-radius: 10px;
+      border-radius: 12px;
       font-size: 14px;
       transition: all 0.3s ease;
       background: white;
@@ -138,11 +220,18 @@
       background-size: 20px;
       padding-right: 40px;
     }
+
+    body.dark-mode select.input-modern {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23e2e8f0'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 20px;
+    }
     
     /* Buttons */
     .btn-modern {
       padding: 12px 20px;
-      border-radius: 10px;
+      border-radius: 12px;
       font-size: 14px;
       font-weight: 600;
       transition: all 0.3s ease;
@@ -186,13 +275,33 @@
       transform: none !important;
     }
     
+    /* Dark mode button visibility fixes */
+    body.dark-mode .btn-blue-modern {
+      background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+    
+    body.dark-mode .btn-red-modern {
+      background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+    }
+    
+    body.dark-mode .btn-modern:hover {
+      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+    }
+    
     /* Transaction Details Box */
     .tx-details-box {
       background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
       border: 2px solid #e5e7eb;
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 16px;
       margin-bottom: 16px;
+      max-height: 200px;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     
     body.dark-mode .tx-details-box {
@@ -200,16 +309,54 @@
       border-color: #475569;
     }
     
-    .tx-details-box > div {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 0;
+    .tx-details-box .detail-row {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 8px 0;
       font-size: 13px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .tx-details-box .detail-row-reason {
+      align-items: flex-start;
+    }
+    
+    body.dark-mode .tx-details-box .detail-row {
+      border-bottom-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .tx-details-box .detail-row:last-child {
+      border-bottom: none;
+    }
+    
+    .reason-list {
+      color: #1f2937;
+      font-weight: 500;
+      word-break: break-word;
+      white-space: normal;
+    }
+    
+    body.dark-mode .reason-list {
+      color: #f1f5f9;
+    }
+    
+    .reason-list ul {
+      margin: 0;
+      padding-left: 20px;
+      list-style-type: disc;
+    }
+    
+    .reason-list li {
+      margin: 4px 0;
+      line-height: 1.5;
     }
     
     .tx-details-box strong {
       color: #4b5563;
       font-weight: 600;
+      word-break: break-word;
     }
     
     body.dark-mode .tx-details-box strong {
@@ -219,6 +366,8 @@
     .tx-details-box span {
       color: #1f2937;
       font-weight: 500;
+      word-break: break-word;
+      white-space: normal;
     }
     
     body.dark-mode .tx-details-box span {
@@ -237,6 +386,7 @@
       color: #065f46;
       font-weight: 600;
       font-size: 14px;
+      margin-bottom:16px;
     }
     
     body.dark-mode .status-indicator {
@@ -263,9 +413,9 @@
       background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
       border: 1px solid #e5e7eb;
       border-left: 4px solid #667eea;
-      border-radius: 10px;
+      border-radius: 14px;
       padding: 14px 16px;
-      margin-bottom: 12px;
+      margin-bottom: 1px;
       transition: all 0.3s ease;
     }
     
@@ -279,6 +429,147 @@
       border-color: #475569;
       border-left-color: #818cf8;
     }
+
+    /* API Health Box Styles */
+    .api-health-box {
+      background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+      border: 1px solid #e5e7eb;
+      margin-bottom:16px;
+      border-radius: 14px;
+      padding: 12px;
+    }
+    body.dark-mode .api-health-box {
+      background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+      border-color: #374151;
+    }
+
+    .api-health-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1b1f25;
+      margin-bottom: 8px;
+    }
+    body.dark-mode .api-health-title {
+      color: #d0d5de;
+    }
+
+    .health-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    body.dark-mode .health-item {
+      border-bottom-color: #374151;
+    }
+
+    .health-item:last-child {
+      border-bottom: none;
+    }
+
+    .health-item-label {
+      color: #374151;
+      font-weight: 500;
+    }
+    body.dark-mode .health-item-label {
+      color: #d1d5db;
+    }
+
+    .health-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .health-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .health-text {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .health-ok .health-dot {
+      background: #6ee7b7;
+    }
+    .health-ok .health-text {
+      color: #065f46;
+    }
+    body.dark-mode .health-ok .health-dot {
+      background: #10b981;
+    }
+    body.dark-mode .health-ok .health-text {
+      color: #6ee7b7;
+    }
+
+    .health-error .health-dot {
+      background: #fca5a5;
+    }
+    .health-error .health-text {
+      color: #991b1b;
+    }
+    body.dark-mode .health-error .health-dot {
+      background: #ef4444;
+    }
+    body.dark-mode .health-error .health-text {
+      color: #fca5a5;
+    }
+
+    .health-checking .health-dot {
+      background: #e5e7eb;
+    }
+    .health-checking .health-text {
+      color: #6b7280;
+    }
+    body.dark-mode .health-checking .health-dot {
+      background: #4b5563;
+    }
+    body.dark-mode .health-checking .health-text {
+      color: #9ca3af;
+    }
+
+    /* System Info Styles */
+    .system-info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .system-info-item {
+      background: #f3f4f6;
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    body.dark-mode .system-info-item {
+      background: #1f2937;
+    }
+
+    .system-info-label {
+      font-size: 10px;
+      color: #6b7280;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    body.dark-mode .system-info-label {
+      color: #9ca3af;
+    }
+
+    .system-info-value {
+      font-size: 13px;
+      color: #111827;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+    body.dark-mode .system-info-value {
+      color: #f9fafb;
+    }
     
     /* Transaction Table */
     .tx-table-container {
@@ -291,6 +582,395 @@
       border-color: #334155;
     }
     
+    /* Professional Transaction Table Styles */
+    .professional-tx-table-wrapper {
+      overflow-x: auto;
+      overflow-y: auto;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      max-height: 600px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+    
+    body.dark-mode .professional-tx-table-wrapper {
+      border-color: #334155;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    
+    .professional-tx-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+    
+    body.dark-mode .professional-tx-table {
+      background: #1e293b;
+    }
+    
+    .tx-table-header {
+      background: linear-gradient(90deg, #f9fafb 0%, #f3f4f6 100%);
+      border-bottom: 2px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    
+    body.dark-mode .tx-table-header {
+      background: linear-gradient(90deg, #334155 0%, #475569 100%);
+      border-bottom-color: #4b5563;
+    }
+    
+    .tx-table-header th {
+      padding: 14px 12px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 12px;
+      color: #374151;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    
+    .tx-table-header th.tx-id {
+      font-weight: 900;
+      font-size: 14px;
+      color: #1f2937;
+    }
+    
+    .tx-table-header th.sortable {
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+      padding-right: 24px;
+      transition: background-color 0.2s ease;
+    }
+    
+    .tx-table-header th.sortable:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+    
+    body.dark-mode .tx-table-header th.sortable:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .sort-indicator {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      margin-left: 6px;
+      cursor: pointer;
+      user-select: none;
+      vertical-align: middle;
+      line-height: 0.8;
+      font-size: 11px;
+      gap: 0px;
+    }
+
+    .sort-indicator:hover {
+      opacity: 0.9;
+    }
+
+    /* Both arrows always visible */
+    .sort-indicator::before {
+      content: '▲';
+      color: #64748b;
+      display: block;
+      transition: color 0.2s ease;
+    }
+
+    .sort-indicator::after {
+      content: '▼';
+      color: #64748b;
+      display: block;
+      transition: color 0.2s ease;
+    }
+
+    /* Active ascending - highlight up arrow */
+    .sort-indicator.asc::before {
+      color: #2563eb;
+      font-weight: 900;
+    }
+
+    .sort-indicator.asc::after {
+      color: #cbd5e1;
+    }
+
+    /* Active descending - highlight down arrow */
+    .sort-indicator.desc::before {
+      color: #cbd5e1;
+    }
+
+    .sort-indicator.desc::after {
+      color: #2563eb;
+      font-weight: 900;
+    }
+
+    /* Dark mode */
+    body.dark-mode .sort-indicator::before,
+    body.dark-mode .sort-indicator::after {
+      color: #64748b;
+    }
+
+    body.dark-mode .sort-indicator.asc::before {
+      color: #60a5fa;
+      font-weight: 900;
+    }
+
+    body.dark-mode .sort-indicator.asc::after {
+      color: #475569;
+    }
+
+    body.dark-mode .sort-indicator.desc::before {
+      color: #475569;
+    }
+
+    body.dark-mode .sort-indicator.desc::after {
+      color: #60a5fa;
+      font-weight: 900;
+    }
+    
+    body.dark-mode .tx-table-header th {
+      color: #cbd5e1;
+    }
+    
+    .tx-table-row {
+      border-bottom: 1px solid #e5e7eb;
+      background: white;
+      transition: all 0.2s ease;
+      height: auto;
+    }
+    
+    .tx-table-row:hover {
+      background: linear-gradient(90deg, #f9fafb 0%, #f3f4f6 100%);
+    }
+    
+    body.dark-mode .tx-table-row {
+      border-bottom-color: #334155;
+      background: #1e293b;
+    }
+    
+    body.dark-mode .tx-table-row:hover {
+      background: #334155;
+    }
+    
+    .tx-table-row:last-child {
+      border-bottom: none;
+    }
+    
+    .tx-col {
+      padding: 12px;
+      font-size: 14px;
+      color: #1f2937;
+      vertical-align: middle;
+      border-right: none;
+    }
+    
+    body.dark-mode .tx-col {
+      color: #e2e8f0;
+      border-right: none;
+    }
+    
+    .tx-col:last-child {
+      border-right: none;
+    }
+    
+    .tx-id {
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+      font-size: 13px;
+      color: #2563eb;
+      min-width: 100px;
+      cursor: pointer;
+    }
+    
+    .tx-id:hover {
+      color: #1d4ed8;
+      opacity: 0.8;
+    }
+    
+    body.dark-mode .tx-id {
+      color: #60a5fa;
+    }
+    
+    body.dark-mode .tx-id:hover {
+      color: #93c5fd;
+    }
+    
+    .tx-user {
+      font-weight: 500;
+      min-width: 90px;
+    }
+    
+    body.dark-mode .tx-user {
+      color: #e2e8f0;
+    }
+    
+    .tx-amount {
+      font-weight: 600;
+      color: #047857;
+      min-width: 80px;
+    }
+    
+    body.dark-mode .tx-amount {
+      color: #34d399;
+    }
+    
+    .tx-risk {
+      min-width: 70px;
+    }
+    
+    .risk-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 28px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 12px;
+      background: linear-gradient(180deg, rgba(15,23,42,0.02), rgba(15,23,42,0.01));
+      border: 1px solid rgba(15,23,42,0.06);
+    }
+    
+    body.dark-mode .risk-badge {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    
+    .tx-channel {
+      min-width: 85px;
+    }
+    
+    .channel-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      background: #e0e7ff;
+      color: #3730a3;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    body.dark-mode .channel-badge {
+      background: #312e81;
+      color: #a5b4fc;
+    }
+    
+    .tx-type {
+      min-width: 75px;
+      color: #6b7280;
+    }
+    
+    body.dark-mode .tx-type {
+      color: #cbd5e1;
+    }
+    
+    body.dark-mode .tx-type span {
+      color: #cbd5e1;
+    }
+    
+    .tx-action {
+      min-width: 75px;
+    }
+    
+    .action-badge-table {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: 2px solid;
+      background: rgba(255, 255, 255, 0.5);
+    }
+    
+    body.dark-mode .action-badge-table {
+      background: rgba(30, 41, 59, 0.8);
+      color: inherit !important;
+      border-width: 2px !important;
+    }
+    
+    .tx-confidence {
+      min-width: 110px;
+    }
+    
+    .tx-time {
+      min-width: 80px;
+      color: #6b7280;
+      font-size: 12px;
+    }
+    
+    body.dark-mode .tx-time {
+      color: #9ca3af;
+    }
+    
+    .tx-actions {
+      min-width: 230px;
+      text-align: right;
+      padding-right: 16px;
+    }
+    
+    .quick-action-group {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    
+    .tx-table-row:hover .quick-action-group {
+      opacity: 1;
+    }
+    
+    .quick-action-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      font-weight: 600;
+      outline: none;
+    }
+    
+    .quick-action-btn:hover {
+      transform: translateY(-2px) scale(1.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .explain-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .view-btn {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+    }
+    
+    .allow-btn {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+    }
+    
+    .delay-btn {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: white;
+    }
+    
+    .block-btn {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+    }
+    
+    /* Old styles kept for backward compatibility - deprecated */
     .tx-row {
       padding: 16px;
       border-bottom: 1px solid #e5e7eb;
@@ -375,6 +1055,501 @@
         transform: translateY(0) scale(1);
       }
     }
+
+    /* Explainability Modal Styles */
+    .explainability-modal-container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+      max-width: 700px;
+      width: 90%;
+      max-height: 90vh;
+      animation: modalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    body.dark-mode .explainability-modal-container {
+      background: #1e293b;
+    }
+
+    .explainability-modal-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      color: white;
+      padding: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+      flex-shrink: 0;
+    }
+
+    .explainability-modal-title {
+      font-size: 28px;
+      font-weight: 900;
+      margin: 0;
+      letter-spacing: -0.5px;
+    }
+
+    .explainability-modal-subtitle {
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0.9;
+      margin-top: 6px;
+    }
+
+    .explainability-close-btn {
+      background: none;
+      border: none;
+      font-size: 32px;
+      cursor: pointer;
+      color: white;
+      line-height: 1;
+      padding: 0;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      border-radius: 50%;
+      opacity: 0.8;
+      flex-shrink: 0;
+    }
+
+    .explainability-close-btn:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.1);
+    }
+
+    .explainability-modal-content {
+      padding: 32px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    /* Scrollbar Styling */
+    .explainability-modal-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .explainability-modal-content::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 10px;
+    }
+
+    body.dark-mode .explainability-modal-content::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+
+    .explainability-modal-content::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 10px;
+    }
+
+    .explainability-modal-content::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    }
+
+    .explainability-tx-info {
+      background: linear-gradient(135deg, #f8f9ff 0%, #f0f1ff 100%);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(102, 126, 234, 0.1);
+    }
+
+    body.dark-mode .explainability-tx-info {
+      background: linear-gradient(135deg, #1e293b 0%, #2d3e52 100%);
+      border-color: rgba(102, 126, 234, 0.2);
+    }
+
+    .tx-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+    }
+
+    .tx-info-row:not(:last-child) {
+      border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+    }
+
+    .tx-info-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #667eea;
+      letter-spacing: 0.5px;
+    }
+
+    .tx-info-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1f2937;
+    }
+
+    body.dark-mode .tx-info-value {
+      color: #f1f5f9;
+    }
+
+    .explainability-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 640px) {
+      .explainability-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .explainability-card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      transition: all 0.3s ease;
+    }
+
+    .explainability-card:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+      transform: translateY(-2px);
+    }
+
+    body.dark-mode .explainability-card {
+      background: #334155;
+      border-color: #475569;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .explainability-card-header {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #667eea;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+    }
+
+    body.dark-mode .explainability-card-header {
+      color: #a5b4fc;
+    }
+
+    .explainability-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .explainability-list li {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #374151;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .explainability-list li::before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      color: #667eea;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    body.dark-mode .explainability-list li {
+      color: #e2e8f0;
+    }
+
+    .explainability-scores {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .explainability-scores div {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #374151;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+    }
+
+    .explainability-scores div:last-child {
+      border-bottom: none;
+    }
+
+    body.dark-mode .explainability-scores div {
+      color: #e2e8f0;
+      border-bottom-color: rgba(102, 126, 234, 0.2);
+    }
+
+    .explainability-scores strong {
+      color: #667eea;
+      font-weight: 700;
+    }
+
+    body.dark-mode .explainability-scores strong {
+      color: #a5b4fc;
+    }
+
+    /* Threshold Guide Styles */
+    .threshold-guide-section {
+      margin-bottom: 24px;
+    }
+
+    .threshold-guide-notes {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border-left: 4px solid #3b82f6;
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    .threshold-guide-notes .threshold-guide-title {
+      color: #1e40af;
+    }
+
+    .threshold-guide-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 12px;
+      margin-top: 0;
+    }
+
+    body.dark-mode .threshold-guide-title {
+      color: #f1f5f9;
+    }
+
+    .threshold-guide-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #374151;
+      margin: 0;
+    }
+
+    body.dark-mode .threshold-guide-text {
+      color: #d1d5db;
+    }
+
+    .threshold-guide-items {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .threshold-guide-item {
+      background: white;
+      border-left: 4px solid #667eea;
+      padding: 16px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .threshold-guide-item:hover {
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+      transform: translateX(4px);
+    }
+
+    body.dark-mode .threshold-guide-item {
+      background: #334155;
+      border-left-color: #818cf8;
+    }
+
+    .threshold-guide-item-label {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #667eea;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    body.dark-mode .threshold-guide-item-label {
+      color: #a5b4fc;
+    }
+
+    .threshold-guide-item-text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #374151;
+      margin: 0;
+    }
+
+    body.dark-mode .threshold-guide-item-text {
+      color: #d1d5db;
+    }
+
+    .allow-badge, .delay-badge, .block-badge {
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .allow-badge {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .delay-badge {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .block-badge {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .threshold-guide-tips {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .tip-item {
+      display: flex;
+      gap: 16px;
+      padding: 16px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      transition: all 0.3s ease;
+    }
+
+    .tip-item:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transform: translateY(-2px);
+    }
+
+    body.dark-mode .tip-item {
+      background: #334155;
+      border-color: #475569;
+    }
+
+    .tip-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .tip-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: #1f2937;
+      margin-bottom: 4px;
+    }
+
+    body.dark-mode .tip-title {
+      color: #f1f5f9;
+    }
+
+    .tip-text {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #374151;
+      margin: 0;
+    }
+
+    body.dark-mode .tip-text {
+      color: #d1d5db;
+    }
+
+    .threshold-guide-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .threshold-guide-list li {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #1e40af;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .threshold-guide-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #2563eb;
+      font-weight: bold;
+    }
+
+    body.dark-mode .threshold-guide-notes {
+      background: linear-gradient(135deg, #1f2a3a 0%, #243044 100%);
+      border-left-color: #60a5fa;
+    }
+
+    body.dark-mode .threshold-guide-notes .threshold-guide-title {
+      color: #bfdbfe;
+    }
+
+    body.dark-mode .threshold-guide-list li {
+      color: #bfdbfe;
+    }
+
+    body.dark-mode .threshold-guide-list li::before {
+      color: #60a5fa;
+    }
+
+    .threshold-matrix {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    body.dark-mode .threshold-matrix {
+      background: #475569;
+    }
+
+    .matrix-row {
+      display: contents;
+    }
+
+    .matrix-cell {
+      background: white;
+      padding: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      text-align: center;
+      color: #374151;
+    }
+
+    .matrix-cell.header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    body.dark-mode .matrix-cell {
+      background: #1e293b;
+      color: #d1d5db;
+    }
+
+    @media (max-width: 640px) {
+      .threshold-matrix {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
     
     .modal-title-modern {
       font-size: 24px;
@@ -400,67 +1575,64 @@
       border-left-color: #60a5fa;
     }
     
-    /* Toast Notifications */
+    /* Toast Notifications - professional card-style */
     .toast {
-      animation: slideInRight 0.3s ease-out, fadeOut 0.3s ease-in 2.7s;
-      min-width: 320px;
-      max-width: 420px;
-      padding: 16px 20px;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      position: relative;
       display: flex;
-      align-items: center;
-      gap: 14px;
-      font-size: 15px;
+      align-items: flex-start;
+      gap: 12px;
+      min-width: 300px;
+      max-width: 480px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.98);
+      color: #0f172a;
+      border: 1px solid rgba(2,6,23,0.06);
+      box-shadow: 0 6px 24px rgba(2,6,23,0.08);
+      font-size: 14px;
       font-weight: 600;
-      backdrop-filter: blur(10px);
+      overflow: hidden;
+      transform: translateX(16px);
+      opacity: 0;
+      transition: transform 220ms cubic-bezier(.2,.9,.2,1), opacity 180ms ease;
     }
-    
-    @keyframes slideInRight {
-      from {
-        transform: translateX(400px);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-    
-    @keyframes fadeOut {
-      from {
-        opacity: 1;
-      }
-      to {
-        opacity: 0;
-      }
-    }
-    
-    .toast-success {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: white;
-    }
-    
-    .toast-error {
-      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-      color: white;
-    }
-    
-    .toast-info {
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-      color: white;
-    }
+
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.hide { opacity: 0; transform: translateX(8px); }
+
+    .toast__icon { width: 44px; height: 44px; flex: 0 0 44px; display:flex; align-items:center; justify-content:center; border-radius:8px; font-size:18px }
+    .toast__content { flex: 1 1 auto; min-width: 0 }
+    .toast__title { font-weight:700; font-size:13px; color:#0f172a; margin-bottom:4px }
+    .toast__message { font-weight:500; color:#475569; font-size:13px; line-height:1.2; word-break:break-word }
+    .toast__close { margin-left:8px; background:transparent; border:0; color:#94a3b8; cursor:pointer; padding:6px; border-radius:6px }
+    .toast__close:hover { background:rgba(15,23,42,0.04); color:#0f172a }
+    /* Undo button: visible layout by default */
+    .toast__undo { background: rgba(255,255,255,0.9); border: 1px solid rgba(15,23,42,0.06); padding:6px 10px; color:#0f172a; font-weight:700; border-radius:8px; box-shadow: 0 6px 16px rgba(2,6,23,0.06); }
+    .toast__undo:hover { background: rgba(255,255,255,1); }
+    body.dark-mode .toast__undo { background: rgba(255,255,255,0.04); color: #e6eef8; border: 1px solid rgba(255,255,255,0.06); box-shadow: none }
+    .toast__progress { position:absolute; left:0; bottom:0; height:3px; background:linear-gradient(90deg,#60a5fa,#3b82f6); width:100%; transform-origin:left center; transform:scaleX(1); transition:transform linear }
+
+    .toast--success .toast__icon { background:linear-gradient(135deg,#ecfdf5,#bbf7d0); color:#065f46 }
+    .toast--error .toast__icon { background:linear-gradient(135deg,#fff1f2,#fecaca); color:#7f1d1d }
+    .toast--info .toast__icon { background:linear-gradient(135deg,#eff6ff,#bfdbfe); color:#1e3a8a }
+
+    body.dark-mode .toast { background: rgba(2,6,23,0.8); color:#e6eef8; border:1px solid rgba(255,255,255,0.06); box-shadow:0 8px 24px rgba(2,6,23,0.6) }
+    body.dark-mode .toast__message { color:#cbd5e1 }
+    body.dark-mode .toast__close { color:#cbd5e1 }
     
     /* Confidence Badges */
     .confidence-badge {
       display: inline-flex;
       align-items: center;
-      padding: 4px 10px;
+      justify-content: center;
+      min-width: 88px;
+      padding: 6px 10px;
       border-radius: 12px;
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      box-sizing: border-box;
     }
     
     .badge-high {
@@ -480,6 +1652,9 @@
       color: #991b1b;
       border: 1px solid #f87171;
     }
+
+    /* Center confidence column cells */
+    .tx-confidence { text-align: center; }
     
     /* Action Badges */
     .action-badge {
@@ -554,9 +1729,32 @@
     #admin_logs .text-xs { color: #6b7280 !important; }
     #admin_logs .text-sm.font-mono { color: #1f2937 !important; }
     #admin_logs .action-badge { opacity: 1 !important; filter: none !important; mix-blend-mode: normal !important; color: #ffffff !important; }
-    #admin_logs .px-2.py-0.5.rounded.text-white { opacity: 1 !important; }
+    #admin_logs .px-2.py-0\.5.rounded.text-white { opacity: 1 !important; }
     body.dark-mode #admin_logs .action-badge { opacity: 1 !important; color: #ffffff !important; }
-    body.dark-mode #admin_logs .px-2.py-0.5.rounded.text-white { opacity: 1 !important; }
+    body.dark-mode #admin_logs .px-2.py-0\.5.rounded.text-white { opacity: 1 !important; }
+    
+    /* Admin username highlighting */
+    #admin_logs .admin-username {
+      font-weight: 600;
+      color: #2563eb;
+    }
+    body.dark-mode #admin_logs .admin-username {
+      color: #60a5fa;
+    }
+    
+    /* Sticky overflow message */
+    .admin-log-overflow {
+      position: sticky !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      z-index: 10 !important;
+      background: rgba(102, 126, 234, 0.95) !important;
+      backdrop-filter: blur(10px) !important;
+    }
+    body.dark-mode .admin-log-overflow {
+      background: rgba(102, 126, 234, 0.85) !important;
+    }
     
     /* Hover glow buttons */
     .hover-glow-button {
@@ -595,21 +1793,1151 @@
     body.dark-mode .hover-glow-button.bg-red-500:hover {
       box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6), 0 0 16px rgba(239, 68, 68, 0.5);
     }
+    
+    /* Model Accuracy Modal Dark Mode */
+    body.dark-mode #modelAccuracyModal .info-modal {
+      background: #1e293b !important;
+      color: #e5e7eb !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal h2 {
+      color: #60a5fa !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal h3 {
+      color: #f1f5f9 !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal p,
+    body.dark-mode #modelAccuracyModal li {
+      color: #cbd5e1 !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal strong {
+      color: #e5e7eb !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal .info-section {
+      color: #e5e7eb !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal .close-btn {
+      color: #94a3b8 !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal [style*="background: #f0f9ff"] {
+      background: #1e3a5f !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal [style*="background: white"] {
+      background: #334155 !important;
+      color: #e5e7eb !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal .pro-tip-section {
+      background: #1e4d3a !important;
+      border-left-color: #10b981 !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal .pro-tip-section strong {
+      color: #34d399 !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal .pro-tip-section span {
+      color: #a7f3d0 !important;
+    }
+
+    /* Floating Action Button Styles */
+    .floating-action-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      cursor: pointer;
+      font-size: 28px;
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+      transition: all 0.3s ease;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .floating-action-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.6);
+    }
+
+    .floating-action-btn:active {
+      transform: scale(0.95);
+    }
+
+    body.dark-mode .floating-action-btn {
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.6);
+    }
+
+    body.dark-mode .floating-action-btn:hover {
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.8);
+    }
 
     /* Chatbot Styles */
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+    .chatbot-toggle {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    body.dark-mode #chatbotMessages {
+    .chatbot-toggle:hover {
+      transform: scale(1.1) rotate(10deg);
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.5);
+    }
+
+    .chatbot-toggle:active {
+      transform: scale(0.95);
+    }
+
+    body.dark-mode .chatbot-toggle {
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+    }
+
+    body.dark-mode .chatbot-toggle:hover {
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.6);
+    }
+
+    .chatbot-window {
+      position: fixed;
+      bottom: 100px;
+      right: 24px;
+      width: 420px;
+      max-width: calc(100vw - 48px);
+      height: 600px;
+      max-height: calc(100vh - 140px);
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 1000;
+      animation: slideUpFade 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      border: 1px solid #e5e7eb;
+    }
+
+    @keyframes slideUpFade {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .chatbot-window.open {
+      display: flex;
+    }
+
+    body.dark-mode .chatbot-window {
+      background: #1e293b;
+      border-color: #334155;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    }
+
+    .chatbot-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 24px 24px 0 0;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .chatbot-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      backdrop-filter: blur(10px);
+    }
+
+    .chatbot-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
+    }
+
+    body.dark-mode .chatbot-messages {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    }
+
+    .chatbot-messages::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .chatbot-messages::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .chatbot-messages::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+    }
+
+    body.dark-mode .chatbot-messages::-webkit-scrollbar-thumb {
+      background: #475569;
+    }
+
+    .chatbot-message {
+      display: flex;
+      max-width: 85%;
+      animation: messageSlide 0.3s ease;
+      margin-bottom: 8px;
+    }
+
+    @keyframes messageSlide {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .chatbot-message.user {
+      justify-content: flex-end;
+    }
+
+    .chatbot-message.bot {
+      justify-content: flex-start;
+    }
+
+    .chatbot-message.user .chatbot-message-content {
+      max-width: 95%;
+    }
+
+    .chatbot-message.bot .chatbot-message-content {
+      max-width: 95%;
+    }
+
+    .chatbot-message-content {
+      padding: 12px 16px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.5;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+      word-wrap: break-word;
+      display: inline-block;
+    }
+
+    .chatbot-message.user .chatbot-message-content {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-bottom-right-radius: 4px;
+      font-weight: 500;
+    }
+
+    .chatbot-message.bot .chatbot-message-content {
+      background: #f0f1f9;
+      color: #1f2937;
+      border: 1px solid #e5e7eb;
+      border-bottom-left-radius: 4px;
+    }
+
+    body.dark-mode .chatbot-message.bot .chatbot-message-content {
+      background: #2d3e52;
+      color: #e2e8f0;
+      border-color: #475569;
+    }
+
+    .chatbot-input-container {
+      display: flex;
+      gap: 12px;
+      padding: 16px 20px;
+      background: white;
+      border-top: 1px solid #e5e7eb;
+      border-radius: 0 0 24px 24px;
+    }
+
+    body.dark-mode .chatbot-input-container {
+      background: #1e293b;
+      border-top-color: #334155;
+    }
+
+    .chatbot-input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      background: #f9fafb;
+      color: #1f2937;
+    }
+
+    .chatbot-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+      background: white;
+    }
+
+    body.dark-mode .chatbot-input {
+      background: #0f172a;
+      border-color: #475569;
+      color: #f1f5f9;
+    }
+
+    .chatbot-send-btn {
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    .chatbot-send-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+    }
+
+    .chatbot-send-btn:active {
+      transform: translateY(0);
+    }
+
+    .chatbot-send-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    body.dark-mode .chatbot-window {
+      background: #1e293b;
+    }
+
+    body.dark-mode .chatbot-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    body.dark-mode .chatbot-messages {
+      background: #334155;
+    }
+
+    body.dark-mode .chatbot-message.bot .chatbot-message-content {
+      background: #475569;
+      color: #e5e7eb;
+    }
+
+    body.dark-mode .chatbot-input {
+      background: #475569;
+      border-color: #64748b;
+      color: #e5e7eb;
+    }
+
+    body.dark-mode .chatbot-input::placeholder {
+      color: #94a3b8;
+    }
+
+    body.dark-mode .chatbot-input-container {
+      background: #1e293b;
+      border-top-color: #334155;
+    }
+
+    /* Threshold Panel Styles */
+    .threshold-panel {
+      background: white;
+      border-radius: 24px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      height: 600px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      border: 1px solid #e5e7eb;
+    }
+
+    .threshold-panel-header {
+      flex-shrink: 0;
+      background: white;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .threshold-panel-header h3 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .threshold-info-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+      font-weight: 600;
+    }
+
+    .threshold-info-btn:hover {
+      transform: scale(1.15) rotate(10deg);
+      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+    }
+
+    .threshold-info-btn:active {
+      transform: scale(0.95);
+    }
+
+    .threshold-panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px;
+      color: #1f2937;
+    }
+
+    .threshold-panel-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .threshold-panel-content::-webkit-scrollbar-track {
+      background: #f3f4f6;
+      border-radius: 4px;
+    }
+
+    .threshold-panel-content::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 4px;
+    }
+
+    .threshold-panel-content::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+
+    body.dark-mode .threshold-panel-content::-webkit-scrollbar-track {
+      background: #334155;
+    }
+
+    body.dark-mode .threshold-panel-content::-webkit-scrollbar-thumb {
+      background: #64748b;
+    }
+
+    body.dark-mode .threshold-panel-content::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    .threshold-panel-actions {
+      flex-shrink: 0;
+      background: #f9fafb;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .threshold-section {
+      margin-bottom: 32px;
+      padding: 20px;
+      background: #f9fafb;
+      border-radius: 12px;
+      border-left: 4px solid #667eea;
+    }
+
+    .threshold-section h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0 0 16px 0;
+      color: #0f172a;
+    }
+
+    .threshold-item {
+      margin-bottom: 20px;
+      padding: 12px;
+      background: white;
+      border-radius: 8px;
+    }
+
+    .threshold-item label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #374151;
+    }
+
+    .threshold-item input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #dbeafe;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .threshold-item input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+
+    .threshold-item input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+
+    .threshold-value {
+      display: inline-block;
+      background: #e0e7ff;
+      color: #667eea;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 13px;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .threshold-description {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    .threshold-panel-actions {
+      display: flex;
+      gap: 12px;
+      padding: 24px 32px;
+      border-top: 1px solid #e5e7eb;
+      background: #f9fafb;
+      justify-content: flex-end;
+      border-radius: 0 0 20px 20px;
+    }
+
+    .threshold-btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .threshold-btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .threshold-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+    }
+
+    .threshold-btn-secondary {
+      background: white;
+      color: #667eea;
+      border: 2px solid #667eea;
+    }
+
+    .threshold-btn-secondary:hover {
+      background: #f0f4ff;
+    }
+
+    .threshold-btn-danger {
+      background: white;
+      color: #ef4444;
+      border: 2px solid #ef4444;
+    }
+
+    .threshold-btn-danger:hover {
+      background: #fef2f2;
+    }
+
+    .live-preview {
+      background: #eff6ff;
+      padding: 16px;
+      border-radius: 8px;
+      border-left: 4px solid #0ea5e9;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+
+    .preview-stat {
+      display: inline-block;
+      margin-right: 24px;
+      padding: 8px 12px;
+      background: white;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .preview-stat.allowed { color: #10b981; }
+    .preview-stat.delayed { color: #f59e0b; }
+    .preview-stat.blocked { color: #ef4444; }
+
+    .threshold-header-badges {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+
+    .admin-only-badge {
+      font-size: 12px;
+      background: #e0e7ff;
+      color: #4f46e5;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    .preset-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+    }
+
+    .preset-status-default {
+      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+      color: #065f46;
+      border-color: #6ee7b7;
+    }
+
+    .preset-status-custom {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      color: #1e3a8a;
+      border-color: #93c5fd;
+    }
+
+    .preset-status-preset {
+      background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+      color: #5b21b6;
+      border-color: #c4b5fd;
+    }
+
+    /* Preset Cards Styling */
+    .preset-card {
+      background: white;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .preset-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .preset-card.active {
+      border-color: #667eea;
+      background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 100%);
+      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+    }
+
+    .preset-card.active::before {
+      content: '✓';
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .preset-card.empty {
+      border-style: dashed;
+      opacity: 0.6;
+    }
+
+    .preset-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .preset-card-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #374151;
+      cursor: text;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .preset-card-name:hover {
+      background: #f3f4f6;
+    }
+
+    .preset-card-name.editing {
+      background: white;
+      border: 1px solid #667eea;
+      outline: none;
+    }
+
+    .preset-card-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .preset-card-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .preset-card-btn:hover {
+      background: #f3f4f6;
+    }
+
+    .preset-card-info {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 8px;
+    }
+
+    .preset-card-config {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-top: 4px;
+      font-family: monospace;
+    }
+
+    body.dark-mode .preset-card {
+      background: #334155;
+      border-color: #475569;
+    }
+
+    body.dark-mode .preset-card:hover {
+      border-color: #818cf8;
+    }
+
+    body.dark-mode .preset-card.active {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+      border-color: #818cf8;
+    }
+
+    body.dark-mode .preset-card-name {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .preset-card-name:hover {
+      background: #475569;
+    }
+
+    body.dark-mode .preset-card-btn:hover {
+      background: #475569;
+    }
+
+    body.dark-mode .admin-only-badge {
+      background: rgba(99,102,241,0.15);
+      color: #c7d2fe;
+      border: 1px solid rgba(99,102,241,0.35);
+    }
+
+    body.dark-mode .preset-status-default {
+      background: rgba(16,185,129,0.15);
+      color: #a7f3d0;
+      border-color: rgba(16,185,129,0.35);
+    }
+
+    body.dark-mode .preset-status-custom {
+      background: rgba(59,130,246,0.15);
+      color: #bfdbfe;
+      border-color: rgba(59,130,246,0.35);
+    }
+
+    body.dark-mode .preset-status-preset {
+      background: rgba(139,92,246,0.18);
+      color: #ddd6fe;
+      border-color: rgba(139,92,246,0.35);
+    }
+
+    /* Preset Section Dark Mode */
+    body.dark-mode #presetsSection {
+      background: #1e293b !important;
+      border-bottom-color: #334155 !important;
+    }
+
+    body.dark-mode #presetsHeader h4 {
+      color: #e5e7eb !important;
+    }
+
+    body.dark-mode #presetsHeader span {
+      color: #64748b !important;
+    }
+
+    body.dark-mode #presetsContent span {
+      color: #94a3b8 !important;
+    }
+
+    body.dark-mode #presetSlotSelect {
       background-color: #334155 !important;
+      background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23cbd5e1%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') !important;
+      color: #e5e7eb !important;
+      border-color: #475569 !important;
     }
 
-    body.dark-mode #chatbotInput {
-      background-color: #475569 !important;
-      color: #f1f5f9 !important;
-      border-color: #64748b !important;
+    /* Animation for collapsible preset */
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        max-height: 0;
+      }
+      to {
+        opacity: 1;
+        max-height: 500px;
+      }
+    }
+
+    /* Spinner animation for loading states */
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    body.dark-mode .threshold-panel {
+      background: #1e293b;
+      color: #e5e7eb;
+      border-color: #334155;
+    }
+
+    body.dark-mode .threshold-panel-header {
+      background: #1e293b;
+      border-bottom-color: #334155;
+    }
+
+    body.dark-mode .threshold-section {
+      background: #334155;
+      border-left-color: #60a5fa;
+    }
+
+    body.dark-mode .threshold-section h3 {
+      color: #f1f5f9;
+    }
+
+    body.dark-mode .threshold-item {
+      background: #475569;
+      color: #e5e7eb;
+    }
+
+    body.dark-mode .threshold-item label {
+      color: #cbd5e1;
+    }
+
+    body.dark-mode .threshold-value {
+      background: #1e3a5f;
+      color: #60a5fa;
+    }
+
+    body.dark-mode .threshold-description {
+      color: #94a3b8;
+    }
+
+    body.dark-mode .threshold-panel-actions {
+      background: #334155;
+      border-top-color: #475569;
+    }
+
+    body.dark-mode .threshold-btn-secondary {
+      background: #334155;
+      color: #60a5fa;
+      border-color: #60a5fa;
+    }
+
+    body.dark-mode .threshold-btn-secondary:hover {
+      background: #475569;
+    }
+
+    body.dark-mode .threshold-btn-danger {
+      background: #334155;
+      color: #f87171;
+      border-color: #f87171;
+    }
+
+    body.dark-mode .threshold-btn-danger:hover {
+      background: #475569;
+    }
+
+    body.dark-mode .live-preview {
+      background: #1e3a5f;
+      border-left-color: #0ea5e9;
+      color: #cbd5e1;
+    }
+
+    body.dark-mode .preview-stat {
+      background: #475569;
+      color: #e5e7eb;
+    }
+
+    body.dark-mode .preview-stat.allowed { color: #6ee7b7; }
+    body.dark-mode .preview-stat.delayed { color: #fbbf24; }
+    body.dark-mode .preview-stat.blocked { color: #f87171; }
+
+    /* Export Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 450px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    body.dark-mode .modal-content {
+      background: #1e293b;
+      color: #f1f5f9;
+    }
+
+    .modal-header {
+      padding: 24px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    body.dark-mode .modal-header {
+      border-bottom-color: #475569;
+    }
+
+    .modal-header h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      color: #6b7280;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+    }
+
+    .modal-close:hover {
+      background: #f3f4f6;
+    }
+
+    body.dark-mode .modal-close:hover {
+      background: #334155;
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #374151;
+      font-size: 14px;
+    }
+
+    body.dark-mode .form-group label {
+      color: #e5e7eb;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      color: #1f2937;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body.dark-mode .form-control {
+      background: #334155;
+      border-color: #475569;
+      color: #f1f5f9;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    body.dark-mode .modal-footer {
+      border-top-color: #475569;
+    }
+
+    .btn-primary, .btn-secondary {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #d1d5db;
+    }
+
+    .btn-secondary:hover {
+      background: #e5e7eb;
+    }
+
+    body.dark-mode .btn-secondary {
+      background: #475569;
+      color: #f1f5f9;
+      border-color: #64748b;
+    }
+
+    body.dark-mode .btn-secondary:hover {
+      background: #64748b;
+    }
+
+    /* Export Audit Modal - Minimal Scoped Styles */
+    #exportAuditModal {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      background: rgba(0, 0, 0, 0.5) !important;
+      display: none !important;
+      align-items: center !important;
+      justify-content: center !important;
+      z-index: 999 !important;
+    }
+
+    #exportAuditModal[style*="display: flex"] {
+      display: flex !important;
     }
   </style>
 </head>
@@ -633,59 +2961,354 @@
     </div>
 
     <!-- Top panels -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6" style="align-items: stretch;">
 
       <!-- Quick Action -->
-      <div class="admin-card">
-        <h3 class="card-title">Quick Action (Manual)</h3>
+      <div class="admin-card quick-action-card">
+        <h3 class="text-lg font-bold">Quick Action (Manual)</h3>
         <label class="form-label-modern">Transaction ID</label>
         <input id="qa_txid" class="input-modern mb-3" placeholder="Enter TX ID" />
         <button id="qa_fetch_btn" class="btn-modern btn-blue-modern w-full mb-4">Get Details</button>
         
-        <!-- Transaction Details (hidden initially) -->
-        <div id="qa_details" class="hidden tx-details-box">
-          <div><strong>User:</strong> <span id="qa_detail_user">-</span></div>
-          <div><strong>Amount:</strong> <span id="qa_detail_amount">-</span></div>
-          <div><strong>Current Action:</strong> <span id="qa_detail_action">-</span></div>
-          <div><strong>Risk Score:</strong> <span id="qa_detail_risk">-</span></div>
-          <div><strong>Reason:</strong> <span id="qa_detail_reason">-</span></div>
+        <!-- Scrollable content area -->
+        <div class="quick-action-content">
+          <!-- Transaction Details (hidden initially) -->
+          <div id="qa_details" class="hidden tx-details-box">
+            <div class="detail-row"><strong>User:</strong> <span id="qa_detail_user">-</span></div>
+            <div class="detail-row"><strong>Amount:</strong> <span id="qa_detail_amount">-</span></div>
+            <div class="detail-row"><strong>Current Action:</strong> <span id="qa_detail_action">-</span></div>
+            <div class="detail-row"><strong>Risk Score:</strong> <span id="qa_detail_risk">-</span></div>
+            <div class="detail-row detail-row-reason">
+              <strong>Reason:</strong>
+              <div id="qa_detail_reason" class="reason-list">-</div>
+            </div>
+          </div>
         </div>
         
-        <label class="form-label-modern">Action</label>
-        <select id="qa_action" class="input-modern mb-4">
-          <option value="ALLOW">ALLOW</option>
-          <option value="DELAY">DELAY</option>
-          <option value="BLOCK">BLOCK</option>
-        </select>
-        <button id="qa_btn" class="btn-modern btn-green-modern w-full" disabled>Apply Action</button>
-        <div id="qa_result" class="mt-3 text-sm text-gray-600"></div>
+        <!-- Action section (always at bottom) -->
+        <div class="action-section">
+          <label class="form-label-modern">Action</label>
+          <select id="qa_action" class="input-modern mb-4">
+            <option value="ALLOW">ALLOW</option>
+            <option value="DELAY">DELAY</option>
+            <option value="BLOCK">BLOCK</option>
+          </select>
+          <button id="qa_btn" class="btn-modern btn-green-modern w-full" disabled>Apply Action</button>
+          <div id="qa_result" class="mt-3 text-sm text-gray-600"></div>
+        </div>
       </div>
 
       <!-- System status -->
       <div class="admin-card">
-        <h3 class="card-title">System Status</h3>
-        <div id="sys_status" class="status-indicator">
-          <span class="status-dot"></span>
-          Live – WebSocket connected
+        <h3 class="text-lg font-bold">System Status</h3>
+        <div id="sys_status_container" style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Web Connection -->
+          <div id="sys_status" class="status-indicator">
+            <span class="status-dot"></span>
+            Live – WebSocket connected
+          </div>
+          
+          <!-- API Health Checks -->
+          <div class="api-health-box" id="api_health_box">
+            <div class="api-health-title">API Endpoints Health</div>
+            
+            <!-- Database -->
+            <div class="health-item">
+              <span class="health-item-label">Database</span>
+              <span id="db_health" class="health-status health-ok">
+                <span class="health-dot"></span>
+                <span class="health-text">Connected</span>
+              </span>
+            </div>
+            
+            <!-- Dashboard Data -->
+            <div class="health-item">
+              <span class="health-item-label">Dashboard Data</span>
+              <span id="ep_dashboard_health" class="health-status health-checking">
+                <span class="health-dot"></span>
+                <span class="health-text">Checking...</span>
+              </span>
+            </div>
+            
+            <!-- Transactions -->
+            <div class="health-item">
+              <span class="health-item-label">Recent Transactions</span>
+              <span id="ep_transactions_health" class="health-status health-checking">
+                <span class="health-dot"></span>
+                <span class="health-text">Checking...</span>
+              </span>
+            </div>
+            
+            <!-- Pattern Analytics -->
+            <div class="health-item">
+              <span class="health-item-label">Pattern Analytics</span>
+              <span id="ep_patterns_health" class="health-status health-checking">
+                <span class="health-dot"></span>
+                <span class="health-text">Checking...</span>
+              </span>
+            </div>
+            
+            <!-- Model Accuracy -->
+            <div class="health-item">
+              <span class="health-item-label">Model Accuracy 
+                <button id="modelAccuracyInfoBtn" class="info-btn-inline" title="Model Info" style="cursor: pointer; background: none; border: none; font-size: 14px; color: #3b82f6; padding: 0 4px;">ℹ️</button>
+              </span>
+              <span id="ep_models_health" class="health-status health-checking">
+                <span class="health-dot"></span>
+                <span class="health-text">Checking...</span>
+              </span>
+            </div>
+
+            <!-- Admin Logs API -->
+            <div class="health-item">
+              <span class="health-item-label">Admin Logs API</span>
+              <span id="ep_logs_health" class="health-status health-checking">
+                <span class="health-dot"></span>
+                <span class="health-text">Checking...</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- System Information -->
+          <div class="api-health-box">
+            <div class="api-health-title">System Information</div>
+            <div class="system-info-grid">
+              <div class="system-info-item">
+                <div class="system-info-label">Server Time</div>
+                <div class="system-info-value" id="server_time">--:--:--</div>
+              </div>
+              <div class="system-info-item">
+                <div class="system-info-label">Uptime</div>
+                <div class="system-info-value" id="server_uptime">
+                  <div style="display: inline-flex; align-items: center; gap: 6px; color: #667eea; font-size: 12px;">
+                    <svg style="width: 14px; height: 14px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Loading...</span>
+                  </div>
+                </div>
+              </div>
+              <div class="system-info-item">
+                <div class="system-info-label">Total Logs</div>
+                <div class="system-info-value" id="total_logs">0</div>
+              </div>
+              <div class="system-info-item">
+                <div class="system-info-label">Active Session</div>
+                <div class="system-info-value" id="session_status">✓ Active</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Admin logs -->
       <div class="admin-card">
-        <h3 class="card-title">Recent Admin Logs</h3>
-        <div id="admin_logs" class="text-sm overflow-y-auto space-y-2" style="max-height: 70vh;"></div>
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-bold">Recent Admin Logs</h3>
+          <button id="exportAuditBtn" class="btn-modern btn-blue-modern" style="padding: 8px 16px; font-size: 13px;">
+            📥 Export Audit Trail
+          </button>
+        </div>
+        <div id="admin_logs" class="text-sm overflow-y-auto overflow-x-hidden space-y-2" style="max-height: 70vh;"></div>
       </div>
     </div>
 
-    <!-- Chatbot Panel -->
-    <div class="admin-card" style="display: flex; flex-direction: column; height: 500px;">
-      <h3 class="card-title">🤖 Fraud Analytics Assistant</h3>
-      <div id="chatbotMessages" style="flex: 1; overflow-y: auto; margin-bottom: 12px; padding: 12px; background: #f9fafb; border-radius: 8px; display: flex; flex-direction: column; gap: 8px;">
-        <div style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 8px;">Chat initialized. Ask me about fraud patterns, transactions, or analytics.</div>
+    <!-- Threshold Tuning Panel Block -->
+    <div class="admin-card threshold-panel" style="margin-bottom: 24px;">
+      <div class="threshold-panel-header" style="padding: 24px 32px; border-bottom: 1px solid #e5e7eb; flex-shrink: 0;">
+        <div class="flex justify-between items-center w-full">
+          <div class="flex items-center gap-3">
+            <h3 class="text-lg font-bold" style="margin: 0;">🎛️ Threshold Tuning Panel</h3>
+            <button id="thresholdInfoBtn" class="threshold-info-btn" title="Threshold Tuning Help" onclick="showThresholdInfo()">ℹ️</button>
+          </div>
+          <div class="threshold-header-badges">
+            <span id="presetStatusBadge" class="preset-status-badge preset-status-default">Default</span>
+            <span class="admin-only-badge">ADMIN ONLY</span>
+          </div>
+        </div>
       </div>
-      <div style="display: flex; gap: 8px;">
-        <input id="chatbotInput" type="text" placeholder="Ask about fraud patterns..." class="input-modern" style="flex: 1; padding: 10px;" />
-        <button id="chatbotSend" class="btn-modern btn-blue-modern" style="padding: 10px 16px;">Send</button>
+
+      <!-- Presets Section - Collapsible -->
+      <div id="presetsSection" style="border-bottom: 1px solid #e5e7eb; background: #f9fafb; transition: all 0.3s ease;">
+        <!-- Preset Header - Always visible -->
+        <div id="presetsHeader" style="padding: 16px 32px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;" onclick="togglePresets()">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="presetsToggleIcon" style="font-size: 18px; transition: transform 0.3s ease;">▼</span>
+            <h4 style="font-size: 15px; font-weight: 700; margin: 0; color: #374151;">💾 Quick Presets</h4>
+          </div>
+          <span style="font-size: 11px; color: #9ca3af; font-weight: 500;">Click to expand/collapse</span>
+        </div>
+        
+        <!-- Preset Content - Collapsible -->
+        <div id="presetsContent" style="padding: 0 32px 24px 32px; display: none; animation: slideDown 0.3s ease;">
+          <div class="flex justify-between items-center mb-4">
+            <span style="font-size: 12px; color: #6b7280;">Save current thresholds to:</span>
+            <div class="flex gap-2 items-center">
+              <select id="presetSlotSelect" style="padding: 6px 32px 6px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23666%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 8px center; background-size: 16px; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none;">
+                <option value="1" selected>Preset 1</option>
+                <option value="2">Preset 2</option>
+                <option value="3">Preset 3</option>
+              </select>
+              <button id="savePresetBtn" style="padding: 6px 16px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">
+                💾 Save
+              </button>
+            </div>
+          </div>
+          <div id="presetCardsContainer" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+            <!-- Preset cards will be generated here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable Content Area -->
+      <div class="threshold-panel-content">
+        <!-- Risk Score Thresholds Section -->
+        <div class="threshold-section">
+          <h3>🎯 Risk Score Thresholds</h3>
+          <p style="font-size: 13px; color: #6b7280; margin-bottom: 16px;">Control decision boundaries based on ensemble fraud score (0.0 - 1.0)</p>
+          
+          <div class="threshold-item">
+            <label>
+              <span>Allow Maximum Score</span>
+              <span class="threshold-value" id="allowMaxVal">0.30</span>
+            </label>
+            <input type="range" id="allowMaxSlider" min="0" max="0.5" step="0.01" value="0.30" style="width: 100%;">
+            <div class="threshold-description">Transactions with score ≤ this value are automatically ALLOWED</div>
+          </div>
+
+          <div class="threshold-item">
+            <label>
+              <span>Delay Maximum Score</span>
+              <span class="threshold-value" id="delayMaxVal">0.60</span>
+            </label>
+            <input type="range" id="delayMaxSlider" min="0.3" max="0.9" step="0.01" value="0.60" style="width: 100%;">
+            <div class="threshold-description">Transactions between Allow and Delay scores are flagged for manual review</div>
+          </div>
+
+          <div class="threshold-item">
+            <label>
+              <span>Block Minimum Score</span>
+              <span class="threshold-value" id="blockMinVal">0.60</span>
+            </label>
+            <input type="range" id="blockMinSlider" min="0.3" max="1.0" step="0.01" value="0.60" style="width: 100%;">
+            <div class="threshold-description">Transactions with score ≥ this value are automatically BLOCKED</div>
+          </div>
+        </div>
+
+        <!-- Confidence Mapping Section -->
+        <div class="threshold-section">
+          <h3>🔍 Confidence Mapping</h3>
+          <p style="font-size: 13px; color: #6b7280; margin-bottom: 16px;">Define confidence levels based on model agreement</p>
+
+          <div class="threshold-item">
+            <label>
+              <span>LOW Confidence Threshold</span>
+              <span class="threshold-value" id="lowConfVal">0.40</span>
+            </label>
+            <input type="range" id="lowConfSlider" min="0" max="0.5" step="0.01" value="0.40" style="width: 100%;">
+            <div class="threshold-description">Model disagreement above this gets marked as LOW confidence</div>
+          </div>
+
+          <div class="threshold-item">
+            <label>
+              <span>MEDIUM-HIGH Threshold</span>
+              <span class="threshold-value" id="mediumConfVal">0.70</span>
+            </label>
+            <input type="range" id="mediumConfSlider" min="0.5" max="1.0" step="0.01" value="0.70" style="width: 100%;">
+            <div class="threshold-description">Scores above this threshold are marked as HIGH confidence</div>
+          </div>
+        </div>
+
+        <!-- Model Weights Section -->
+        <div class="threshold-section">
+          <h3>⚖️ Model Weights (Advanced)</h3>
+          <p style="font-size: 13px; color: #6b7280; margin-bottom: 16px;">Adjust influence of each model on final ensemble score (must sum to 100%)</p>
+
+          <div class="threshold-item">
+            <label>
+              <span>Random Forest Weight</span>
+              <span class="threshold-value" id="rfWeightVal">35%</span>
+            </label>
+            <input type="range" id="rfWeightSlider" min="0" max="100" step="1" value="35" style="width: 100%;">
+            <div class="threshold-description">Vote counting algorithm for pattern detection</div>
+          </div>
+
+          <div class="threshold-item">
+            <label>
+              <span>XGBoost Weight</span>
+              <span class="threshold-value" id="xgbWeightVal">40%</span>
+            </label>
+            <input type="range" id="xgbWeightSlider" min="0" max="100" step="1" value="40" style="width: 100%;">
+            <div class="threshold-description">Gradient boosting for high accuracy</div>
+          </div>
+
+          <div class="threshold-item">
+            <label>
+              <span>Isolation Forest Weight</span>
+              <span class="threshold-value" id="isoWeightVal">25%</span>
+            </label>
+            <input type="range" id="isoWeightSlider" min="0" max="100" step="1" value="25" style="width: 100%;">
+            <div class="threshold-description">Anomaly detection for outlier transactions</div>
+          </div>
+
+          <div style="background: #fef3c7; padding: 12px; border-radius: 6px; margin-top: 12px; border-left: 3px solid #f59e0b; font-size: 12px; color: #b45309;">
+            <strong>⚠️ Sum of weights:</strong> <span id="weightSum">100%</span> (must equal 100%)
+          </div>
+        </div>
+
+        <!-- Live Preview Section -->
+        <div class="live-preview">
+          <strong>📈 Live Preview (Last 100 Transactions)</strong>
+          <div style="margin-top: 12px;">
+            <span class="preview-stat allowed">✓ Would Allow: <span id="previewAllow">-</span></span>
+            <span class="preview-stat delayed">⏱️ Would Delay: <span id="previewDelay">-</span></span>
+            <span class="preview-stat blocked">✕ Would Block: <span id="previewBlock">-</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fixed Action Buttons at Bottom -->
+      <div class="threshold-panel-actions" style="padding: 24px 32px; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; justify-content: flex-end; flex-shrink: 0;">
+        <button id="resetThresholdBtn" class="threshold-btn threshold-btn-danger">🔄 Restore Defaults</button>
+        <button id="applyThresholdBtn" class="threshold-btn threshold-btn-primary">✓ Apply Changes</button>
+      </div>
+    </div>
+
+    <!-- Chatbot Toggle Button -->
+    <button id="chatbotToggle" class="chatbot-toggle" title="Ask AI Assistant">
+      💬
+    </button>
+
+    <!-- Chatbot Window -->
+    <div id="chatbotWindow" class="chatbot-window">
+      <div class="chatbot-header">
+        <div class="flex items-center gap-2">
+          <div class="chatbot-avatar">🤖</div>
+          <div>
+            <div class="font-semibold">SYNARA AI</div>
+            <div class="text-xs opacity-75">Ask me about transactions or fraud patterns</div>
+          </div>
+        </div>
+        <button id="chatbotClose" class="text-2xl leading-none hover:opacity-75">&times;</button>
+      </div>
+      
+      <div id="chatbotMessages" class="chatbot-messages">
+        <div class="chatbot-message bot">
+          <div class="chatbot-message-content">
+            Hello! I'm Synara your fraud detection assistant. Ask me about transaction patterns, risk scores, or suspicious activities.
+          </div>
+        </div>
+      </div>
+      
+      <div class="chatbot-input-container">
+        <input 
+          type="text" 
+          id="chatbotInput" 
+          class="chatbot-input" 
+          placeholder="Ask about transactions, patterns, risk scores..."
+        />
+        <button id="chatbotSend" class="chatbot-send-btn">Send</button>
       </div>
     </div>
 
@@ -710,30 +3333,169 @@
 
     <!-- Explainability Modal -->
     <div id="explainModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
-      <div class="modal-content-modern" style="max-width: 700px;">
-        <div class="flex justify-between items-start mb-4">
+      <div class="explainability-modal-container">
+        <div class="explainability-modal-header">
           <div>
-            <h3 class="text-2xl font-bold text-gray-800">Explainability</h3>
-            <div class="text-sm text-gray-500">Why the system decided • Suspicious patterns</div>
+            <h3 class="explainability-modal-title">🔍 Explainability</h3>
+            <div class="explainability-modal-subtitle">Why the system decided • Suspicious patterns</div>
           </div>
-          <button id="explainClose" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>
+          <button id="explainClose" class="explainability-close-btn">&times;</button>
         </div>
 
-        <div class="border rounded-lg p-4 bg-gray-50 mb-4">
-          <div class="text-xs text-gray-500">TX ID</div>
-          <div id="expl_tx_id" class="font-mono text-sm text-blue-700 mb-2">-</div>
-          <div class="text-xs text-gray-500">Action / Risk</div>
-          <div class="text-sm text-gray-800"><span id="expl_action" class="font-semibold"></span> • <span id="expl_risk"></span></div>
+        <div class="explainability-modal-content">
+          <div class="explainability-tx-info">
+            <div class="tx-info-row">
+              <div class="tx-info-label">TX ID</div>
+              <div id="expl_tx_id" class="tx-info-value font-mono">-</div>
+            </div>
+            <div class="tx-info-row">
+              <div class="tx-info-label">Action / Risk</div>
+              <div class="tx-info-value"><span id="expl_action" class="font-semibold"></span> • <span id="expl_risk"></span></div>
+            </div>
+          </div>
+
+          <div class="explainability-grid">
+            <div class="explainability-card">
+              <div class="explainability-card-header">Reasons</div>
+              <ul id="expl_reasons" class="explainability-list"></ul>
+            </div>
+            <div class="explainability-card">
+              <div class="explainability-card-header">Model Scores</div>
+              <div id="expl_models" class="explainability-scores"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Threshold Tuning Info Modal -->
+    <div id="thresholdInfoModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+      <div class="explainability-modal-container" style="max-width: 800px;">
+        <div class="explainability-modal-header">
+          <div>
+            <h3 class="explainability-modal-title">🎛️ Threshold Tuning Guide</h3>
+            <div class="explainability-modal-subtitle">Master the fraud detection thresholds • Optimize decision-making</div>
+          </div>
+          <button id="thresholdInfoClose" class="explainability-close-btn" onclick="closeThresholdInfo()">&times;</button>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="border rounded-lg p-4 bg-white">
-            <div class="text-xs font-semibold text-gray-600 mb-3">Reasons</div>
-            <ul id="expl_reasons" class="text-sm space-y-1 list-disc list-inside text-gray-800"></ul>
+        <div class="explainability-modal-content">
+          <div class="threshold-guide-section">
+            <h4 class="threshold-guide-title">📊 What is Threshold Tuning?</h4>
+            <p class="threshold-guide-text">
+              Threshold tuning allows you to adjust the decision boundaries for fraud detection. These thresholds determine at which risk score level transactions are automatically allowed, delayed, or blocked.
+            </p>
           </div>
-          <div class="border rounded-lg p-4 bg-white">
-            <div class="text-xs font-semibold text-gray-600 mb-3">Model Scores</div>
-            <div id="expl_models" class="text-sm space-y-1 text-gray-800"></div>
+
+          <div class="threshold-guide-section">
+            <h4 class="threshold-guide-title">🎯 The Three Thresholds</h4>
+            <div class="threshold-guide-items">
+              <div class="threshold-guide-item">
+                <div class="threshold-guide-item-label">Allow Maximum Score (0.0 - 0.5)</div>
+                <p class="threshold-guide-item-text">Transactions with a risk score <strong>≤ this value</strong> are <span class="allow-badge">automatically ALLOWED</span>. Lower values = stricter (fewer false positives, but may block legitimate users).</p>
+              </div>
+              <div class="threshold-guide-item">
+                <div class="threshold-guide-item-label">Delay Threshold (0.0 - 1.0)</div>
+                <p class="threshold-guide-item-text">Transactions between Allow Max and this value are <span class="delay-badge">marked for DELAY</span>. These require manual review or additional verification.</p>
+              </div>
+              <div class="threshold-guide-item">
+                <div class="threshold-guide-item-label">Block Minimum Score (0.5 - 1.0)</div>
+                <p class="threshold-guide-item-text">Transactions with a risk score <strong>≥ this value</strong> are <span class="block-badge">automatically BLOCKED</span>. Higher values = stricter (fewer legitimate transactions blocked, but fraud may slip through).</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="threshold-guide-section">
+            <h4 class="threshold-guide-title">💡 How to Use Thresholds Effectively</h4>
+            <div class="threshold-guide-tips">
+              <div class="tip-item">
+                <span class="tip-icon">🔍</span>
+                <div>
+                  <div class="tip-title">Conservative (Strict) Mode</div>
+                  <p class="tip-text">Lower Allow Max (0.15-0.20) and Higher Block Min (0.75-0.90). Better fraud prevention but more customer friction.</p>
+                </div>
+              </div>
+              <div class="tip-item">
+                <span class="tip-icon">🚀</span>
+                <div>
+                  <div class="tip-title">Aggressive (Permissive) Mode</div>
+                  <p class="tip-text">Higher Allow Max (0.40-0.50) and Lower Block Min (0.50-0.65). Better user experience but higher fraud risk.</p>
+                </div>
+              </div>
+              <div class="tip-item">
+                <span class="tip-icon">⚖️</span>
+                <div>
+                  <div class="tip-title">Balanced (Recommended)</div>
+                  <p class="tip-text">Allow Max: 0.30, Delay: 0.60, Block Min: 0.75. Provides good balance between security and usability.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="threshold-guide-section threshold-guide-notes">
+            <h4 class="threshold-guide-title" style="margin-top: 0;">⚠️ Important Notes</h4>
+            <ul class="threshold-guide-list">
+              <li><strong>Test First:</strong> Always test threshold changes in a non-production environment first</li>
+              <li><strong>Monitor Impact:</strong> Check fraud metrics and false positive rates after changes</li>
+              <li><strong>Gradual Changes:</strong> Make small adjustments (0.05 increments) and observe the impact</li>
+              <li><strong>Business Hours:</strong> Implement changes during business hours when you can monitor</li>
+              <li><strong>Audit Trail:</strong> All threshold changes are logged and can be audited</li>
+            </ul>
+          </div>
+
+          <div class="threshold-guide-section">
+            <h4 class="threshold-guide-title">💾 Quick Presets</h4>
+            <p class="threshold-guide-text">Use Quick Presets to save up to three threshold configurations per admin account and switch instantly without re-tuning.</p>
+            <div class="threshold-guide-items">
+              <div class="threshold-guide-item">
+                <div class="threshold-guide-item-label">Save a Preset</div>
+                <p class="threshold-guide-item-text">Select Preset 1/2/3, then click <strong>Save</strong> to store the current thresholds.</p>
+              </div>
+              <div class="threshold-guide-item">
+                <div class="threshold-guide-item-label">Load & Switch</div>
+                <p class="threshold-guide-item-text">Click a preset card to apply it instantly. The header badge shows the active preset or <strong>Custom</strong>.</p>
+              </div>
+              <div class="threshold-guide-item">
+                <div class="threshold-guide-item-label">Rename / Delete</div>
+                <p class="threshold-guide-item-text">Double‑click a preset name to rename. Use 🗑️ to delete an unused preset.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="threshold-guide-section">
+            <h4 class="threshold-guide-title">📈 Expected Effects of Threshold Changes</h4>
+            <div class="threshold-matrix">
+              <div class="matrix-row">
+                <div class="matrix-cell header">Change</div>
+                <div class="matrix-cell header">Fraud Detection</div>
+                <div class="matrix-cell header">User Experience</div>
+                <div class="matrix-cell header">Manual Review</div>
+              </div>
+              <div class="matrix-row">
+                <div class="matrix-cell">↓ Allow Max</div>
+                <div class="matrix-cell">📈 Better</div>
+                <div class="matrix-cell">📉 Worse (more blocks)</div>
+                <div class="matrix-cell">📈 More reviews</div>
+              </div>
+              <div class="matrix-row">
+                <div class="matrix-cell">↑ Allow Max</div>
+                <div class="matrix-cell">📉 Worse</div>
+                <div class="matrix-cell">📈 Better (fewer blocks)</div>
+                <div class="matrix-cell">📉 Fewer reviews</div>
+              </div>
+              <div class="matrix-row">
+                <div class="matrix-cell">↑ Block Min</div>
+                <div class="matrix-cell">📉 Worse</div>
+                <div class="matrix-cell">📈 Better</div>
+                <div class="matrix-cell">📉 Fewer blocks</div>
+              </div>
+              <div class="matrix-row">
+                <div class="matrix-cell">↓ Block Min</div>
+                <div class="matrix-cell">📈 Better</div>
+                <div class="matrix-cell">📉 Worse</div>
+                <div class="matrix-cell">📈 More blocks</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -743,8 +3505,8 @@
 
     <!-- Transactions -->
     <div class="admin-card">
-      <div class="flex justify-between items-center mb-4 flex-wrap gap-3">
-        <h3 class="card-title mb-0">Transactions (Admin View)</h3>
+      <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+        <h3 class="text-lg font-bold">Transactions (Admin View)</h3>
         <div class="flex gap-3">
           <select id="timeFilter" class="input-modern" style="width: auto; min-width: 160px;">
             <option value="1h">Last 1 Hour</option>
@@ -760,16 +3522,78 @@
           </select>
         </div>
       </div>
-      <div id="admin_recent" class="tx-table-container max-h-96 overflow-y-auto"></div>
+      <div class="professional-tx-table-wrapper">
+        <table class="professional-tx-table" id="admin_recent"></table>
+      </div>
     </div>
   </div>
 
   <!-- Toast Container -->
-  <div id="toastContainer" class="fixed bottom-6 right-6 z-50 space-y-3"></div>
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-[1001] space-y-3"></div>
+
+  <!-- Model Accuracy Info Modal -->
+  <div id="modelAccuracyModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="info-modal" style="background: white; border-radius: 20px; max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto; padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+      <div class="info-modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2 style="font-size: 24px; font-weight: 800; margin: 0; color: #1f2937;">📊 Model Performance Metrics</h2>
+        <button id="closeModelAccuracyModal" class="close-btn" style="background: none; border: none; font-size: 32px; cursor: pointer; color: #1f2937; line-height: 1; padding: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">&times;</button>
+      </div>
+      
+      <div class="info-modal-content" style="color: #1f2937; line-height: 1.7;">
+        <div class="info-section" style="margin-bottom: 24px;">
+          <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">🤖 What are Model Performance Metrics?</h3>
+          <p>Our fraud detection system uses an ensemble of three powerful machine learning models working together. These metrics show how accurately each model identifies fraudulent transactions.</p>
+        </div>
+
+        <div class="info-section" style="margin-bottom: 24px;">
+          <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">🧠 The Models</h3>
+          <ul style="list-style: none; padding: 0; margin: 0;">
+            <li style="padding: 8px 0;"><strong>Random Forest (🌲):</strong> Uses multiple decision trees to vote on fraud likelihood. Excellent at capturing complex patterns in transaction behavior.</li>
+            <li style="padding: 8px 0;"><strong>XGBoost (⚡):</strong> Advanced gradient boosting algorithm that learns from errors. Highly accurate for structured transaction data.</li>
+            <li style="padding: 8px 0;"><strong>Isolation Forest (🌳):</strong> Specialized in anomaly detection. Identifies transactions that deviate from normal patterns.</li>
+          </ul>
+        </div>
+
+        <div class="info-section" style="margin-bottom: 24px; background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 4px solid #3b82f6;">
+          <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">🎯 Ensemble Score Calculation</h3>
+          <p style="margin-bottom: 12px;"><strong>The ensemble score is calculated using a weighted average of all three models:</strong></p>
+          <div style="background: white; padding: 16px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 14px; margin: 12px 0; color: #1f2937;">
+            <strong>Ensemble Score = (w₁ × Random Forest) + (w₂ × XGBoost) + (w₃ × Isolation Forest)</strong>
+          </div>
+          <p style="margin-top: 12px;"><strong>Default weights:</strong></p>
+          <ul style="list-style: disc; padding-left: 24px; margin: 8px 0;">
+            <li>Random Forest (w₁): 0.35 (35%)</li>
+            <li>XGBoost (w₂): 0.40 (40%)</li>
+            <li>Isolation Forest (w₃): 0.25 (25%)</li>
+          </ul>
+          <p style="margin-top: 12px; font-size: 14px; color: #475569;"><em>Note: Weights sum to 1.0 and can be adjusted based on model performance during retraining.</em></p>
+        </div>
+
+        <div class="info-section" style="margin-bottom: 24px;">
+          <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">📊 Understanding Accuracy</h3>
+          <p><strong>Accuracy Percentage:</strong> Shows what percentage of transactions the model correctly classifies as fraud or legitimate.</p>
+          <p style="margin-top: 8px;"><strong>Example:</strong> 97.21% accuracy means the model correctly identifies 9,721 out of 10,000 transactions.</p>
+        </div>
+
+        <div class="info-section" style="margin-bottom: 24px;">
+          <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">🎯 Why Ensemble Matters</h3>
+          <p>Using multiple models together (ensemble) reduces false positives and catches sophisticated fraud that single models might miss. Each model contributes its unique strength to the final decision.</p>
+        </div>
+
+        <div class="pro-tip-section" style="background: #ecfdf5; padding: 16px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #10b981;">
+          <strong style="color: #059669;">💡 Pro Tip:</strong> <span style="color: #047857;">Model accuracy above 95% indicates excellent fraud detection capability. Regular retraining keeps models sharp.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
 
 <script>
 let adminTxCache = [];
+let adminLogCache = [];
 let undoTimer = null;
+let adminTableSort = { column: 'tx-time', direction: 'desc' };
 
 /* ---------- Helpers ---------- */
 function getPrevAction(tx_id) {
@@ -791,95 +3615,178 @@ function confidenceBadge(level) {
 }
 
 /* ---------- Toast Notification System ---------- */
-
-function showToast(type, message) {
-  const container = document.getElementById('toastContainer');
-  const toast = document.createElement('div');
-  
-  const icons = {
-    success: '✅',
-    error: '❌',
-    info: 'ℹ️'
-  };
-  
-  toast.className = `toast toast-${type}`;
-  toast.innerHTML = `
-    <span style="font-size: 24px;">${icons[type] || 'ℹ️'}</span>
-    <span>${message}</span>
-  `;
-  
-  container.appendChild(toast);
-  
-  // Auto-remove after 3 seconds
-  setTimeout(() => {
-    toast.remove();
-  }, 3000);
+function escapeHtml(str){
+  if (!str && str !== 0) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-// Undo toast with countdown and button
-function showUndoToast(tx_id, newAction, prevAction) {
-  const container = document.getElementById('toastContainer');
-  const toast = document.createElement('div');
-  toast.className = 'toast toast-info';
+function getIcon(type){
+  if (type === 'success') return '✅';
+  if (type === 'error') return '❌';
+  return 'ℹ️';
+}
 
-  let seconds = 5;
+function showToast(type, message, title){
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.setAttribute('role','status');
+  toast.className = `toast toast--${type || 'info'}`;
   toast.innerHTML = `
-    <span style="font-size: 24px;">⏳</span>
-    <div class="flex-1">
-      <div class="font-semibold">${newAction} applied to ${tx_id.slice(0, 8)}...</div>
-      <div class="text-sm">Undo available (${seconds}s)</div>
+    <div class="toast__icon" aria-hidden="true">${getIcon(type)}</div>
+    <div class="toast__content">
+      <div class="toast__title">${escapeHtml(title || (type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Notice'))}</div>
+      <div class="toast__message">${escapeHtml(message)}</div>
     </div>
-    <button id="undoBtn" class="px-3 py-1 text-sm bg-white/30 border border-white/50 rounded-lg hover:bg-white/40 transition">Undo</button>
+    <button class="toast__close" aria-label="Dismiss">×</button>
+    <div class="toast__progress" aria-hidden="true"></div>
   `;
-
   container.appendChild(toast);
 
-  const countdownEl = toast.querySelector('div.text-sm');
-  const undoBtn = toast.querySelector('#undoBtn');
+  const closeBtn = toast.querySelector('.toast__close');
+  const progressEl = toast.querySelector('.toast__progress');
 
-  const clearAll = () => {
-    if (undoTimer) clearInterval(undoTimer);
-    toast.remove();
-  };
+  requestAnimationFrame(()=> toast.classList.add('show'));
 
-  undoTimer = setInterval(async () => {
-    seconds -= 1;
-    if (countdownEl) countdownEl.textContent = `Undo available (${seconds}s)`;
-    if (seconds <= 0) {
-      clearAll();
-    }
-  }, 1000);
-
-  undoBtn.onclick = async (e) => {
-    e.stopPropagation();
-    try {
-      const res = await fetch('/admin/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tx_id, action: prevAction })
-      });
-      const result = await res.json();
-      if (!res.ok) {
-        showToast('error', result.detail || 'Undo failed');
-      } else {
-        showToast('success', `Reverted to ${prevAction} for ${tx_id.slice(0, 8)}...`);
-        addAdminLog({
-          tx_id,
-          user_id: (result && result.updated && result.updated.user_id) ? result.updated.user_id : 'unknown',
-          action: prevAction,
-          time: new Date().toISOString()
-        });
-        fetchRecent();
-      }
-    } catch (err) {
-      showToast('error', err.message || 'Undo failed');
-    } finally {
-      clearAll();
-    }
-  };
+  const duration = 4000;
+  const start = Date.now();
+  let raf = null;
+  function tick(){
+    const elapsed = Date.now() - start;
+    const pct = Math.max(0, 1 - elapsed/duration);
+    if (progressEl) progressEl.style.transform = `scaleX(${pct})`;
+    if (elapsed >= duration) return remove();
+    raf = requestAnimationFrame(tick);
+  }
+  function remove(){ if (raf) cancelAnimationFrame(raf); toast.classList.remove('show'); toast.classList.add('hide'); setTimeout(()=>{ try{ toast.remove(); }catch(e){} }, 220); }
+  closeBtn.addEventListener('click', e=>{ e.stopPropagation(); remove(); });
+  toast.addEventListener('click', ()=> remove());
+  tick();
 }
 
-/* ---------- Dark Mode Toggle (Admin) ---------- */
+function showUndoToast(tx_id, newAction, prevAction){
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.setAttribute('role','status');
+  toast.className = 'toast toast--info';
+  toast.innerHTML = `
+    <div class="toast__icon" aria-hidden="true">⏳</div>
+    <div class="toast__content">
+      <div class="toast__title">${escapeHtml(newAction)} applied</div>
+      <div class="toast__message">${escapeHtml(tx_id.slice(0,8))} — Undo available (<span class="undo-count">5</span>s)</div>
+    </div>
+    <button id="undoBtn" class="toast__close toast__undo" aria-label="Undo">Undo</button>
+    <div class="toast__progress" aria-hidden="true"></div>
+  `;
+  container.appendChild(toast);
+  // animate in
+  requestAnimationFrame(()=> toast.classList.add('show'));
+  const countdownEl = toast.querySelector('.undo-count');
+  const undoBtn = toast.querySelector('#undoBtn');
+  const progressEl = toast.querySelector('.toast__progress');
+  let start = Date.now(); const duration = 5000; let raf = null;
+  function tick(){ const elapsed = Date.now()-start; const remain = Math.max(0, Math.ceil((duration-elapsed)/1000)); if(countdownEl) countdownEl.textContent = remain; const pct = Math.max(0,1-elapsed/duration); if(progressEl) progressEl.style.transform = `scaleX(${pct})`; if(elapsed>=duration) return remove(); raf = requestAnimationFrame(tick); }
+  function remove(){ if(raf) cancelAnimationFrame(raf); try{ toast.remove(); }catch(e){} }
+  undoBtn.addEventListener('click', async (e)=>{ e.stopPropagation(); try{ const res = await fetch('/admin/action',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tx_id, action: prevAction }) }); const result = await res.json(); if(!res.ok){ showToast('error', result.detail || 'Undo failed'); } else { showToast('success', `Reverted to ${prevAction} for ${tx_id.slice(0,8)}...`); addAdminLog({ tx_id, user_id: (result && result.updated && result.updated.user_id) ? result.updated.user_id : 'unknown', action: prevAction, time: new Date().toISOString() }); fetchRecent(); } }catch(err){ showToast('error', err.message || 'Undo failed'); } finally { remove(); } });
+  requestAnimationFrame(tick);
+}
+
+/* ---------- System Health Check ---------- */
+async function checkSystemHealth() {
+  try {
+    const res = await fetch('/api/system-health');
+    if (!res.ok) throw new Error('Health check failed');
+    
+    const data = await res.json();
+    const components = data.components || {};
+    
+    // Helper function to set health status
+    function setHealthStatus(elId, isHealthy) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.className = 'health-status ' + (isHealthy ? 'health-ok' : 'health-error');
+      const textEl = el.querySelector('.health-text');
+      if (textEl) textEl.textContent = isHealthy ? 'OK' : 'Error';
+    }
+    
+    // Update database health
+    const dbStatus = components.database?.status || 'unknown';
+    const dbEl = document.getElementById('db_health');
+    if (dbEl) {
+      const isHealthy = dbStatus === 'healthy';
+      dbEl.className = 'health-status ' + (isHealthy ? 'health-ok' : 'health-error');
+      const textEl = dbEl.querySelector('.health-text');
+      if (textEl) textEl.textContent = isHealthy ? 'Connected' : 'Disconnected';
+    }
+    
+    // Update endpoint health
+    const endpoints = components.endpoints || {};
+    const epMappings = {
+      'dashboard-data': 'ep_dashboard_health',
+      'recent-transactions': 'ep_transactions_health',
+      'pattern-analytics': 'ep_patterns_health',
+      'model-accuracy': 'ep_models_health'
+    };
+    
+    for (const [epName, elId] of Object.entries(epMappings)) {
+      const epStatus = endpoints[epName]?.status || 'unknown';
+      setHealthStatus(elId, epStatus === 'healthy');
+    }
+
+    // Check admin logs endpoint
+    try {
+      const logsRes = await fetch('/admin/logs?_=' + Date.now());
+      setHealthStatus('ep_logs_health', logsRes.ok);
+    } catch (e) {
+      setHealthStatus('ep_logs_health', false);
+    }
+
+    // Update system information
+    updateSystemInfo();
+  } catch (e) {
+    console.error('System health check error:', e);
+  }
+}
+
+function updateSystemInfo() {
+  // Update server time
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+  const serverTimeEl = document.getElementById('server_time');
+  if (serverTimeEl) serverTimeEl.textContent = timeStr;
+
+  // Update total logs count
+  const totalLogsEl = document.getElementById('total_logs');
+  if (totalLogsEl) totalLogsEl.textContent = adminLogCache.length;
+
+  // Calculate uptime (time since page load)
+  if (!window.pageLoadTime) {
+    window.pageLoadTime = Date.now();
+  }
+  const uptimeMs = Date.now() - window.pageLoadTime;
+  const uptimeHours = Math.floor(uptimeMs / 3600000);
+  const uptimeMin = Math.floor((uptimeMs % 3600000) / 60000);
+  const uptimeSec = Math.floor((uptimeMs % 60000) / 1000);
+  const uptimeEl = document.getElementById('server_uptime');
+  if (uptimeEl) {
+    if (uptimeHours > 0) {
+      uptimeEl.textContent = `${uptimeHours}h ${uptimeMin}m ${uptimeSec}s`;
+    } else if (uptimeMin > 0) {
+      uptimeEl.textContent = `${uptimeMin}m ${uptimeSec}s`;
+    } else {
+      uptimeEl.textContent = `${uptimeSec}s`;
+    }
+  }
+}
+
+/* ---------- Setup initial page + health checks ---------- */
+
 function updateDarkModeButtonAdmin(isDark) {
   const btn = document.getElementById('darkModeToggleAdmin');
   if (!btn) return;
@@ -918,65 +3825,161 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // Change button to loading state immediately
-      qaBtn.textContent = 'Applying action...';
+      qaBtn.innerHTML = `
+        <div style="display: inline-flex; align-items: center; gap: 6px;">
+          <svg style="width: 16px; height: 16px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Applying action...</span>
+        </div>
+      `;
       qaBtn.disabled = true;
       
       showConfirmation(tx_id, action);
     };
   }
+  
+  // Initial health check and periodic refresh
+  checkSystemHealth();
+  setInterval(checkSystemHealth, 30000); // Check every 30 seconds
+  
+  // Update system info every second (for clock and uptime)
+  setInterval(updateSystemInfo, 1000);
 });
 
 /* ---------- render transaction row ---------- */
 function renderAdminTx(tx) {
-  const div = document.createElement('div');
-  div.className = 'tx-row';
+  const tr = document.createElement('tr');
+  tr.className = 'tx-table-row';
 
   const risk = Number(tx.risk_score ?? 0);
-  const riskColor = risk >= 0.8 ? 'text-red-600' : risk >= 0.6 ? 'text-orange-600' : 'text-green-600';
+  const allowMax = typeof currentThresholds !== 'undefined'
+    ? Number(currentThresholds.allowMax)
+    : 0.30;
+  const blockMin = typeof currentThresholds !== 'undefined'
+    ? Number(currentThresholds.blockMin)
+    : 0.60;
+  const riskColor = risk > blockMin
+    ? '#dc2626'
+    : risk > allowMax
+      ? '#eab308'
+      : '#16a34a';
+  const actionColor = tx.action === 'BLOCK' ? '#dc2626' : tx.action === 'DELAY' ? '#eab308' : '#16a34a';
+  
+  const timestamp = new Date(tx.ts || tx.created_at || tx.timestamp || 0).toLocaleTimeString('en-US', { hour12: false });
 
-  div.innerHTML = `
-    <div class="flex-1">
-      <div class="font-mono text-xs font-semibold text-gray-700">${tx.tx_id}</div>
-      <div class="text-xs text-gray-600 mt-1">
-        ${tx.user_id || ''} • ₹${Number(tx.amount || 0).toFixed(2)} • Risk: <span class="${riskColor} font-semibold">${risk.toFixed(2)}</span>
+  tr.innerHTML = `
+    <td class="tx-col tx-time">
+      <span class="text-xs text-gray-500">${timestamp}</span>
+    </td>
+    <td class="tx-col tx-id" onclick="fillAndScrollTx('${tx.tx_id}'); event.stopPropagation();">
+      <div class="font-mono font-semibold text-blue-700">${tx.tx_id || '-'}</div>
+    </td>
+    <td class="tx-col tx-user">
+      <span class="text-sm font-medium">${tx.user_id || '-'}</span>
+    </td>
+    <td class="tx-col tx-amount">
+      <span class="font-semibold">₹${Number(tx.amount || 0).toFixed(2)}</span>
+    </td>
+    <td class="tx-col tx-risk">
+      <div class="risk-badge" style="color: ${riskColor};">
+        <span class="risk-value">${risk.toFixed(2)}</span>
       </div>
-      <div class="text-xs text-gray-500 mt-1">
-        Channel: ${tx.channel || 'N/A'} • Type: ${tx.tx_type || 'N/A'}
-      </div>
-    </div>
-
-    <div class="flex items-center gap-3">
-      <span class="text-xs font-semibold ${
-        tx.action === 'BLOCK' ? 'text-red-600' :
-        tx.action === 'DELAY' ? 'text-yellow-600' : 'text-green-600'
-      }">
+    </td>
+    <td class="tx-col tx-channel">
+      <span class="channel-badge">${tx.channel || 'N/A'}</span>
+    </td>
+    <td class="tx-col tx-type">
+      <span class="text-sm">${tx.tx_type || 'N/A'}</span>
+    </td>
+    <td class="tx-col tx-action">
+      <div class="action-badge-table" style="color: ${actionColor}; border-color: ${actionColor};">
         ${tx.action || 'ALLOW'}
-      </span>
-      <span>${confidenceBadge(tx.confidence_level)}</span>
-
-      <!-- Hover quick actions -->
-      <div class="action-buttons">
-        <button onclick="showExplain('${tx.tx_id}')" class="action-btn-sm bg-indigo-500 text-white hover-glow-button" title="Explainability">Exp</button>
-        <button onclick="fillAndFetchTx('${tx.tx_id}')" class="action-btn-sm bg-blue-500 text-white hover-glow-button">View</button>
-        <button onclick="showConfirmation('${tx.tx_id}','ALLOW')" class="action-btn-sm bg-green-500 text-white hover-glow-button">A</button>
-        <button onclick="showConfirmation('${tx.tx_id}','DELAY')" class="action-btn-sm bg-yellow-500 text-white hover-glow-button">D</button>
-        <button onclick="showConfirmation('${tx.tx_id}','BLOCK')" class="action-btn-sm bg-red-500 text-white hover-glow-button">B</button>
       </div>
-    </div>
+    </td>
+    <td class="tx-col tx-confidence">
+      ${confidenceBadge(tx.confidence_level)}
+    </td>
+    <td class="tx-col tx-actions">
+      <div class="quick-action-group">
+        <button onclick="showExplain('${tx.tx_id}')" class="quick-action-btn explain-btn" title="Explainability">�</button>
+        <button onclick="fillAndFetchTx('${tx.tx_id}')" class="quick-action-btn view-btn" title="View Details">👁️</button>
+        <button onclick="showConfirmation('${tx.tx_id}','ALLOW')" class="quick-action-btn allow-btn" title="Allow">✓</button>
+        <button onclick="showConfirmation('${tx.tx_id}','DELAY')" class="quick-action-btn delay-btn" title="Delay">⏱️</button>
+        <button onclick="showConfirmation('${tx.tx_id}','BLOCK')" class="quick-action-btn block-btn" title="Block">✕</button>
+      </div>
+    </td>
   `;
 
-  // Click on row to fill TX ID only (no fetch)
-  div.onclick = (e) => {
-    if (!e.target.closest('button')) {
-      fillTxIdOnly(tx.tx_id);
-    }
-  };
+  return tr;
+}
 
-  return div;
+/* ---------- Admin table sorting ---------- */
+function sortAdminTable(column) {
+  // Toggle direction if same column, otherwise default to desc
+  if (adminTableSort.column === column) {
+    adminTableSort.direction = adminTableSort.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    adminTableSort.column = column;
+    adminTableSort.direction = 'desc';
+  }
+
+  // Sort the cache based on column and direction
+  adminTxCache.sort((a, b) => {
+    let aVal, bVal;
+
+    switch (column) {
+      case 'tx-time':
+        aVal = new Date(a.ts || a.created_at || a.timestamp || 0).getTime();
+        bVal = new Date(b.ts || b.created_at || b.timestamp || 0).getTime();
+        break;
+      case 'tx-user':
+        aVal = (a.user_id || a.user || '').toLowerCase();
+        bVal = (b.user_id || b.user || '').toLowerCase();
+        break;
+      case 'tx-amount':
+        aVal = Number(a.amount || 0);
+        bVal = Number(b.amount || 0);
+        break;
+      case 'tx-risk':
+        aVal = Number(a.risk_score ?? a.risk ?? 0);
+        bVal = Number(b.risk_score ?? b.risk ?? 0);
+        break;
+      case 'tx-channel':
+        aVal = (a.channel || '').toLowerCase();
+        bVal = (b.channel || '').toLowerCase();
+        break;
+      case 'tx-type':
+        aVal = (a.tx_type || a.type || '').toLowerCase();
+        bVal = (b.tx_type || b.type || '').toLowerCase();
+        break;
+      case 'tx-action':
+        const actionOrder = { 'BLOCK': 1, 'DELAY': 2, 'ALLOW': 3 };
+        aVal = actionOrder[(a.action || 'ALLOW').toUpperCase()] || 3;
+        bVal = actionOrder[(b.action || 'ALLOW').toUpperCase()] || 3;
+        break;
+      case 'tx-confidence':
+        const confOrder = { 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
+        aVal = confOrder[(a.confidence_level || 'HIGH').toUpperCase()] || 1;
+        bVal = confOrder[(b.confidence_level || 'HIGH').toUpperCase()] || 1;
+        break;
+      default:
+        return 0;
+    }
+
+    if (aVal < bVal) return adminTableSort.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return adminTableSort.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Redraw table (sort indicators will be applied during redraw)
+  redrawAdminRecent();
 }
 
 /* ---------- load recent ---------- */
 async function fetchRecent() {
+  showAdminLoading();
   const timeRange = document.getElementById('timeFilter')?.value || '24h';
   const res = await fetch(`/recent-transactions?limit=2000&time_range=${timeRange}`);
   const j = await res.json();
@@ -990,9 +3993,100 @@ function redrawAdminRecent() {
 
   el.innerHTML = '';
 
-  adminTxCache
-    .filter(tx => filter === 'ALL' || tx.action === filter)
-    .forEach(tx => el.appendChild(renderAdminTx(tx)));
+  // Add table headers
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  headerRow.className = 'tx-table-header';
+  
+  const headers = [
+    { col: 'tx-time', label: 'Time', sortable: true },
+    { col: 'tx-id', label: 'TX ID', sortable: false },
+    { col: 'tx-user', label: 'User', sortable: true },
+    { col: 'tx-amount', label: 'Amount', sortable: true },
+    { col: 'tx-risk', label: 'Risk', sortable: true },
+    { col: 'tx-channel', label: 'Channel', sortable: true },
+    { col: 'tx-type', label: 'Type', sortable: true },
+    { col: 'tx-action', label: 'Action', sortable: true },
+    { col: 'tx-confidence', label: 'Confidence', sortable: true },
+    { col: 'tx-actions', label: 'Actions', sortable: false }
+  ];
+  
+  headers.forEach(header => {
+    const th = document.createElement('th');
+    th.className = `tx-col ${header.col}`;
+    
+    if (header.sortable) {
+      th.classList.add('sortable');
+      
+      const span = document.createElement('span');
+      span.className = 'sort-indicator';
+      span.dataset.column = header.col;
+      
+      // Apply current sort state
+      if (adminTableSort.column === header.col) {
+        span.classList.add(adminTableSort.direction);
+      }
+      
+      span.onclick = (e) => {
+        e.stopPropagation();
+        sortAdminTable(header.col);
+      };
+      
+      th.textContent = header.label + ' ';
+      th.appendChild(span);
+    } else {
+      th.textContent = header.label;
+    }
+    
+    headerRow.appendChild(th);
+  });
+  
+  thead.appendChild(headerRow);
+  el.appendChild(thead);
+
+  const filteredTxs = adminTxCache.filter(tx => filter === 'ALL' || tx.action === filter);
+  
+  if (filteredTxs.length === 0) {
+    // Show message if no transactions (either empty cache or filtered out)
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="10" style="padding: 40px; text-align: center; color: #9ca3af;">No transactions found</td>';
+    el.appendChild(tr);
+    return;
+  }
+  
+  // PERFORMANCE: Use document fragment and limit to 100 rows
+  const fragment = document.createDocumentFragment();
+  const maxRows = 100;
+  const rowsToRender = filteredTxs.slice(0, maxRows);
+  
+  rowsToRender.forEach(tx => fragment.appendChild(renderAdminTx(tx)));
+  
+  // Show message if more rows exist
+  if (filteredTxs.length > maxRows) {
+    console.log(`TX Table overflow: ${filteredTxs.length} > ${maxRows}`);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="10" style="padding: 20px; text-align: center; color: #ffffff; font-weight: 600; background: rgba(102, 126, 234, 0.95); border-radius: 8px; position: sticky; bottom: 0; left: 0; right: 0; z-index: 10;">Showing ${maxRows} of ${filteredTxs.length} transactions. Use filters to narrow results.</td>`;
+    fragment.appendChild(tr);
+  }
+  
+  el.appendChild(fragment);
+}
+
+function showAdminLoading() {
+  const el = document.getElementById('admin_recent');
+  el.innerHTML = `
+    <tr class="tx-table-row" style="height: 200px;">
+      <td colspan="10" style="text-align: center; padding: 60px 20px;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; color: #667eea;">
+          <svg style="width: 20px; height: 20px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span style="font-size: 14px; font-weight: 600;">Loading transactions...</span>
+        </div>
+      </td>
+    </tr>
+  `;
 }
 
 /* ---------- explainability modal ---------- */
@@ -1092,6 +4186,22 @@ function showExplain(tx_id) {
   modal.classList.remove('hidden');
 }
 
+/* ---------- threshold tuning info modal ---------- */
+function showThresholdInfo() {
+  const modal = document.getElementById('thresholdInfoModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+  }
+}
+
+function closeThresholdInfo() {
+  const modal = document.getElementById('thresholdInfoModal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+
 /* ---------- quick action ---------- */
 async function quickAction(tx_id, action) {
   const res = await fetch('/admin/action', {
@@ -1140,7 +4250,15 @@ document.getElementById('qa_fetch_btn').onclick = async () => {
 
   // Show loading state
   const originalText = btn.textContent;
-  btn.textContent = 'Getting details...';
+  btn.innerHTML = `
+    <div style="display: inline-flex; align-items: center; gap: 6px;">
+      <svg style="width: 16px; height: 16px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <span>Getting details...</span>
+    </div>
+  `;
   btn.disabled = true;
 
   try {
@@ -1161,21 +4279,31 @@ document.getElementById('qa_fetch_btn').onclick = async () => {
     document.getElementById('qa_detail_risk').textContent = Number(tx.risk_score || 0).toFixed(2);
     
     // Show explainability reasons if present
+    const reasonEl = document.getElementById('qa_detail_reason');
     const reasons = tx.explainability?.reasons;
+    
     if (Array.isArray(reasons) && reasons.length) {
-      document.getElementById('qa_detail_reason').textContent = reasons.join('; ');
+      // Format as bullet list
+      reasonEl.innerHTML = '<ul>' + reasons.map(r => `<li>${r}</li>`).join('') + '</ul>';
     } else {
       let reason = 'N/A';
       if (tx.block_reason) {
-        reason = tx.block_reason;
+        // Parse block_reason for semicolons or other delimiters
+        const reasonParts = tx.block_reason.split(/;|\n/).map(r => r.trim()).filter(r => r);
+        if (reasonParts.length > 1) {
+          reasonEl.innerHTML = '<ul>' + reasonParts.map(r => `<li>${r}</li>`).join('') + '</ul>';
+        } else {
+          reasonEl.textContent = tx.block_reason;
+        }
       } else if (tx.action === 'BLOCK') {
-        reason = `High risk score (${Number(tx.risk_score || 0).toFixed(2)})`;
+        reasonEl.textContent = `High risk score (${Number(tx.risk_score || 0).toFixed(2)})`;
       } else if (tx.action === 'DELAY') {
-        reason = 'Verification pending';
+        reasonEl.textContent = 'Verification pending';
       } else if (tx.action === 'ALLOW') {
-        reason = 'Cleared';
+        reasonEl.textContent = 'Cleared';
+      } else {
+        reasonEl.textContent = reason;
       }
-      document.getElementById('qa_detail_reason').textContent = reason;
     }
     
     document.getElementById('qa_details').classList.remove('hidden');
@@ -1185,7 +4313,7 @@ document.getElementById('qa_fetch_btn').onclick = async () => {
     document.getElementById('qa_result').textContent = 'Error: ' + e.message;
   } finally {
     // Restore button state
-    btn.textContent = originalText;
+    btn.innerHTML = originalText;
     btn.disabled = false;
   }
 };
@@ -1200,12 +4328,30 @@ function fillTxIdOnly(tx_id) {
   document.getElementById('qa_result').textContent = '';
 }
 
+/* ---------- fill TX ID and scroll to Quick Action (TX ID click only) ---------- */
+function fillAndScrollTx(tx_id) {
+  // Fill TX ID only
+  fillTxIdOnly(tx_id);
+  // Scroll to Quick Action block
+  const quickActionCard = document.querySelector('.quick-action-card');
+  if (quickActionCard) {
+    quickActionCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
 /* ---------- fill TX ID and fetch details (View button) ---------- */
 function fillAndFetchTx(tx_id) {
   // Fill TX ID
   fillTxIdOnly(tx_id);
-  // Auto-fetch details
-  document.getElementById('qa_fetch_btn').click();
+  // Scroll to Quick Action block
+  const quickActionCard = document.querySelector('.quick-action-card');
+  if (quickActionCard) {
+    quickActionCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  // Auto-fetch details after a short delay to allow scroll
+  setTimeout(() => {
+    document.getElementById('qa_fetch_btn').click();
+  }, 300);
 }
 
 
@@ -1271,7 +4417,15 @@ function setupModalButtons() {
       
       // Show loading state on modal button
       const originalText = submitBtn.textContent;
-      submitBtn.textContent = 'Applying action...';
+      submitBtn.innerHTML = `
+        <div style="display: inline-flex; align-items: center; gap: 6px;">
+          <svg style="width: 16px; height: 16px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Applying action...</span>
+        </div>
+      `;
       submitBtn.disabled = true;
       
       // Apply Action button is already in loading state, no need to change it again
@@ -1312,9 +4466,6 @@ function setupModalButtons() {
           time: new Date().toISOString()
         });
         
-        // Refresh transactions list
-        fetchRecent();
-        
         // Clear form after successful action
         document.getElementById('qa_txid').value = '';
         document.getElementById('qa_action').value = 'ALLOW';
@@ -1325,13 +4476,13 @@ function setupModalButtons() {
         document.getElementById('qa_result').textContent = 'Error: ' + e.message;
       } finally {
         // Restore modal button state
-        submitBtn.textContent = originalText;
+        submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
         
         // Restore Apply Action button state
         const applyBtn = document.getElementById('qa_btn');
         if (applyBtn) {
-          applyBtn.textContent = 'Apply Action';
+          applyBtn.innerHTML = 'Apply Action';
           applyBtn.disabled = false;
         }
       }
@@ -1350,6 +4501,23 @@ function setupModalButtons() {
       if (e.target.id === 'explainModal') hideExplain();
     };
   }
+
+  // Threshold Info Modal listeners
+  const thresholdInfoModal = document.getElementById('thresholdInfoModal');
+  const thresholdInfoClose = document.getElementById('thresholdInfoClose');
+  
+  if (thresholdInfoClose) {
+    thresholdInfoClose.onclick = (e) => {
+      e.preventDefault();
+      closeThresholdInfo();
+    };
+  }
+
+  if (thresholdInfoModal) {
+    thresholdInfoModal.onclick = (e) => {
+      if (e.target.id === 'thresholdInfoModal') closeThresholdInfo();
+    };
+  }
 }
 
 /* ---------- setup modal close button ---------- */
@@ -1365,6 +4533,26 @@ function setupModalCloseBtn() {
 }
 
 /* ---------- websocket live updates ---------- */
+let wsUpdateTimeout = null;
+let hasPendingUpdate = false;
+
+function debouncedRedraw() {
+  if (wsUpdateTimeout) {
+    hasPendingUpdate = true;
+    return;
+  }
+  
+  redrawAdminRecent();
+  
+  wsUpdateTimeout = setTimeout(() => {
+    wsUpdateTimeout = null;
+    if (hasPendingUpdate) {
+      hasPendingUpdate = false;
+      debouncedRedraw();
+    }
+  }, 500); // Redraw at most every 500ms
+}
+
 function setupWS() {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss':'ws'}://${location.host}/ws`);
 
@@ -1374,15 +4562,15 @@ function setupWS() {
 
     if (msg.type === 'tx_inserted') {
       adminTxCache.unshift(msg.data);
-      adminTxCache = adminTxCache.slice(0, 30);
-      redrawAdminRecent();
+      adminTxCache = adminTxCache.slice(0, 100); // Keep more in cache but only show 100
+      debouncedRedraw();
     }
 
     if (msg.type === 'tx_updated') {
       const idx = adminTxCache.findIndex(t => t.tx_id === msg.data.tx_id);
       if (idx !== -1) {
         adminTxCache[idx] = msg.data;
-        redrawAdminRecent();
+        debouncedRedraw();
       }
     }
   };
@@ -1390,60 +4578,238 @@ function setupWS() {
   ws.onclose = () => setTimeout(setupWS, 2000);
 }
 
-  function addAdminLog(log) {
+/* ---------- Admin Logs Persistence (localStorage) ---------- */
+const ADMIN_LOGS_KEY = 'fdt_admin_logs';
+const MAX_STORED_LOGS = 100;
+
+function saveAdminLogToStorage(log) {
+  try {
+    let logs = JSON.parse(localStorage.getItem(ADMIN_LOGS_KEY) || '[]');
+    logs.unshift({ ...log, timestamp: Date.now() });
+    logs = logs.slice(0, MAX_STORED_LOGS);
+    localStorage.setItem(ADMIN_LOGS_KEY, JSON.stringify(logs));
+  } catch (e) {
+    console.error('Failed to save admin log to storage:', e);
+  }
+}
+
+function loadAdminLogsFromStorage() {
+  try {
+    const logs = JSON.parse(localStorage.getItem(ADMIN_LOGS_KEY) || '[]');
     const el = document.getElementById('admin_logs');
     if (!el) return;
-
-    const div = document.createElement('div');
-    div.className = 'admin-log-item';
-
-    const badgeClass = log.action === 'BLOCK' ? 'badge-block' : (log.action === 'DELAY' ? 'badge-delay' : 'badge-allow');
-    div.innerHTML = `
-      <div class="flex justify-between items-center">
-        <div>
-          <div class="font-mono text-sm font-semibold">${log.tx_id}</div>
-          <div class="text-xs text-gray-500 mt-1">
-            User: <span class="font-semibold">${log.user_id || 'unknown'}</span>
-            • ${new Date(log.time).toLocaleTimeString()}
+    
+    el.innerHTML = '';
+    logs.forEach(log => {
+      const div = document.createElement('div');
+      div.className = 'admin-log-item';
+      
+      const badgeClass = log.action === 'BLOCK' ? 'badge-block' : (log.action === 'DELAY' ? 'badge-delay' : 'badge-allow');
+      div.innerHTML = `
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="font-mono text-sm font-semibold">${log.tx_id}</div>
+            <div class="text-xs text-gray-500 mt-1">
+              User: <span class="font-semibold">${log.user_id || 'unknown'}</span>
+              • ${new Date(log.time).toLocaleTimeString()}
+            </div>
           </div>
+          <span class="action-badge ${badgeClass}">${log.action}</span>
         </div>
-        <span class="action-badge ${badgeClass}">${log.action}</span>
-      </div>
-    `;
+      `;
+      
+      el.appendChild(div);
+    });
+    
+    // Show overflow message if there are more logs
+    if (logs.length > maxLogs) {
+      const overflowDiv = document.createElement('div');
+      overflowDiv.className = 'admin-log-overflow';
+      overflowDiv.style.cssText = 'padding: 16px; text-align: center; color: #667eea; font-weight: 600; background: rgba(102, 126, 234, 0.1); border-radius: 8px; margin-top: 8px;';
+      overflowDiv.textContent = `Showing ${maxLogs} of ${logs.length} total admin logs`;
+      el.appendChild(overflowDiv);
+    }
+  } catch (e) {
+    console.error('Failed to load admin logs from storage:', e);
+  }
+}
 
-    el.prepend(div);
+async function loadAdminLogsFromServer() {
+  try {
+    const res = await fetch(`/admin/logs?_=${Date.now()}`);
+    if (!res.ok) throw new Error('Failed to fetch admin logs');
+    
+    const data = await res.json();
+    const logs = data.logs || [];
+    
+    // Store ALL logs in cache
+    adminLogCache = logs;
+    console.log(`Loaded ${logs.length} admin logs into cache`);
+    
+    const el = document.getElementById('admin_logs');
+    if (!el) return;
+    
+    el.innerHTML = '';
+    
+    // Display only the most recent 100 logs
+    const maxLogs = 100;
+    const logsToDisplay = logs.slice(0, maxLogs);
+    
+    logsToDisplay.forEach(log => {
+      const ts = log.created_at || log.time || log.timestamp || log.createdAt || log.time_created;
+      // Parse timestamp with UTC timezone handling
+      let tsText = '—';
+      if (ts) {
+        try {
+          // If timestamp doesn't have timezone info, add Z to treat as UTC
+          let isoString = ts;
+          if (typeof ts === 'string') {
+            // Check if timezone info exists (Z, +, or - after time)
+            if (!ts.includes('Z') && !ts.includes('+') && !ts.includes('-', 19)) {
+              isoString = ts + 'Z';
+            }
+          }
+          const date = new Date(isoString);
+          if (!isNaN(date)) {
+            tsText = date.toLocaleTimeString('en-US', { hour12: false });
+          }
+        } catch (e) {
+          tsText = '—';
+        }
+      }
+      
+      const div = document.createElement('div');
+      div.className = 'admin-log-item';
+      
+      const badgeClass = log.action === 'BLOCK' ? 'badge-block' : (log.action === 'DELAY' ? 'badge-delay' : 'badge-allow');
+      div.innerHTML = `
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="font-mono text-sm font-semibold">${log.tx_id}</div>
+            <div class="text-xs text-gray-500 mt-1">
+              User: <span class="font-semibold">${log.user_id || 'unknown'}</span>
+              • Admin: <span class="admin-username">${log.admin_username || 'system'}</span>
+              • ${tsText}
+            </div>
+          </div>
+          <span class="action-badge ${badgeClass}">${log.action}</span>
+        </div>
+      `;
+      
+      el.appendChild(div);
+    });
+    
+    // Show overflow message if there are more logs
+    if (logs.length > maxLogs) {
+      console.log(`Showing overflow message: ${logs.length} > ${maxLogs}`);
+      const overflowDiv = document.createElement('div');
+      overflowDiv.className = 'admin-log-overflow';
+      overflowDiv.style.cssText = 'padding: 16px; text-align: center; color: #ffffff; font-weight: 600; background: rgba(102, 126, 234, 0.95); border-radius: 8px; margin-top: 8px; position: sticky; bottom: 0; left: 0; right: 0; z-index: 10; backdrop-filter: blur(10px);';
+      overflowDiv.textContent = `Showing ${maxLogs} of ${logs.length} total admin logs`;
+      el.appendChild(overflowDiv);
+    } else {
+      console.log(`No overflow: ${logs.length} <= ${maxLogs}`);
+    }
+    
+    // Update system info to reflect log count
+    updateSystemInfo();
+  } catch (e) {
+    console.error('Failed to load admin logs from server:', e);
+    // Fallback to localStorage if server fetch fails
+    loadAdminLogsFromStorage();
+  }
+}
+function addAdminLog(log) {
+    // The backend's /admin/action endpoint already saved the log
+    // Just refresh the logs list to display the new entry
+    loadAdminLogsFromServer();
   }
 
 
 fetchRecent();
 setupWS();
 
+// Load admin logs from server on page load (cross-device persistence)
+loadAdminLogsFromServer();
+
+// Refresh admin logs every 30 seconds to catch updates from other admins
+setInterval(loadAdminLogsFromServer, 30000);
+
 // Chatbot setup
 let chatHistory = [];
+
+function addChatMessage(content, isUser = false) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `chatbot-message ${isUser ? 'user' : 'bot'}`;
+  
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'chatbot-message-content';
+  
+  // Format with proper line breaks
+  let formatted = content.trim();
+  
+  // Detect and style section headers (supports ──, ───, ━━, ━━━, ==, ===)
+  if (formatted.includes('─') || formatted.includes('━') || /={2,}/.test(formatted)) {
+    const lines = formatted.split('\n');
+    let htmlContent = '';
+    
+    lines.forEach(line => {
+      line = line.trim();
+      
+      // Section header detection - matches 2+ separator chars on each side
+      if (/^[─━=]{2,}.*[─━=]{2,}$/.test(line)) {
+        const title = line.replace(/[─━=]/g, '').trim();
+        htmlContent += `<div class="msg-section-header">${title}</div>`;
+      } else if (line) {
+        htmlContent += `<div>${line}</div>`;
+      } else {
+        htmlContent += '<br>';
+      }
+    });
+    
+    contentDiv.innerHTML = htmlContent;
+  } else {
+    contentDiv.textContent = formatted;
+  }
+  
+  messageDiv.appendChild(contentDiv);
+  document.getElementById('chatbotMessages').appendChild(messageDiv);
+  document.getElementById('chatbotMessages').scrollTop = document.getElementById('chatbotMessages').scrollHeight;
+}
+
+function showTypingIndicator() {
+  const typingDiv = document.createElement('div');
+  typingDiv.className = 'chatbot-message bot';
+  typingDiv.id = 'typingIndicator';
+  
+  const indicator = document.createElement('div');
+  indicator.className = 'typing-indicator chatbot-message-content';
+  indicator.innerHTML = '<span></span><span></span><span></span>';
+  
+  typingDiv.appendChild(indicator);
+  document.getElementById('chatbotMessages').appendChild(typingDiv);
+  document.getElementById('chatbotMessages').scrollTop = document.getElementById('chatbotMessages').scrollHeight;
+}
+
+function removeTypingIndicator() {
+  const indicator = document.getElementById('typingIndicator');
+  if (indicator) indicator.remove();
+}
+
 document.getElementById('chatbotSend')?.addEventListener('click', async () => {
   const chatbotInput = document.getElementById('chatbotInput');
   const chatbotSend = document.getElementById('chatbotSend');
   const message = chatbotInput.value.trim();
   if (!message) return;
   
-  // Add user message
-  const userDiv = document.createElement('div');
-  userDiv.style.cssText = 'align-self: flex-end; max-width: 70%; padding: 8px 12px; background: #667eea; color: white; border-radius: 8px; word-wrap: break-word;';
-  userDiv.textContent = message;
-  document.getElementById('chatbotMessages').appendChild(userDiv);
-  
+  addChatMessage(message, true);
   chatHistory.push({ role: 'user', content: message });
+  
   chatbotInput.value = '';
   chatbotSend.disabled = true;
   chatbotInput.disabled = true;
   
-  // Show typing indicator
-  const typingDiv = document.createElement('div');
-  typingDiv.id = 'typingIndicator';
-  typingDiv.style.cssText = 'align-self: flex-start; display: flex; gap: 4px; padding: 8px 12px; background: #e5e7eb; border-radius: 8px;';
-  typingDiv.innerHTML = '<span style="width: 8px; height: 8px; background: #6b7280; border-radius: 50%; animation: pulse 1.5s infinite;"></span><span style="width: 8px; height: 8px; background: #6b7280; border-radius: 50%; animation: pulse 1.5s infinite 0.3s;"></span><span style="width: 8px; height: 8px; background: #6b7280; border-radius: 50%; animation: pulse 1.5s infinite 0.6s;"></span>';
-  document.getElementById('chatbotMessages').appendChild(typingDiv);
-  document.getElementById('chatbotMessages').scrollTop = document.getElementById('chatbotMessages').scrollHeight;
+  showTypingIndicator();
   
   try {
     const response = await fetch('/api/chatbot', {
@@ -1459,27 +4825,17 @@ document.getElementById('chatbotSend')?.addEventListener('click', async () => {
     if (!response.ok) throw new Error('Chatbot request failed');
     
     const data = await response.json();
-    typingDiv.remove();
-    
-    // Add bot response
-    const botDiv = document.createElement('div');
-    botDiv.style.cssText = 'align-self: flex-start; max-width: 70%; padding: 8px 12px; background: #f3f4f6; color: #1f2937; border-radius: 8px; word-wrap: break-word; white-space: pre-wrap;';
-    botDiv.textContent = data.response;
-    document.getElementById('chatbotMessages').appendChild(botDiv);
-    
+    removeTypingIndicator();
+    addChatMessage(data.response, false);
     chatHistory.push({ role: 'assistant', content: data.response });
   } catch (error) {
     console.error('Chatbot error:', error);
-    typingDiv.remove();
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = 'align-self: flex-start; max-width: 70%; padding: 8px 12px; background: #fee2e2; color: #991b1b; border-radius: 8px;';
-    errorDiv.textContent = 'Sorry, I encountered an error. Please try again.';
-    document.getElementById('chatbotMessages').appendChild(errorDiv);
+    removeTypingIndicator();
+    addChatMessage('Sorry, I encountered an error. Please try again.', false);
   } finally {
     chatbotSend.disabled = false;
     chatbotInput.disabled = false;
     chatbotInput.focus();
-    document.getElementById('chatbotMessages').scrollTop = document.getElementById('chatbotMessages').scrollHeight;
   }
 });
 
@@ -1491,11 +4847,846 @@ document.getElementById('chatbotInput')?.addEventListener('keypress', (e) => {
   }
 });
 
+// Chatbot Toggle and Close Handlers
+document.getElementById('chatbotToggle')?.addEventListener('click', () => {
+  const chatbotWindow = document.getElementById('chatbotWindow');
+  if (chatbotWindow) {
+    chatbotWindow.classList.toggle('open');
+    if (chatbotWindow.classList.contains('open')) {
+      document.getElementById('chatbotInput')?.focus();
+    }
+  }
+});
+
+document.getElementById('chatbotClose')?.addEventListener('click', () => {
+  const chatbotWindow = document.getElementById('chatbotWindow');
+  if (chatbotWindow) {
+    chatbotWindow.classList.remove('open');
+  }
+});
+
 document.getElementById('adminFilter')
   ?.addEventListener('change', redrawAdminRecent);
 
 document.getElementById('timeFilter')
   ?.addEventListener('change', fetchRecent);
+
+// Model Accuracy Info Modal
+document.getElementById('modelAccuracyInfoBtn')?.addEventListener('click', () => {
+  const modal = document.getElementById('modelAccuracyModal');
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+});
+
+document.getElementById('closeModelAccuracyModal')?.addEventListener('click', () => {
+  const modal = document.getElementById('modelAccuracyModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+});
+
+document.getElementById('modelAccuracyModal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'modelAccuracyModal') {
+    e.target.style.display = 'none';
+  }
+});
+
+// Export Audit Trail - Show Modal
+document.getElementById('exportAuditBtn')?.addEventListener('click', () => {
+  const modal = document.getElementById('exportAuditModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    // Set default dates
+    const now = new Date();
+    const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    document.getElementById('auditExportEndDate').value = now.toISOString().slice(0, 16);
+    document.getElementById('auditExportStartDate').value = start.toISOString().slice(0, 16);
+  }
+});
+
+// Handle custom date range visibility for audit export
+document.getElementById('auditExportTimeRange')?.addEventListener('change', (e) => {
+  const customRange = document.getElementById('auditCustomDateRange');
+  if (customRange) {
+    customRange.style.display = e.target.value === 'custom' ? 'block' : 'none';
+  }
+});
+
+// Audit Export Function
+async function performAuditExport() {
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const formatDateTime = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value).trim();
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  };
+  const clean = (value) => (value === null || value === undefined) ? '' : String(value).replace(/\s+/g, ' ').trim();
+  const num = (value, digits = 2) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(digits) : '';
+  };
+
+  try {
+    // Get selected options
+    const timeRange = document.getElementById('auditExportTimeRange').value;
+    const format = document.getElementById('auditExportFormat').value;
+    
+    // Calculate date range - create new instance so we don't modify the real Date()
+    const endDate = new Date();
+    let startDate = new Date(endDate.getTime()); // Create a copy
+    
+    if (timeRange === '24h') {
+      startDate.setHours(startDate.getHours() - 24);
+    } else if (timeRange === '7d') {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (timeRange === '30d') {
+      startDate.setDate(startDate.getDate() - 30);
+    } else if (timeRange === '90d') {
+      startDate.setDate(startDate.getDate() - 90);
+    } else if (timeRange === 'custom') {
+      startDate = new Date(document.getElementById('auditExportStartDate').value);
+    }
+
+    const [logsRes, txRes] = await Promise.all([
+      fetch(`/admin/logs?limit=99999&_=${Date.now()}`),
+      fetch(`/recent-transactions?limit=99999&time_range=${timeRange}&_=${Date.now()}`)
+    ]);
+
+    if (!logsRes.ok) throw new Error('Failed to fetch admin logs');
+    const logsData = await logsRes.json();
+    let logs = logsData.logs || [];
+
+    // Filter by date range
+    logs = logs.filter(log => {
+      const logDate = new Date(log.created_at || log.time || log.timestamp);
+      return logDate >= startDate && logDate <= endDate;
+    });
+
+    const txData = txRes.ok ? await txRes.json() : { transactions: [] };
+    const txList = txData.transactions || [];
+    const txMap = new Map(txList.map(t => [t.tx_id, t]));
+
+    if (!logs.length) {
+      alert('No audit logs to export for the selected time range');
+      return;
+    }
+
+    const headers = [
+      'Timestamp',
+      'Admin User',
+      'Action',
+      'Transaction ID',
+      'User ID',
+      'Amount',
+      'Channel',
+      'Risk Score',
+      'Confidence Level',
+      'Recipient VPA',
+      'Device ID',
+      'Location',
+      'Remarks',
+      'Reason'
+    ];
+
+    const rows = [headers];
+    logs.forEach(log => {
+      const tx = txMap.get(log.tx_id) || {};
+      const reason = Array.isArray(tx?.explainability?.reasons)
+        ? tx.explainability.reasons.join('; ')
+        : (tx.block_reason || '');
+
+      rows.push([
+        formatDateTime(log.created_at || log.time || log.timestamp),
+        clean(log.admin_username || 'system'),
+        clean((log.action || '').toUpperCase()),
+        clean(log.tx_id),
+        clean(log.user_id || tx.user_id),
+        num(tx.amount, 2),
+        clean(tx.channel),
+        num(tx.risk_score ?? tx.risk, 4),
+        clean((tx.confidence_level || '').toUpperCase()),
+        clean(tx.recipient_vpa),
+        clean(tx.device_id),
+        clean(tx.location),
+        clean(tx.remarks),
+        clean(reason)
+      ]);
+    });
+
+    let content, fileName, mimeType;
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '_');
+
+    if (format === 'csv') {
+      const csvBody = rows.map(r => r.map(c => {
+        const escaped = String(c ?? '').replace(/"/g, '""');
+        return `"${escaped}"`;
+      }).join(',')).join('\n');
+      content = `\ufeff${csvBody}`;
+      fileName = `admin_audit_trail_${timestamp}.csv`;
+      mimeType = 'text/csv;charset=utf-8;';
+    } else if (format === 'json') {
+      const jsonData = rows.slice(1).map(row => {
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = row[i]);
+        return obj;
+      });
+      content = JSON.stringify(jsonData, null, 2);
+      fileName = `admin_audit_trail_${timestamp}.json`;
+      mimeType = 'application/json;charset=utf-8;';
+    } else if (format === 'txt') {
+      const txtBody = rows.map(r => r.join('\t')).join('\n');
+      content = txtBody;
+      fileName = `admin_audit_trail_${timestamp}.txt`;
+      mimeType = 'text/plain;charset=utf-8;';
+    } else if (format === 'xlsx') {
+      const csvBody = rows.map(r => r.map(c => {
+        const escaped = String(c ?? '').replace(/"/g, '""');
+        return `"${escaped}"`;
+      }).join(',')).join('\n');
+      content = csvBody;
+      fileName = `admin_audit_trail_${timestamp}.xlsx`;
+      mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8;';
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    document.getElementById('exportAuditModal').style.display = 'none';
+    showToast(`Exported ${logs.length} audit logs as ${format.toUpperCase()}`, 'success');
+  } catch (e) {
+    console.error('Audit export failed:', e);
+    alert('Export failed. Please try again.');
+  }
+}
+
+
+/* ========== THRESHOLD TUNING PANEL ========== */
+
+// Default thresholds (fixed defaults for restoration)
+const DEFAULT_THRESHOLDS = {
+  allowMax: 0.30,
+  delayMax: 0.60,
+  blockMin: 0.60,
+  lowConfidence: 0.40,
+  mediumConfidence: 0.70,
+  highConfidence: 0.85,
+  rfWeight: 35,
+  xgbWeight: 40,
+  isoWeight: 25
+};
+
+// Current thresholds in memory
+let currentThresholds = { ...DEFAULT_THRESHOLDS };
+let activePresetSlot = null; // Track which preset is currently active
+let presets = {}; // Store loaded presets
+
+function thresholdsEqual(a, b) {
+  if (!a || !b) return false;
+  const floatKeys = ['allowMax', 'delayMax', 'blockMin', 'lowConfidence', 'mediumConfidence', 'highConfidence'];
+  const intKeys = ['rfWeight', 'xgbWeight', 'isoWeight'];
+  const epsilon = 0.001;
+
+  for (const key of floatKeys) {
+    if (typeof a[key] !== 'number' || typeof b[key] !== 'number') return false;
+    if (Math.abs(a[key] - b[key]) > epsilon) return false;
+  }
+
+  for (const key of intKeys) {
+    if (typeof a[key] !== 'number' || typeof b[key] !== 'number') return false;
+    if (a[key] !== b[key]) return false;
+  }
+
+  return true;
+}
+
+function updatePresetBadge() {
+  const badge = document.getElementById('presetStatusBadge');
+  if (!badge) return;
+
+  let label = 'Custom';
+  let className = 'preset-status-badge preset-status-custom';
+
+  if (thresholdsEqual(currentThresholds, DEFAULT_THRESHOLDS)) {
+    label = 'Default';
+    className = 'preset-status-badge preset-status-default';
+  } else {
+    let matchSlot = null;
+    if (activePresetSlot && presets[activePresetSlot] && thresholdsEqual(currentThresholds, presets[activePresetSlot].config)) {
+      matchSlot = activePresetSlot;
+    } else {
+      for (const [slot, preset] of Object.entries(presets)) {
+        if (preset?.config && thresholdsEqual(currentThresholds, preset.config)) {
+          matchSlot = Number(slot);
+          break;
+        }
+      }
+    }
+
+    if (matchSlot && presets[matchSlot]) {
+      label = presets[matchSlot].name || `Preset ${matchSlot}`;
+      className = 'preset-status-badge preset-status-preset';
+    }
+  }
+
+  badge.textContent = label;
+  badge.className = className;
+}
+
+// Load presets from server on page load
+async function loadPresets() {
+  try {
+    const response = await fetch('/admin/get-presets');
+    if (!response.ok) throw new Error('Failed to load presets');
+    
+    const data = await response.json();
+    presets = data.presets || {};
+    renderPresetCards();
+    updatePresetBadge();
+  } catch (e) {
+    console.error('Error loading presets:', e);
+    renderPresetCards(); // Render empty cards
+    updatePresetBadge();
+  }
+}
+
+// Render preset cards
+function renderPresetCards() {
+  const container = document.getElementById('presetCardsContainer');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  for (let slot = 1; slot <= 3; slot++) {
+    const preset = presets[slot];
+    const isEmpty = !preset;
+    const isActive = activePresetSlot === slot;
+    
+    const card = document.createElement('div');
+    card.className = `preset-card ${isEmpty ? 'empty' : ''} ${isActive ? 'active' : ''}`;
+    card.dataset.slot = slot;
+    
+    const defaultName = `Preset ${slot}`;
+    const presetName = preset ? preset.name : defaultName;
+    const updatedAt = preset && preset.updated_at ? new Date(preset.updated_at).toLocaleString() : 'Not saved';
+    
+    card.innerHTML = `
+      <div class="preset-card-header">
+        <div class="preset-card-name" contenteditable="false" data-slot="${slot}" data-original="${presetName}">
+          ${presetName}
+        </div>
+        <div class="preset-card-actions">
+          ${!isEmpty ? `<button class="preset-card-btn" onclick="deletePreset(${slot})" title="Delete">🗑️</button>` : ''}
+        </div>
+      </div>
+      <div class="preset-card-info">
+        ${isEmpty ? '💾 Empty slot' : `📅 ${updatedAt}`}
+      </div>
+      ${!isEmpty ? `<div class="preset-card-config">Allow: ${preset.config.allowMax.toFixed(2)} | Block: ${preset.config.blockMin.toFixed(2)}</div>` : ''}
+    `;
+    
+    // Click to load preset
+    if (!isEmpty) {
+      card.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('preset-card-name') && !e.target.classList.contains('preset-card-btn')) {
+          loadPreset(slot);
+        }
+      });
+    }
+    
+    // Double-click name to edit
+    const nameEl = card.querySelector('.preset-card-name');
+    nameEl.addEventListener('dblclick', () => {
+      nameEl.contentEditable = 'true';
+      nameEl.classList.add('editing');
+      nameEl.focus();
+      document.execCommand('selectAll', false, null);
+    });
+    
+    nameEl.addEventListener('blur', () => {
+      nameEl.contentEditable = 'false';
+      nameEl.classList.remove('editing');
+      const newName = nameEl.textContent.trim();
+      if (newName && newName !== nameEl.dataset.original && presets[slot]) {
+        updatePresetName(slot, newName);
+      } else {
+        nameEl.textContent = nameEl.dataset.original;
+      }
+    });
+    
+    nameEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        nameEl.blur();
+      } else if (e.key === 'Escape') {
+        nameEl.textContent = nameEl.dataset.original;
+        nameEl.blur();
+      }
+    });
+    
+    container.appendChild(card);
+  }
+}
+
+// Toggle preset section
+function togglePresets() {
+  const content = document.getElementById('presetsContent');
+  const icon = document.getElementById('presetsToggleIcon');
+  
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    icon.style.transform = 'rotate(0deg)';
+  } else {
+    content.style.display = 'none';
+    icon.style.transform = 'rotate(-90deg)';
+  }
+}
+
+// Save preset
+document.getElementById('savePresetBtn')?.addEventListener('click', async () => {
+  const selectEl = document.getElementById('presetSlotSelect');
+  if (!selectEl) {
+    showToast('error', '❌ Preset selection error - refresh page and try again');
+    return;
+  }
+  
+  const slotValue = selectEl.value;
+  const slot = parseInt(slotValue);
+  
+  console.log('Save preset - Select element found:', !!selectEl);
+  console.log('Save preset - Select value (string):', slotValue, 'Parsed slot (int):', slot);
+  console.log('Save preset - Validation: !slot=', !slot, 'isNaN(slot)=', isNaN(slot), 'slot < 1=', slot < 1, 'slot > 3=', slot > 3);
+  
+  if (!slot || isNaN(slot) || slot < 1 || slot > 3) {
+    showToast('error', `❌ Invalid preset slot selected (${slotValue}). Please select Preset 1, 2, or 3.`);
+    return;
+  }
+  
+  const config = { ...currentThresholds };
+  
+  // Get preset name if exists, otherwise use default
+  const existingName = presets[slot] ? presets[slot].name : `Preset ${slot}`;
+  
+  const payloadToSend = {
+    preset_slot: slot,
+    preset_name: existingName,
+    config: config
+  };
+  console.log('Save preset - Payload to send:', payloadToSend);
+  
+  try {
+    const response = await fetch('/admin/save-preset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payloadToSend)
+    });
+    
+    const responseText = await response.text();
+    console.log('Save response status:', response.status, 'body:', responseText);
+    
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status} - ${responseText}`);
+    }
+    
+    const data = JSON.parse(responseText);
+    showToast('success', `✅ Successfully saved ${existingName} with current thresholds`);
+    
+    // Reload presets
+    await loadPresets();
+    activePresetSlot = slot;
+    renderPresetCards();
+    updatePresetBadge();
+  } catch (e) {
+    console.error('Error saving preset:', e);
+    showToast('error', `❌ Failed to save preset: ${e.message}`);
+  }
+});
+
+// Load preset
+async function loadPreset(slot) {
+  const preset = presets[slot];
+  if (!preset) {
+    showToast('error', `❌ Preset ${slot} is empty - please save it first`);
+    return;
+  }
+  
+  try {
+    currentThresholds = { ...preset.config };
+    
+    // Update all sliders and displays
+    document.getElementById('allowMaxSlider').value = currentThresholds.allowMax;
+    document.getElementById('allowMaxVal').textContent = currentThresholds.allowMax.toFixed(2);
+    
+    document.getElementById('delayMaxSlider').value = currentThresholds.delayMax;
+    document.getElementById('delayMaxVal').textContent = currentThresholds.delayMax.toFixed(2);
+    
+    document.getElementById('blockMinSlider').value = currentThresholds.blockMin;
+    document.getElementById('blockMinVal').textContent = currentThresholds.blockMin.toFixed(2);
+    
+    document.getElementById('lowConfSlider').value = currentThresholds.lowConfidence;
+    document.getElementById('lowConfVal').textContent = currentThresholds.lowConfidence.toFixed(2);
+    
+    document.getElementById('mediumConfSlider').value = currentThresholds.mediumConfidence;
+    document.getElementById('mediumConfVal').textContent = currentThresholds.mediumConfidence.toFixed(2);
+    
+    document.getElementById('rfWeightSlider').value = currentThresholds.rfWeight;
+    document.getElementById('rfWeightVal').textContent = currentThresholds.rfWeight + '%';
+    
+    document.getElementById('xgbWeightSlider').value = currentThresholds.xgbWeight;
+    document.getElementById('xgbWeightVal').textContent = currentThresholds.xgbWeight + '%';
+    
+    document.getElementById('isoWeightSlider').value = currentThresholds.isoWeight;
+    document.getElementById('isoWeightVal').textContent = currentThresholds.isoWeight + '%';
+    
+    updateWeightSum();
+    updateLivePreview();
+    
+    activePresetSlot = slot;
+    renderPresetCards();
+    updatePresetBadge();
+    
+    showToast('success', `✅ Loaded "${preset.name}" - all thresholds updated`);
+  } catch (e) {
+    console.error('Error loading preset:', e);
+    showToast('error', `❌ Failed to load preset: ${e.message}`);
+  }
+}
+
+// Update preset name
+async function updatePresetName(slot, newName) {
+  const preset = presets[slot];
+  if (!preset) {
+    showToast('error', `❌ Preset ${slot} not found`);
+    return;
+  }
+  
+  const oldName = preset.name;
+  
+  try {
+    const response = await fetch('/admin/save-preset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        preset_slot: slot,
+        preset_name: newName,
+        config: preset.config
+      })
+    });
+    
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+    
+    presets[slot].name = newName;
+    renderPresetCards();
+    showToast('success', `✅ Renamed "${oldName}" to "${newName}"`);
+  } catch (e) {
+    console.error('Error updating preset name:', e);
+    showToast('error', `❌ Failed to rename preset: ${e.message}`);
+  }
+}
+
+// Delete preset
+async function deletePreset(slot) {
+  const presetName = presets[slot] ? presets[slot].name : `Preset ${slot}`;
+  
+  if (!confirm(`Are you sure you want to permanently delete "${presetName}"? This cannot be undone.`)) return;
+  
+  try {
+    const response = await fetch('/admin/delete-preset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preset_slot: slot })
+    });
+    
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+    
+    delete presets[slot];
+    if (activePresetSlot === slot) activePresetSlot = null;
+    renderPresetCards();
+    updatePresetBadge();
+    showToast('success', `✅ Deleted "${presetName}" successfully`);
+  } catch (e) {
+    console.error('Error deleting preset:', e);
+    showToast('error', `❌ Failed to delete "${presetName}": ${e.message}`);
+  }
+}
+
+// Initialize presets on page load
+loadPresets();
+
+// Risk Score Sliders
+document.getElementById('allowMaxSlider')?.addEventListener('input', (e) => {
+  currentThresholds.allowMax = parseFloat(e.target.value);
+  document.getElementById('allowMaxVal').textContent = currentThresholds.allowMax.toFixed(2);
+  validateThresholds();
+  updateLivePreview();
+  updatePresetBadge();
+});
+
+document.getElementById('delayMaxSlider')?.addEventListener('input', (e) => {
+  currentThresholds.delayMax = parseFloat(e.target.value);
+  document.getElementById('delayMaxVal').textContent = currentThresholds.delayMax.toFixed(2);
+  validateThresholds();
+  updateLivePreview();
+  updatePresetBadge();
+});
+
+document.getElementById('blockMinSlider')?.addEventListener('input', (e) => {
+  currentThresholds.blockMin = parseFloat(e.target.value);
+  document.getElementById('blockMinVal').textContent = currentThresholds.blockMin.toFixed(2);
+  validateThresholds();
+  updateLivePreview();
+  updatePresetBadge();
+});
+
+// Confidence Sliders
+document.getElementById('lowConfSlider')?.addEventListener('input', (e) => {
+  currentThresholds.lowConfidence = parseFloat(e.target.value);
+  document.getElementById('lowConfVal').textContent = currentThresholds.lowConfidence.toFixed(2);
+  validateThresholds();
+  updatePresetBadge();
+});
+
+document.getElementById('mediumConfSlider')?.addEventListener('input', (e) => {
+  currentThresholds.mediumConfidence = parseFloat(e.target.value);
+  document.getElementById('mediumConfVal').textContent = currentThresholds.mediumConfidence.toFixed(2);
+  validateThresholds();
+  updatePresetBadge();
+});
+
+// Weight Sliders
+document.getElementById('rfWeightSlider')?.addEventListener('input', (e) => {
+  currentThresholds.rfWeight = parseInt(e.target.value);
+  document.getElementById('rfWeightVal').textContent = currentThresholds.rfWeight + '%';
+  updateWeightSum();
+  updatePresetBadge();
+});
+
+document.getElementById('xgbWeightSlider')?.addEventListener('input', (e) => {
+  currentThresholds.xgbWeight = parseInt(e.target.value);
+  document.getElementById('xgbWeightVal').textContent = currentThresholds.xgbWeight + '%';
+  updateWeightSum();
+  updatePresetBadge();
+});
+
+document.getElementById('isoWeightSlider')?.addEventListener('input', (e) => {
+  currentThresholds.isoWeight = parseInt(e.target.value);
+  document.getElementById('isoWeightVal').textContent = currentThresholds.isoWeight + '%';
+  updateWeightSum();
+  updatePresetBadge();
+});
+
+function updateWeightSum() {
+  const sum = currentThresholds.rfWeight + currentThresholds.xgbWeight + currentThresholds.isoWeight;
+  const weightSumEl = document.getElementById('weightSum');
+  if (weightSumEl) {
+    weightSumEl.textContent = sum + '%';
+    if (sum === 100) {
+      weightSumEl.style.color = '#10b981';
+    } else {
+      weightSumEl.style.color = '#ef4444';
+    }
+  }
+}
+
+function validateThresholds() {
+  const issues = [];
+  
+  // Guardrail: BLOCK threshold cannot go below 0.40
+  if (currentThresholds.blockMin < 0.40) {
+    issues.push('⚠️ BLOCK threshold cannot be below 0.40 (safety guardrail)');
+    currentThresholds.blockMin = 0.40;
+  }
+  
+  // Guardrail: ALLOW threshold cannot go above 0.50
+  if (currentThresholds.allowMax > 0.50) {
+    issues.push('⚠️ ALLOW threshold cannot exceed 0.50 (safety guardrail)');
+    currentThresholds.allowMax = 0.50;
+  }
+  
+  // Guardrail: Logical order
+  if (currentThresholds.allowMax >= currentThresholds.blockMin) {
+    issues.push('⚠️ ALLOW max must be less than BLOCK min');
+    currentThresholds.blockMin = Math.min(1.0, currentThresholds.allowMax + 0.10);
+  }
+  
+  if (issues.length > 0) {
+    showToast(issues.join(' | '), 'warning');
+  }
+  
+  // Update display after validation
+  document.getElementById('allowMaxVal').textContent = currentThresholds.allowMax.toFixed(2);
+  document.getElementById('blockMinVal').textContent = currentThresholds.blockMin.toFixed(2);
+  document.getElementById('allowMaxSlider').value = currentThresholds.allowMax;
+  document.getElementById('blockMinSlider').value = currentThresholds.blockMin;
+}
+
+function updateLivePreview() {
+  // Simulate how last 100 transactions would be classified
+  let allowCount = 0, delayCount = 0, blockCount = 0;
+  
+  // Use first 100 transactions from cache
+  const previewTxs = adminTxCache.slice(0, 100);
+  
+  previewTxs.forEach(tx => {
+    const score = tx.risk_score || 0;
+    if (score <= currentThresholds.allowMax) {
+      allowCount++;
+    } else if (score <= currentThresholds.blockMin) {
+      delayCount++;
+    } else {
+      blockCount++;
+    }
+  });
+  
+  document.getElementById('previewAllow').textContent = allowCount;
+  document.getElementById('previewDelay').textContent = delayCount;
+  document.getElementById('previewBlock').textContent = blockCount;
+}
+
+// Reset to defaults
+document.getElementById('resetThresholdBtn')?.addEventListener('click', () => {
+  if (!confirm('Are you sure? This will restore ALL thresholds to defaults.')) return;
+  
+  currentThresholds = { ...DEFAULT_THRESHOLDS };
+  
+  document.getElementById('allowMaxSlider').value = DEFAULT_THRESHOLDS.allowMax;
+  document.getElementById('delayMaxSlider').value = DEFAULT_THRESHOLDS.delayMax;
+  document.getElementById('blockMinSlider').value = DEFAULT_THRESHOLDS.blockMin;
+  document.getElementById('lowConfSlider').value = DEFAULT_THRESHOLDS.lowConfidence;
+  document.getElementById('mediumConfSlider').value = DEFAULT_THRESHOLDS.mediumConfidence;
+  document.getElementById('rfWeightSlider').value = DEFAULT_THRESHOLDS.rfWeight;
+  document.getElementById('xgbWeightSlider').value = DEFAULT_THRESHOLDS.xgbWeight;
+  document.getElementById('isoWeightSlider').value = DEFAULT_THRESHOLDS.isoWeight;
+  
+  document.getElementById('allowMaxVal').textContent = DEFAULT_THRESHOLDS.allowMax.toFixed(2);
+  document.getElementById('delayMaxVal').textContent = DEFAULT_THRESHOLDS.delayMax.toFixed(2);
+  document.getElementById('blockMinVal').textContent = DEFAULT_THRESHOLDS.blockMin.toFixed(2);
+  document.getElementById('lowConfVal').textContent = DEFAULT_THRESHOLDS.lowConfidence.toFixed(2);
+  document.getElementById('mediumConfVal').textContent = DEFAULT_THRESHOLDS.mediumConfidence.toFixed(2);
+  document.getElementById('rfWeightVal').textContent = DEFAULT_THRESHOLDS.rfWeight + '%';
+  document.getElementById('xgbWeightVal').textContent = DEFAULT_THRESHOLDS.xgbWeight + '%';
+  document.getElementById('isoWeightVal').textContent = DEFAULT_THRESHOLDS.isoWeight + '%';
+  
+  updateWeightSum();
+  updateLivePreview();
+  activePresetSlot = null;
+  updatePresetBadge();
+  
+  showToast('✅ Thresholds restored to defaults', 'success');
+});
+
+// Apply threshold changes
+document.getElementById('applyThresholdBtn')?.addEventListener('click', async () => {
+  // Final validation
+  const sum = currentThresholds.rfWeight + currentThresholds.xgbWeight + currentThresholds.isoWeight;
+  if (sum !== 100) {
+    showToast('❌ Model weights must sum to 100%', 'error');
+    return;
+  }
+  
+  if (currentThresholds.allowMax >= currentThresholds.blockMin) {
+    showToast('❌ Invalid threshold configuration', 'error');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/admin/update-thresholds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentThresholds)
+    });
+    
+    if (response.ok) {
+      showToast('✅ Thresholds applied successfully! Changes are live immediately.', 'success');
+      
+      // Log this admin action
+      const adminLogs = document.getElementById('admin_logs');
+      const log = document.createElement('div');
+      log.className = 'admin-log-item';
+      log.innerHTML = `
+        <div class="flex justify-between items-center">
+          <div class="text-xs font-mono font-semibold">THRESHOLD UPDATE</div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-gray-500">${new Date().toLocaleTimeString()}</span>
+            <span class="action-badge" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">CONFIG</span>
+          </div>
+        </div>
+        <div class="text-xs text-gray-600 mt-1">Risk: ${currentThresholds.allowMax.toFixed(2)}-${currentThresholds.blockMin.toFixed(2)} | Weights: RF ${currentThresholds.rfWeight}% XGB ${currentThresholds.xgbWeight}% ISO ${currentThresholds.isoWeight}%</div>
+      `;
+      adminLogs.prepend(log);
+    } else {
+      showToast('❌ Failed to apply thresholds', 'error');
+    }
+  } catch (error) {
+    console.error('Error applying thresholds:', error);
+    showToast('❌ Error: ' + error.message, 'error');
+  }
+});
+
+// Initialize threshold panel on page load
+document.addEventListener('DOMContentLoaded', () => {
+  updateWeightSum();
+  updateLivePreview();
+});
+
 </script>
+
+<!-- Export Audit Trail Modal -->
+<div id="exportAuditModal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Export Audit Trail</h2>
+      <button class="modal-close" onclick="document.getElementById('exportAuditModal').style.display='none'">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Time Range</label>
+        <select id="auditExportTimeRange" class="form-control">
+          <option value="24h">Last 24 Hours</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+          <option value="90d">Last 90 Days</option>
+          <option value="custom">Custom Date Range</option>
+        </select>
+      </div>
+
+      <div id="auditCustomDateRange" style="display: none;" class="form-group">
+        <label>From Date</label>
+        <input type="datetime-local" id="auditExportStartDate" class="form-control">
+        <label style="margin-top: 10px;">To Date</label>
+        <input type="datetime-local" id="auditExportEndDate" class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label>File Format</label>
+        <select id="auditExportFormat" class="form-control">
+          <option value="csv">CSV (Excel)</option>
+          <option value="json">JSON (Structured)</option>
+          <option value="txt">TXT (Delimited)</option>
+          <option value="xlsx">XLSX (Excel Workbook)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="document.getElementById('exportAuditModal').style.display='none'">Cancel</button>
+      <button class="btn-primary" onclick="performAuditExport()">Export</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

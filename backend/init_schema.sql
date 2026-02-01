@@ -104,3 +104,18 @@ VALUES
     ('device_002', 'user_002', 'Priya Android', 'Android', TRUE),
     ('device_003', 'user_003', 'Amit Samsung', 'Android', TRUE)
 ON CONFLICT (device_id) DO NOTHING;
+
+    -- Admin Logs table for tracking admin actions across devices
+    CREATE TABLE IF NOT EXISTS admin_logs (
+        log_id SERIAL PRIMARY KEY,
+        tx_id VARCHAR(100) NOT NULL,
+        user_id VARCHAR(255),
+        action VARCHAR(20) NOT NULL,
+        admin_username VARCHAR(100),
+        source_ip VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Create index for admin logs queries
+    CREATE INDEX IF NOT EXISTS idx_admin_logs_created_at ON admin_logs(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_admin_logs_tx_id ON admin_logs(tx_id);
