@@ -1,0 +1,12 @@
+# Fix for admin log insert - replace row[0] with row["log_id"]
+# Line 931 in app/main.py
+
+# BEFORE:
+#         row = cur.fetchone()
+#         log_id = row[0] if row else None
+#         conn.commit()
+
+# AFTER:
+#         row = cur.fetchone()
+#         log_id = row["log_id"] if row else None
+#         conn.commit()
