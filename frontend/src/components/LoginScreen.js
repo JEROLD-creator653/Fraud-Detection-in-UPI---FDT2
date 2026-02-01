@@ -25,19 +25,20 @@ const LoginScreen = ({ onLogin }) => {
      e.preventDefault();
      setError('');
      
-     // Basic validation
-     const validation = errorHandler.validateForm(
-       formData,
-       {
-         phone: {
-           required: true,
-           label: 'Phone Number',
-           custom: (value) => {
-             const cleanPhone = value.replace(/\D/g, '');
-             return cleanPhone.length === 10;
-           },
-           message: 'Please enter a valid 10-digit phone number'
-         },
+      // Basic validation
+      const validation = errorHandler.validateForm(
+        formData,
+        {
+          phone: {
+            required: true,
+            label: 'Phone Number',
+            custom: (value) => {
+              const cleanPhone = value.replace(/\D/g, '');
+              // Accept 10 digits (local) or 12 digits (with country code +91)
+              return cleanPhone.length === 10 || cleanPhone.length === 12;
+            },
+            message: 'Please enter a valid 10-digit phone number (with or without +91)'
+          },
          password: {
            required: true,
            label: 'Password',

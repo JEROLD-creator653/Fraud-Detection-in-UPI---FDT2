@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUserTransactions, submitUserDecision, confirmTransaction, cancelTransaction } from '../api';
+import { getUserTransactions, confirmTransaction, cancelTransaction } from '../api';
 import { useNotifications } from './NotificationSystem';
 import cacheManager from '../utils/cacheManager';
 import { exportToCSV, exportToJSON, exportToDetailedReport } from '../utils/exportUtils';

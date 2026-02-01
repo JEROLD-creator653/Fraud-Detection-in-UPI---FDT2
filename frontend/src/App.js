@@ -124,29 +124,19 @@ function AppContent() {
               )
             }
           />
-          <Route
-            path="/risk-analysis"
-            element={
-              isAuthenticated ? (
-                <RiskAnalysis user={user} />
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
-          />
-          <Route
-            path="/security-settings"
-            element={
-              isAuthenticated ? (
-                <SecuritySettings user={user} />
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
-          />
-          <Route
-            path="/"
-            element={
+           <Route
+             path="/risk-analysis"
+             element={
+               isAuthenticated ? (
+                 <RiskAnalysis user={user} />
+               ) : (
+                 <Navigate to="/login" />
+               )
+             }
+           />
+           <Route
+             path="/"
+             element={
               isAuthenticated ? (
                 <Navigate to="/dashboard" />
               ) : (
