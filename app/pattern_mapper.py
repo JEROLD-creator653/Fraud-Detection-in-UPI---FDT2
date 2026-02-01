@@ -414,7 +414,7 @@ class PatternMapper:
             if spread >= cls.THRESHOLDS["model_spread_disagreement"]:
                 triggers.append("high_spread")
                 confidence = 0.7
-                explanation.append(f"Model disagreement: spread={spread:.2f} (min={min_score:.2f}, max={max_score:.2f})")
+                explanation.append(f"Models disagree significantly: lowest score={min_score:.0%}, highest score={max_score:.0%} (difference: {spread:.0%})")
 
             # Explicitly call out anomaly-only vs supervised-only to clarify disagreements
             supervised_scores = [s for s in [rf_score, xgb_score] if s is not None]
@@ -425,15 +425,15 @@ class PatternMapper:
                 if iforest_score >= cls.THRESHOLDS["model_high_risk"] and len(supervised_high) == 0:
                     triggers.append("anomaly_vs_supervised")
                     confidence = max(confidence, 0.72)
-                    explanation.append("Behavioural risk: anomaly model high while supervised models are low")
+                    explanation.append("Unusual behavioral pattern detected, but no match with known fraud signatures")
 
                 if len(supervised_high) == len(supervised_scores) and (iforest_score < cls.THRESHOLDS["model_high_risk"] if iforest_score is not None else True):
                     triggers.append("supervised_vs_anomaly")
                     confidence = max(confidence, 0.72)
-                    explanation.append("Known fraud pattern: supervised models high while anomaly model is low")
+                    explanation.append("Matches known fraud patterns, but transaction behavior appears statistically typical")
         
         detected = len(triggers) > 0
-        explanation_text = "; ".join(explanation) if explanation else "No model disagreement"
+        explanation_text = "; ".join(explanation) if explanation else "All models show consistent risk assessment"
         
         return PatternResult(
             pattern="Model Disagreement",

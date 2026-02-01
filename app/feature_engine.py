@@ -9,7 +9,7 @@ try:
     r = redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
     r.ping()
 except Exception as e:
-    print(f"⚠ Redis unavailable: {e}. Using fallback without Redis.")
+    print(f"[WARN] Redis unavailable: {e}. Using fallback without Redis.")
     r = None
 
 # ---------------------------------------------
@@ -87,6 +87,7 @@ def extract_features(tx):
     # 2. TEMPORAL FEATURES
     # =========================================================
     features["hour_of_day"] = float(ts.hour)
+    features["month_of_year"] = float(ts.month)  # 1-12
     features["day_of_week"] = float(ts.weekday())  # 0=Monday, 6=Sunday
     features["is_weekend"] = 1.0 if ts.weekday() >= 5 else 0.0
     features["is_night"] = 1.0 if (ts.hour >= 22 or ts.hour <= 5) else 0.0
@@ -95,81 +96,104 @@ def extract_features(tx):
     # =========================================================
     # 3. VELOCITY FEATURES (transaction frequency)
     # =========================================================
-    tx_key = f"user:{user}:timestamps"
-    r.zadd(tx_key, {str(now_ts): now_ts})
-    r.zremrangebyscore(tx_key, 0, now_ts - 86400)  # keep 24h
-    
-    features["tx_count_1h"] = float(r.zcount(tx_key, now_ts - 3600, now_ts))
-    features["tx_count_6h"] = float(r.zcount(tx_key, now_ts - 21600, now_ts))
-    features["tx_count_24h"] = float(r.zcount(tx_key, now_ts - 86400, now_ts))
-    
-    # High-speed velocity
-    vel_1m_key = f"user:{user}:vel_1m"
-    vel_5m_key = f"user:{user}:vel_5m"
-    r.zadd(vel_1m_key, {str(now_ts): now_ts})
-    r.zadd(vel_5m_key, {str(now_ts): now_ts})
-    r.zremrangebyscore(vel_1m_key, 0, now_ts - 60)
-    r.zremrangebyscore(vel_5m_key, 0, now_ts - 300)
-    
-    features["tx_count_1min"] = float(r.zcount(vel_1m_key, now_ts - 60, now_ts))
-    features["tx_count_5min"] = float(r.zcount(vel_5m_key, now_ts - 300, now_ts))
-    
-    r.expire(tx_key, 86400)
-    r.expire(vel_1m_key, 120)
-    r.expire(vel_5m_key, 600)
+    if r is not None:
+        tx_key = f"user:{user}:timestamps"
+        r.zadd(tx_key, {str(now_ts): now_ts})
+        r.zremrangebyscore(tx_key, 0, now_ts - 86400)  # keep 24h
+        
+        features["tx_count_1h"] = float(r.zcount(tx_key, now_ts - 3600, now_ts))
+        features["tx_count_6h"] = float(r.zcount(tx_key, now_ts - 21600, now_ts))
+        features["tx_count_24h"] = float(r.zcount(tx_key, now_ts - 86400, now_ts))
+        
+        # High-speed velocity
+        vel_1m_key = f"user:{user}:vel_1m"
+        vel_5m_key = f"user:{user}:vel_5m"
+        r.zadd(vel_1m_key, {str(now_ts): now_ts})
+        r.zadd(vel_5m_key, {str(now_ts): now_ts})
+        r.zremrangebyscore(vel_1m_key, 0, now_ts - 60)
+        r.zremrangebyscore(vel_5m_key, 0, now_ts - 300)
+        
+        features["tx_count_1min"] = float(r.zcount(vel_1m_key, now_ts - 60, now_ts))
+        features["tx_count_5min"] = float(r.zcount(vel_5m_key, now_ts - 300, now_ts))
+        
+        r.expire(tx_key, 86400)
+        r.expire(vel_1m_key, 120)
+        r.expire(vel_5m_key, 600)
+    else:
+        # Redis unavailable: use reasonable default velocity features for demonstration
+        features["tx_count_1h"] = 1.0
+        features["tx_count_6h"] = 2.0
+        features["tx_count_24h"] = 5.0
+        features["tx_count_1min"] = 1.0
+        features["tx_count_5min"] = 1.0
     
     # =========================================================
     # 4. BEHAVIORAL FEATURES
     # =========================================================
     
-    # New recipient detection
-    rec_key = f"user:{user}:recipients"
-    new_rec = 0
-    if not r.sismember(rec_key, recipient):
-        new_rec = 1
-        r.sadd(rec_key, recipient)
-    r.expire(rec_key, 86400 * 30)
-    features["is_new_recipient"] = float(new_rec)
-    
-    # Recipient transaction count
-    features["recipient_tx_count"] = float(r.scard(rec_key))
-    
-    # Device change detection
-    dev_key = f"user:{user}:devices"
-    device_change = 0
-    if not r.sismember(dev_key, device):
-        device_change = 1
-        r.sadd(dev_key, device)
-    r.expire(dev_key, 86400 * 60)
-    features["is_new_device"] = float(device_change)
-    features["device_count"] = float(r.scard(dev_key))
+    if r is not None:
+        # New recipient detection
+        rec_key = f"user:{user}:recipients"
+        new_rec = 0
+        if not r.sismember(rec_key, recipient):
+            new_rec = 1
+            r.sadd(rec_key, recipient)
+        r.expire(rec_key, 86400 * 30)
+        features["is_new_recipient"] = float(new_rec)
+        
+        # Recipient transaction count
+        features["recipient_tx_count"] = float(r.scard(rec_key))
+        
+        # Device change detection
+        dev_key = f"user:{user}:devices"
+        device_change = 0
+        if not r.sismember(dev_key, device):
+            device_change = 1
+            r.sadd(dev_key, device)
+        r.expire(dev_key, 86400 * 60)
+        features["is_new_device"] = float(device_change)
+        features["device_count"] = float(r.scard(dev_key))
+    else:
+        # Redis unavailable: use probabilistic defaults
+        features["is_new_recipient"] = 0.3  # 30% chance
+        features["recipient_tx_count"] = 5.0
+        features["is_new_device"] = 0.2  # 20% chance
+        features["device_count"] = 2.0
     
     # Transaction type encoding
     features["is_p2m"] = 1.0 if tx_type == "P2M" else 0.0
+    features["is_p2p"] = 1.0 if tx_type == "P2P" else 0.0
     
     # =========================================================
     # 5. STATISTICAL FEATURES (amount patterns)
     # =========================================================
     
-    # Track amount history for user
-    amt_key = f"user:{user}:amounts"
-    r.zadd(amt_key, {str(amount): now_ts})
-    r.zremrangebyscore(amt_key, 0, now_ts - 86400 * 7)  # keep 7 days
-    r.expire(amt_key, 86400 * 7)
-    
-    # Get recent amounts for statistics
-    recent_amounts = r.zrangebyscore(amt_key, now_ts - 86400 * 7, now_ts)
-    if recent_amounts:
-        amounts_float = [float(a) for a in recent_amounts]
-        features["amount_mean"] = statistics.mean(amounts_float)
-        features["amount_std"] = statistics.stdev(amounts_float) if len(amounts_float) > 1 else 0.0
-        features["amount_max"] = max(amounts_float)
-        features["amount_deviation"] = abs(amount - features["amount_mean"]) / (features["amount_std"] + 1.0)
+    if r is not None:
+        # Track amount history for user
+        amt_key = f"user:{user}:amounts"
+        r.zadd(amt_key, {str(amount): now_ts})
+        r.zremrangebyscore(amt_key, 0, now_ts - 86400 * 7)  # keep 7 days
+        r.expire(amt_key, 86400 * 7)
+        
+        # Get recent amounts for statistics
+        recent_amounts = r.zrangebyscore(amt_key, now_ts - 86400 * 7, now_ts)
+        if recent_amounts:
+            amounts_float = [float(a) for a in recent_amounts]
+            features["amount_mean"] = statistics.mean(amounts_float)
+            features["amount_std"] = statistics.stdev(amounts_float) if len(amounts_float) > 1 else 0.0
+            features["amount_max"] = max(amounts_float)
+            features["amount_deviation"] = abs(amount - features["amount_mean"]) / (features["amount_std"] + 1.0)
+        else:
+            features["amount_mean"] = amount
+            features["amount_std"] = 0.0
+            features["amount_max"] = amount
+            features["amount_deviation"] = 0.0
     else:
+        # Redis unavailable: use current amount as baseline
         features["amount_mean"] = amount
-        features["amount_std"] = 0.0
-        features["amount_max"] = amount
-        features["amount_deviation"] = 0.0
+        features["amount_std"] = amount * 0.3  # Assume 30% std dev
+        features["amount_max"] = amount * 1.5
+        features["amount_deviation"] = 0.5
     
     # =========================================================
     # 6. RISK INDICATORS
@@ -201,12 +225,12 @@ def get_feature_names():
     return [
         # Basic (3)
         "amount", "log_amount", "is_round_amount",
-        # Temporal (5)
-        "hour_of_day", "day_of_week", "is_weekend", "is_night", "is_business_hours",
+        # Temporal (6)
+        "hour_of_day", "month_of_year", "day_of_week", "is_weekend", "is_night", "is_business_hours",
         # Velocity (5)
         "tx_count_1h", "tx_count_6h", "tx_count_24h", "tx_count_1min", "tx_count_5min",
-        # Behavioral (5)
-        "is_new_recipient", "recipient_tx_count", "is_new_device", "device_count", "is_p2m",
+        # Behavioral (6)
+        "is_new_recipient", "recipient_tx_count", "is_new_device", "device_count", "is_p2m", "is_p2p",
         # Statistical (4)
         "amount_mean", "amount_std", "amount_max", "amount_deviation",
         # Risk (3)
