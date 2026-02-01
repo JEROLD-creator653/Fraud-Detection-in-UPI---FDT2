@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 from typing import Dict, Optional, Union, Any
 import numpy as np
 
-from .explainability import explain_transaction
+try:
+    from .explainability import explain_transaction
+except (ImportError, SystemError):
+    from explainability import explain_transaction
 
 # Model loading and caching
 _MODELS_LOADED = False
@@ -32,41 +35,41 @@ def load_models():
         # Load models - use absolute path based on script location
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         model_dir = os.path.join(script_dir, "models")
-        print(f"📂 Looking for models in: {model_dir}")
+        print(f"[INFO] Looking for models in: {model_dir}")
         
         try:
             _IFOREST = joblib.load(os.path.join(model_dir, "iforest.joblib"))
-            print("✓ Loaded Isolation Forest model")
+            print("[OK] Loaded Isolation Forest model")
         except Exception as e:
-            print(f"⚠ Could not load Isolation Forest: {e}")
+            print(f"[WARN] Could not load Isolation Forest: {e}")
         
         try:
             _RANDOM_FOREST = joblib.load(os.path.join(model_dir, "random_forest.joblib"))
-            print("✓ Loaded Random Forest model")
+            print("[OK] Loaded Random Forest model")
         except Exception as e:
-            print(f"⚠ Could not load Random Forest: {e}")
+            print(f"[WARN] Could not load Random Forest: {e}")
         
         try:
             _XGBOOST = joblib.load(os.path.join(model_dir, "xgboost.joblib"))
-            print("✓ Loaded XGBoost model")
+            print("[OK] Loaded XGBoost model")
         except Exception as e:
-            print(f"⚠ Could not load XGBoost: {e}")
+            print(f"[WARN] Could not load XGBoost: {e}")
         
         # Load metadata
         try:
             with open(os.path.join(model_dir, "metadata.json"), "r") as f:
                 _MODEL_METADATA = json.load(f)
-            print("✓ Loaded model metadata")
+            print("[OK] Loaded model metadata")
         except Exception as e:
-            print(f"⚠ Could not load metadata: {e}")
+            print(f"[WARN] Could not load metadata: {e}")
         
         _MODELS_LOADED = True
         
         if not any([_IFOREST, _RANDOM_FOREST, _XGBOOST]):
-            print("⚠ WARNING: No models loaded! Using fallback rule-based scoring.")
+            print("[WARN] WARNING: No models loaded! Using fallback rule-based scoring.")
         
     except Exception as e:
-        print(f"❌ Error loading models: {e}")
+        print(f"[ERROR] Error loading models: {e}")
         _MODELS_LOADED = True  # Prevent retry
 
 
@@ -77,11 +80,14 @@ def extract_features(tx: dict) -> dict:
     """
     try:
         # Try to use the enhanced feature_engine
-        from .feature_engine import extract_features as extract_features_enhanced
+        try:
+            from .feature_engine import extract_features as extract_features_enhanced
+        except (ImportError, SystemError):
+            from feature_engine import extract_features as extract_features_enhanced
         return extract_features_enhanced(tx)
     except Exception as e:
         # Fallback: simplified feature extraction
-        print(f"⚠ Using fallback feature extraction: {e}")
+        print(f"[WARN] Using fallback feature extraction: {e}")
         return extract_features_fallback(tx)
 
 
@@ -90,7 +96,10 @@ def extract_features_fallback(tx: dict) -> dict:
     Fallback feature extraction when Redis/feature_engine unavailable.
     Returns features matching the expected feature set.
     """
-    from .feature_engine import get_feature_names
+    try:
+        from .feature_engine import get_feature_names
+    except (ImportError, SystemError):
+        from feature_engine import get_feature_names
     
     ts_field = tx.get("timestamp") or tx.get("ts") or tx.get("created_at")
     try:
@@ -112,6 +121,7 @@ def extract_features_fallback(tx: dict) -> dict:
         "is_round_amount": 1.0 if (amount % 100 == 0 or amount % 500 == 0) else 0.0,
         # Temporal
         "hour_of_day": float(ts.hour),
+        "month_of_year": float(ts.month),
         "day_of_week": float(ts.weekday()),
         "is_weekend": 1.0 if ts.weekday() >= 5 else 0.0,
         "is_night": 1.0 if (ts.hour >= 22 or ts.hour <= 5) else 0.0,
@@ -128,6 +138,7 @@ def extract_features_fallback(tx: dict) -> dict:
         "is_new_device": 0.0,
         "device_count": 1.0,
         "is_p2m": 1.0 if tx_type == "P2M" else 0.0,
+        "is_p2p": 1.0 if tx_type == "P2P" else 0.0,
         # Statistical
         "amount_mean": amount,
         "amount_std": amount * 0.3,
@@ -145,11 +156,17 @@ def extract_features_fallback(tx: dict) -> dict:
 def features_to_vector(feature_dict: dict) -> np.ndarray:
     """Convert feature dictionary to numpy array in correct order."""
     try:
-        from .feature_engine import features_to_vector as ftv
+        try:
+            from .feature_engine import features_to_vector as ftv
+        except (ImportError, SystemError):
+            from feature_engine import features_to_vector as ftv
         return np.array(ftv(feature_dict))
     except:
         # Fallback: use fixed order matching training
-        from .feature_engine import get_feature_names
+        try:
+            from .feature_engine import get_feature_names
+        except (ImportError, SystemError):
+            from feature_engine import get_feature_names
         feature_names = get_feature_names()
         return np.array([float(feature_dict.get(name, 0.0)) for name in feature_names])
 
