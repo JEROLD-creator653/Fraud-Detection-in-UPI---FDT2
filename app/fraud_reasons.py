@@ -61,7 +61,7 @@ def generate_fraud_reasons(
     """
     
     if thresholds is None:
-        thresholds = {"delay": 0.03, "block": 0.06}
+        thresholds = {"delay": 0.35, "block": 0.70}
     
     reasons = []
     
@@ -178,14 +178,14 @@ def generate_fraud_reasons(
     if is_new_recipient > 0:
         reasons.append(FraudReason(
             "Payment to new/unknown recipient",
-            "high",
+            "medium",
             "is_new_recipient",
             is_new_recipient
         ))
     elif recipient_tx_count == 1:
         reasons.append(FraudReason(
             "First transaction to this recipient",
-            "medium",
+            "low",
             "recipient_tx_count",
             recipient_tx_count
         ))
@@ -407,10 +407,10 @@ def categorize_fraud_risk(
     """
     
     if thresholds is None:
-        thresholds = {"delay": 0.03, "block": 0.06}
+        thresholds = {"delay": 0.35, "block": 0.70}
     
-    delay_threshold = thresholds.get("delay", 0.03)
-    block_threshold = thresholds.get("block", 0.06)
+    delay_threshold = thresholds.get("delay", 0.35)
+    block_threshold = thresholds.get("block", 0.70)
     
     # Determine risk level
     if ensemble_score >= block_threshold:
