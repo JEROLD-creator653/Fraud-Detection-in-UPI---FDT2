@@ -15,6 +15,7 @@ const FraudAlert = () => {
 
   useEffect(() => {
     fetchTransaction();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txId]);
 
   const fetchTransaction = async () => {

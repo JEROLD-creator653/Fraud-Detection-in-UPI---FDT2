@@ -117,7 +117,7 @@ class CacheManager {
       byCategory: {}
     };
 
-    for (const [key, item] of this.cache.entries()) {
+    for (const [, item] of this.cache.entries()) {
       if (!stats.byCategory[item.category]) {
         stats.byCategory[item.category] = 0;
       }
