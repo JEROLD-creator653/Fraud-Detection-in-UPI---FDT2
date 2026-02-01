@@ -5,12 +5,21 @@ import cacheManager from './utils/cacheManager';
 // Use explicit backend URL
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
+// Log the API URL being used
+if (process.env.NODE_ENV === 'development') {
+  console.log('🔧 FDT API Configuration:');
+  console.log('  Backend URL:', API_BASE_URL);
+  console.log('  Environment:', process.env.NODE_ENV);
+  console.log('  REACT_APP_BACKEND_URL:', process.env.REACT_APP_BACKEND_URL);
+}
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  timeout: 10000 // 10 second timeout
 });
 
 // Add auth token to requests
@@ -29,8 +38,24 @@ api.interceptors.request.use(
 
 // Handle auth errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ API Response:', response.config.url, response.status);
+    }
+    return response;
+  },
   (error) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ API Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+    }
+    
     if (error.response?.status === 401) {
       // Token expired or invalid
       localStorage.removeItem('fdt_token');
