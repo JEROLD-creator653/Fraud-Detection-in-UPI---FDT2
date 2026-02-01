@@ -1,5 +1,6 @@
 // API utilities for backend communication
 import axios from 'axios';
+import cacheManager from './utils/cacheManager';
 
 // Use explicit backend URL
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
@@ -53,15 +54,34 @@ export const loginUser = async (credentials) => {
 
 // User APIs
 export const getUserDashboard = async () => {
+  const cacheKey = 'user_dashboard';
+  const cachedData = cacheManager.get(cacheKey);
+  
+  if (cachedData) {
+    return cachedData;
+  }
+
   const response = await api.get('/api/user/dashboard');
-  return response.data;
+  const data = response.data;
+  cacheManager.set(cacheKey, data, 'dashboard');
+  return data;
 };
 
 export const getUserTransactions = async (limit = 20, statusFilter = null) => {
   const params = { limit };
   if (statusFilter) params.status_filter = statusFilter;
+  
+  const cacheKey = `transactions_${limit}_${statusFilter || 'all'}`;
+  const cachedData = cacheManager.get(cacheKey);
+  
+  if (cachedData) {
+    return cachedData;
+  }
+
   const response = await api.get('/api/user/transactions', { params });
-  return response.data;
+  const data = response.data;
+  cacheManager.set(cacheKey, data, 'transactions');
+  return data;
 };
 
 // Transaction APIs
@@ -72,6 +92,27 @@ export const createTransaction = async (transactionData) => {
 
 export const submitUserDecision = async (decisionData) => {
   const response = await api.post('/api/user-decision', decisionData);
+  return response.data;
+};
+
+// Send Money specific APIs
+export const searchUsers = async (phone) => {
+  const response = await api.get('/api/users/search', { params: { phone } });
+  return response.data;
+};
+
+export const confirmTransaction = async (txId) => {
+  const response = await api.post('/api/transaction/confirm', { tx_id: txId });
+  return response.data;
+};
+
+export const cancelTransaction = async (txId) => {
+  const response = await api.post('/api/transaction/cancel', { tx_id: txId });
+  return response.data;
+};
+
+export const getTransaction = async (txId) => {
+  const response = await api.get(`/api/transaction/${txId}`);
   return response.data;
 };
 

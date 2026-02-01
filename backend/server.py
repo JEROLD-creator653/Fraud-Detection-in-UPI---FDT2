@@ -11,16 +11,21 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
 
-from fastapi import FastAPI, Request, HTTPException, status, Depends
+from fastapi import FastAPI, Request, HTTPException, status, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from passlib.hash import bcrypt
 import jwt
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 import psycopg2
 import psycopg2.extras
+
+# Import WebSocket manager
+from .ws_manager import ws_manager
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -32,8 +37,9 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "fdt_jwt_secret_key_change_in_produ
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
-# Initialize FastAPI app
+# Initialize FastAPI app and scheduler
 app = FastAPI(title="FDT API", version="1.0.0")
+scheduler = AsyncIOScheduler()
 
 # CORS Configuration - Allow all origins including preview URLs
 app.add_middleware(
@@ -44,6 +50,199 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# Startup event to initialize database schema
+@app.on_event("startup")
+def startup_event():
+    """Initialize database schema on startup"""
+    try:
+        conn = get_db_conn()
+        cur = conn.cursor()
+        
+        # Step 1: Add daily_limit column if it doesn't exist
+        cur.execute(
+            """
+            ALTER TABLE users 
+            ADD COLUMN IF NOT EXISTS daily_limit DECIMAL(15, 2) DEFAULT 10000.00
+            """
+        )
+        
+        # Step 2: Add Send Money feature columns to transactions table
+        new_columns = [
+            ("receiver_user_id", "VARCHAR(100) REFERENCES users(user_id)"),
+            ("status_history", "TEXT[] DEFAULT '{}'"),
+            ("amount_deducted_at", "TIMESTAMP"),
+            ("amount_credited_at", "TIMESTAMP")
+        ]
+        
+        for column_name, column_def in new_columns:
+            try:
+                cur.execute(f"ALTER TABLE transactions ADD COLUMN IF NOT EXISTS {column_name} {column_def}")
+            except Exception as e:
+                print(f"Column {column_name} already exists or error: {e}")
+        
+        # Step 3: Create transaction_ledger table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS transaction_ledger (
+                ledger_id SERIAL PRIMARY KEY,
+                tx_id VARCHAR(100) REFERENCES transactions(tx_id),
+                operation VARCHAR(50) NOT NULL,
+                user_id VARCHAR(100) REFERENCES users(user_id),
+                amount DECIMAL(15, 2) NOT NULL,
+                operation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                remarks TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Step 4: Create user_daily_transactions table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_daily_transactions (
+                record_id SERIAL PRIMARY KEY,
+                user_id VARCHAR(100) REFERENCES users(user_id),
+                transaction_date DATE NOT NULL,
+                total_amount DECIMAL(15, 2) DEFAULT 0.00,
+                transaction_count INTEGER DEFAULT 0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, transaction_date)
+            )
+        """)
+        
+        # Step 5: Create indexes
+        indexes = [
+            ("idx_transactions_receiver_user_id", "transactions", "receiver_user_id"),
+            ("idx_transaction_ledger_tx_id", "transaction_ledger", "tx_id"),
+            ("idx_transaction_ledger_user_id", "transaction_ledger", "user_id"),
+            ("idx_user_daily_transactions_user_date", "user_daily_transactions", "user_id, transaction_date")
+        ]
+        
+        for index_name, table_name, columns in indexes:
+            try:
+                cur.execute(f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({columns})")
+            except Exception as e:
+                print(f"Index {index_name} already exists or error: {e}")
+        
+        # Step 6: Add new test users
+        new_users = [
+            ('user_004', 'Abishek Kumar', '+919876543219', 'abishek@example.com', 
+             '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 20000.00, 10000.00),
+            ('user_005', 'Jerold Smith', '+919876543218', 'jerold@example.com', 
+             '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 18000.00, 10000.00),
+            ('user_006', 'Gowtham Kumar', '+919876543217', 'gowtham@example.com', 
+             '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 22000.00, 10000.00)
+        ]
+        
+        for user_data in new_users:
+            try:
+                cur.execute("""
+                    INSERT INTO users (user_id, name, phone, email, password_hash, balance, daily_limit)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id) DO NOTHING
+                """, user_data)
+            except Exception as e:
+                print(f"User {user_data[1]} already exists or error: {e}")
+        
+        conn.commit()
+        print("✓ Database schema initialized successfully (including Send Money feature)")
+    except Exception as e:
+        print(f"⚠ Warning: Could not ensure database schema: {e}")
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
+    
+    # Start the scheduler
+    try:
+        scheduler.add_job(
+            auto_refund_delayed_transactions,
+            trigger=IntervalTrigger(minutes=1),  # Run every 1 minute
+            id="auto_refund_job",
+            name="Auto-refund delayed transactions",
+            replace_existing=True
+        )
+        scheduler.start()
+        print("✓ Auto-refund scheduler started")
+    except Exception as e:
+        print(f"⚠ Warning: Could not start scheduler: {e}")
+
+async def auto_refund_delayed_transactions():
+    """Auto-refund transactions that have been delayed for more than 5 minutes"""
+    def _auto_refund():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Find transactions older than 5 minutes with DELAY status
+            five_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
+            cur.execute(
+                """
+                SELECT tx_id, user_id, amount, recipient_vpa, created_at
+                FROM transactions 
+                WHERE action = 'DELAY' 
+                AND db_status = 'pending'
+                AND created_at < %s
+                """,
+                (five_minutes_ago,)
+            )
+            
+            expired_transactions = cur.fetchall()
+            
+            for tx in expired_transactions:
+                # Refund sender
+                cur.execute(
+                    "UPDATE users SET balance = balance + %s WHERE user_id = %s",
+                    (float(tx["amount"]), tx["user_id"])
+                )
+                
+                # Log refund in transaction_ledger
+                cur.execute(
+                    """
+                    INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                    VALUES (%s, 'REFUND', %s, %s, %s)
+                    """,
+                    (tx["tx_id"], tx["user_id"], float(tx["amount"]), "Auto-refund after 5 minute timeout")
+                )
+                
+                # Update transaction status
+                cur.execute(
+                    """
+                    UPDATE transactions 
+                    SET db_status = 'auto-refunded', 
+                        action = 'BLOCK',
+                        updated_at = NOW()
+                    WHERE tx_id = %s
+                    """,
+                    (tx["tx_id"],)
+                )
+                
+                # Emit WebSocket event for auto-refund
+                try:
+                    asyncio.create_task(
+                        ws_manager.send_to_user(tx["user_id"], {
+                            "type": "transaction_auto_refunded",
+                            "tx_id": tx["tx_id"],
+                            "amount": float(tx["amount"]),
+                            "reason": "Auto-refund after 5 minute timeout"
+                        })
+                    )
+                except Exception as e:
+                    print(f"WebSocket emit error for auto-refund: {e}")
+                
+                print(f"Auto-refunded transaction {tx['tx_id']} (₹{tx['amount']})")
+            
+            if expired_transactions:
+                conn.commit()
+                print(f"✓ Auto-refunded {len(expired_transactions)} delayed transactions")
+            
+        except Exception as e:
+            print(f"Auto-refund error: {e}")
+            if conn:
+                conn.rollback()
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_auto_refund)
 
 # ============================================================================
 # DATABASE HELPERS
@@ -92,6 +291,21 @@ class UserDecision(BaseModel):
 class PushToken(BaseModel):
     fcm_token: str
     device_id: Optional[str] = None
+
+class TransactionLimitUpdate(BaseModel):
+    daily_limit: float
+
+class UserSearchResult(BaseModel):
+    user_id: str
+    name: str
+    phone: str
+    upi_id: str
+
+class TransactionConfirm(BaseModel):
+    tx_id: str
+
+class TransactionCancel(BaseModel):
+    tx_id: str
 
 # ============================================================================
 # AUTHENTICATION HELPERS
@@ -184,6 +398,7 @@ async def login_user(credentials: UserLogin):
             cur = conn.cursor()
             
             # Get user by phone
+            print(f"DEBUG: Attempting login with phone: {credentials.phone}")
             cur.execute(
                 "SELECT user_id, name, phone, email, password_hash, balance FROM users WHERE phone = %s AND is_active = TRUE",
                 (credentials.phone,)
@@ -191,11 +406,17 @@ async def login_user(credentials: UserLogin):
             user = cur.fetchone()
             
             if not user:
+                print(f"DEBUG: No user found for phone {credentials.phone}")
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
+            
+            print(f"DEBUG: Found user: {user['name']} (ID: {user['user_id']}, Phone: {user['phone']})")
             
             # Verify password
             if not bcrypt.verify(credentials.password, user["password_hash"]):
+                print(f"DEBUG: Password verification failed for {user['name']}")
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
+            
+            print(f"DEBUG: Password verified successfully for {user['name']}")
             
             # Create token
             token = create_access_token(user["user_id"])
@@ -203,6 +424,8 @@ async def login_user(credentials: UserLogin):
             # Remove password hash from response
             user_data = dict(user)
             del user_data["password_hash"]
+            
+            print(f"DEBUG: Returning user data: {user_data}")
             
             return {
                 "status": "success",
@@ -237,10 +460,14 @@ async def get_user_dashboard(user_id: str = Depends(get_current_user)):
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
             
+            # Add UPI ID to user data
+            user_dict = dict(user)
+            user_dict["upi_id"] = f"{user_dict['phone'].replace('+91', '').replace('+', '')}@upi"
+            
             # Get recent transactions (last 5)
             cur.execute(
                 """
-                SELECT tx_id, amount, recipient_vpa, tx_type, action, risk_score, created_at, db_status
+                SELECT tx_id, amount, recipient_vpa, tx_type, action, risk_score, created_at, db_status, remarks
                 FROM transactions
                 WHERE user_id = %s
                 ORDER BY created_at DESC
@@ -268,7 +495,7 @@ async def get_user_dashboard(user_id: str = Depends(get_current_user)):
             
             return {
                 "status": "success",
-                "user": dict_to_json_serializable(dict(user)),
+                "user": dict_to_json_serializable(user_dict),
                 "recent_transactions": dict_to_json_serializable([dict(t) for t in recent_transactions]),
                 "stats": dict_to_json_serializable(dict(stats))
             }
@@ -289,8 +516,8 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
         try:
             cur = conn.cursor()
             
-            # Get user balance
-            cur.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
+            # Get user balance and daily limit
+            cur.execute("SELECT balance, daily_limit FROM users WHERE user_id = %s", (user_id,))
             user = cur.fetchone()
             
             if not user:
@@ -299,9 +526,36 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             if float(user["balance"]) < tx_data.amount:
                 raise HTTPException(status_code=400, detail="Insufficient balance")
             
+            # Check daily limit and get cumulative amount for today
+            today = datetime.now(timezone.utc).date()
+            cur.execute(
+                """
+                SELECT COALESCE(total_amount, 0) as total_amount, COALESCE(transaction_count, 0) as transaction_count
+                FROM user_daily_transactions 
+                WHERE user_id = %s AND transaction_date = %s
+                """,
+                (user_id, today)
+            )
+            daily_stats = cur.fetchone()
+            
+            total_today = float(daily_stats["total_amount"]) if daily_stats else 0.0
+            
             # Generate transaction ID
             tx_id = f"tx_{uuid.uuid4().hex[:12]}"
             device_id = tx_data.device_id or f"device_{uuid.uuid4().hex[:8]}"
+            
+            # Find receiver user if it's a registered user
+            receiver_user_id = None
+            if "@upi" in tx_data.recipient_vpa.lower():
+                # Extract phone number from UPI ID
+                phone_from_vpa = tx_data.recipient_vpa.replace("@upi", "").replace("+91", "").replace("+", "")
+                cur.execute(
+                    "SELECT user_id FROM users WHERE phone LIKE %s AND is_active = TRUE",
+                    (f"%{phone_from_vpa}",)
+                )
+                receiver = cur.fetchone()
+                if receiver:
+                    receiver_user_id = receiver["user_id"]
             
             # Build transaction object for ML scoring
             transaction = {
@@ -338,40 +592,94 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                 else:
                     risk_score = 0.1
             
-            # Determine action based on thresholds
+            # Determine action based on thresholds and daily limit
             delay_threshold = float(os.getenv("DELAY_THRESHOLD", "0.30"))
             block_threshold = float(os.getenv("BLOCK_THRESHOLD", "0.60"))
+            
+            # Force DELAY if exceeding daily limit
+            total_with_this_tx = total_today + tx_data.amount
+            exceeds_daily_limit = total_with_this_tx > float(user["daily_limit"])
             
             if risk_score >= block_threshold:
                 action = "BLOCK"
                 db_status = "blocked"
-            elif risk_score >= delay_threshold:
+            elif risk_score >= delay_threshold or exceeds_daily_limit:
                 action = "DELAY"
                 db_status = "pending"
             else:
                 action = "ALLOW"
                 db_status = "success"
             
-            # Insert transaction
+            # Insert transaction with new fields
             cur.execute(
                 """
                 INSERT INTO transactions 
-                (tx_id, user_id, device_id, ts, amount, recipient_vpa, tx_type, channel, risk_score, action, db_status, remarks, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                (tx_id, user_id, device_id, ts, amount, recipient_vpa, tx_type, channel, 
+                 risk_score, action, db_status, remarks, receiver_user_id, amount_deducted_at, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                 RETURNING tx_id, user_id, amount, recipient_vpa, risk_score, action, db_status, created_at
                 """,
                 (tx_id, user_id, device_id, transaction["ts"], tx_data.amount, 
                  tx_data.recipient_vpa, transaction["tx_type"], "app", 
-                 risk_score, action, db_status, tx_data.remarks)
+                 risk_score, action, db_status, tx_data.remarks, receiver_user_id)
             )
             
             result = cur.fetchone()
             
-            # If allowed, update balance
+            # Debit sender immediately for all transactions
+            cur.execute(
+                "UPDATE users SET balance = balance - %s WHERE user_id = %s",
+                (tx_data.amount, user_id)
+            )
+            
+            # Log debit in transaction_ledger
+            cur.execute(
+                """
+                INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                VALUES (%s, 'DEBIT', %s, %s, %s)
+                """,
+                (tx_id, user_id, float(tx_data.amount), 
+                 f"Send to {tx_data.recipient_vpa}" + (" (forced DELAY: exceeds daily limit)" if exceeds_daily_limit else ""))
+            )
+            
+            # Handle different actions
             if action == "ALLOW":
+                # Credit receiver immediately
+                if receiver_user_id:
+                    cur.execute(
+                        "UPDATE users SET balance = balance + %s WHERE user_id = %s",
+                        (tx_data.amount, receiver_user_id)
+                    )
+                    
+                    # Log credit in transaction_ledger
+                    cur.execute(
+                        """
+                        INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                        VALUES (%s, 'CREDIT', %s, %s, %s)
+                        """,
+                        (tx_id, receiver_user_id, float(tx_data.amount), f"Credit from {user_id}")
+                    )
+                    
+                    # Mark as credited
+                    cur.execute(
+                        "UPDATE transactions SET amount_credited_at = NOW() WHERE tx_id = %s",
+                        (tx_id,)
+                    )
+            
+            elif action == "BLOCK":
+                # Refund immediately for BLOCK
                 cur.execute(
-                    "UPDATE users SET balance = balance - %s WHERE user_id = %s",
+                    "UPDATE users SET balance = balance + %s WHERE user_id = %s",
                     (tx_data.amount, user_id)
+                )
+                
+                # Log refund in transaction_ledger
+                cur.execute(
+                    """
+                    INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                    VALUES (%s, 'REFUND', %s, %s, %s)
+                    """,
+                    (tx_id, user_id, float(tx_data.amount), "Refund for BLOCK transaction")
                 )
             
             # Create fraud alert if risky
@@ -379,6 +687,8 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                 reason = []
                 if tx_data.amount > 10000:
                     reason.append("High transaction amount")
+                if exceeds_daily_limit:
+                    reason.append("Exceeds daily transaction limit")
                 if risk_score >= block_threshold:
                     reason.append("ML model detected suspicious pattern")
                 
@@ -390,13 +700,62 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                     (tx_id, user_id, action, risk_score, "; ".join(reason))
                 )
             
+            # Update daily transactions tracking
+            cur.execute(
+                """
+                INSERT INTO user_daily_transactions (user_id, transaction_date, total_amount, transaction_count)
+                VALUES (%s, %s, %s, 1)
+                ON CONFLICT (user_id, transaction_date) 
+                DO UPDATE SET 
+                    total_amount = user_daily_transactions.total_amount + %s,
+                    transaction_count = user_daily_transactions.transaction_count + 1,
+                    updated_at = NOW()
+                """,
+                (user_id, today, float(tx_data.amount), float(tx_data.amount))
+            )
+            
             conn.commit()
+            
+            # Schedule WebSocket events (async but handled via create_task)
+            try:
+                asyncio.create_task(
+                    ws_manager.send_to_user(user_id, {
+                        "type": "transaction_created",
+                        "transaction": dict_to_json_serializable(dict(result)),
+                        "requires_confirmation": action in ["DELAY", "BLOCK"],
+                        "risk_level": "high" if risk_score >= block_threshold else "medium" if risk_score >= delay_threshold else "low"
+                    })
+                )
+                
+                asyncio.create_task(
+                    ws_manager.send_to_user(user_id, {
+                        "type": "balance_updated",
+                        "amount": -float(tx_data.amount),
+                        "operation": "debit",
+                        "new_balance": float(user["balance"]) - float(tx_data.amount)
+                    })
+                )
+                
+                # If ALLOW and receiver is registered user, notify receiver
+                if action == "ALLOW" and receiver_user_id:
+                    asyncio.create_task(
+                        ws_manager.send_to_user(receiver_user_id, {
+                            "type": "transaction_received",
+                            "transaction": dict_to_json_serializable(dict(result)),
+                            "amount": float(tx_data.amount)
+                        })
+                    )
+                    
+            except Exception as e:
+                print(f"WebSocket emit error: {e}")
             
             return {
                 "status": "success",
                 "transaction": dict_to_json_serializable(dict(result)),
                 "requires_confirmation": action in ["DELAY", "BLOCK"],
-                "risk_level": "high" if risk_score >= block_threshold else "medium" if risk_score >= delay_threshold else "low"
+                "risk_level": "high" if risk_score >= block_threshold else "medium" if risk_score >= delay_threshold else "low",
+                "daily_limit_exceeded": exceeds_daily_limit,
+                "receiver_user_id": receiver_user_id
             }
         finally:
             conn.close()
@@ -483,27 +842,38 @@ async def get_user_transactions(
             cur = conn.cursor()
             
             query = """
-                SELECT tx_id, amount, recipient_vpa, tx_type, action, risk_score, 
-                       db_status, remarks, created_at
-                FROM transactions
-                WHERE user_id = %s
+                SELECT t.tx_id, t.amount, t.recipient_vpa, t.tx_type, t.action, t.risk_score, 
+                       t.db_status, t.remarks, t.created_at, fa.reason as fraud_reasons
+                FROM transactions t
+                LEFT JOIN fraud_alerts fa ON t.tx_id = fa.tx_id
+                WHERE t.user_id = %s
             """
             params = [user_id]
             
             if status_filter:
-                query += " AND action = %s"
+                query += " AND t.action = %s"
                 params.append(status_filter.upper())
             
-            query += " ORDER BY created_at DESC LIMIT %s"
+            query += " ORDER BY t.created_at DESC LIMIT %s"
             params.append(limit)
             
             cur.execute(query, params)
             transactions = cur.fetchall()
             
+            # Process transactions to split fraud reasons into arrays
+            processed_transactions = []
+            for tx in transactions:
+                tx_dict = dict(tx)
+                if tx_dict.get("fraud_reasons"):
+                    tx_dict["fraud_reasons"] = [reason.strip() for reason in tx_dict["fraud_reasons"].split(";")]
+                else:
+                    tx_dict["fraud_reasons"] = []
+                processed_transactions.append(tx_dict)
+            
             return {
                 "status": "success",
-                "transactions": dict_to_json_serializable([dict(t) for t in transactions]),
-                "count": len(transactions)
+                "transactions": dict_to_json_serializable(processed_transactions),
+                "count": len(processed_transactions)
             }
         finally:
             conn.close()
@@ -558,6 +928,385 @@ async def register_push_token(token_data: PushToken, user_id: str = Depends(get_
             conn.close()
     
     return await run_in_threadpool(_register_token)
+
+# ============================================================================
+# API ENDPOINTS - TRANSACTION LIMIT
+# ============================================================================
+
+@app.get("/api/user/transaction-limit")
+async def get_transaction_limit(user_id: str = Depends(get_current_user)):
+    """Get user's daily transaction limit"""
+    def _get_limit():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Get daily limit from users table
+            cur.execute(
+                "SELECT daily_limit FROM users WHERE user_id = %s",
+                (user_id,)
+            )
+            result = cur.fetchone()
+            
+            if not result:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            return {
+                "status": "success",
+                "daily_limit": float(result['daily_limit']) if result['daily_limit'] else 10000.00
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_get_limit)
+
+@app.post("/api/user/transaction-limit")
+async def set_transaction_limit(limit_data: TransactionLimitUpdate, user_id: str = Depends(get_current_user)):
+    """Set user's daily transaction limit"""
+    def _set_limit():
+        daily_limit = limit_data.daily_limit
+        
+        if not daily_limit or daily_limit <= 0:
+            raise HTTPException(status_code=400, detail="Daily limit must be greater than 0")
+        
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Update daily limit
+            cur.execute(
+                """
+                UPDATE users 
+                SET daily_limit = %s, updated_at = NOW()
+                WHERE user_id = %s
+                RETURNING user_id, daily_limit
+                """,
+                (float(daily_limit), user_id)
+            )
+            
+            result = cur.fetchone()
+            conn.commit()
+            
+            if not result:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            return {
+                "status": "success",
+                "message": f"Daily transaction limit updated to ₹{daily_limit}",
+                "daily_limit": float(result['daily_limit'])
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_set_limit)
+
+# ============================================================================
+# API ENDPOINTS - SEND MONEY FEATURE
+# ============================================================================
+
+@app.get("/api/users/search")
+async def search_users(phone: str = "", user_id: str = Depends(get_current_user)):
+    """Search for registered users by phone number"""
+    def _search_users():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Search users by phone number (partial match)
+            cur.execute(
+                """
+                SELECT user_id, name, phone FROM users 
+                WHERE phone LIKE %s AND is_active = TRUE AND user_id != %s
+                ORDER BY phone
+                LIMIT 10
+                """,
+                (f"%{phone}%", user_id)
+            )
+            
+            users = cur.fetchall()
+            
+            # Format results with UPI ID
+            results = []
+            for user in users:
+                results.append({
+                    "user_id": user["user_id"],
+                    "name": user["name"],
+                    "phone": user["phone"],
+                    "upi_id": f"{user['phone'].replace('+91', '').replace('+', '')}@upi"
+                })
+            
+            return {
+                "status": "success",
+                "results": results,
+                "count": len(results)
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_search_users)
+
+@app.post("/api/transaction/confirm")
+async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = Depends(get_current_user)):
+    """Confirm a delayed transaction and credit the receiver"""
+    def _confirm():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Get transaction details
+            cur.execute(
+                """
+                SELECT tx_id, user_id, amount, recipient_vpa, receiver_user_id, action, db_status
+                FROM transactions 
+                WHERE tx_id = %s AND user_id = %s AND db_status = 'pending'
+                """,
+                (confirm_data.tx_id, user_id)
+            )
+            
+            transaction = cur.fetchone()
+            if not transaction:
+                raise HTTPException(status_code=404, detail="Transaction not found or not pending")
+            
+            # Credit receiver if it's a registered user
+            if transaction["receiver_user_id"]:
+                cur.execute(
+                    """
+                    UPDATE users 
+                    SET balance = balance + %s, updated_at = NOW()
+                    WHERE user_id = %s
+                    RETURNING balance
+                    """,
+                    (float(transaction["amount"]), transaction["receiver_user_id"])
+                )
+                receiver_balance = cur.fetchone()
+                
+                # Log credit operation in ledger
+                cur.execute(
+                    """
+                    INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                    VALUES (%s, 'CREDIT', %s, %s, %s)
+                    """,
+                    (confirm_data.tx_id, transaction["receiver_user_id"], 
+                     float(transaction["amount"]), f"Credit from {user_id}")
+                )
+            
+            # Update transaction status
+            cur.execute(
+                """
+                UPDATE transactions 
+                SET db_status = 'confirmed', 
+                    action = 'ALLOW',
+                    amount_credited_at = NOW(),
+                    updated_at = NOW()
+                WHERE tx_id = %s
+                """,
+                (confirm_data.tx_id,)
+            )
+            
+            conn.commit()
+            
+            # Emit WebSocket events
+            try:
+                # Transaction confirmed event
+                asyncio.create_task(
+                    ws_manager.send_to_user(user_id, {
+                        "type": "transaction_confirmed",
+                        "tx_id": confirm_data.tx_id,
+                        "amount": float(transaction["amount"]),
+                        "recipient": transaction["recipient_vpa"]
+                    })
+                )
+                
+                # If receiver is registered user, notify them
+                if receiver_balance:
+                    asyncio.create_task(
+                        ws_manager.send_to_user(transaction["receiver_user_id"], {
+                            "type": "transaction_credited",
+                            "tx_id": confirm_data.tx_id,
+                            "amount": float(transaction["amount"]),
+                            "sender": user_id
+                        })
+                    )
+                    
+            except Exception as e:
+                print(f"WebSocket emit error: {e}")
+            
+            return {
+                "status": "success",
+                "message": "Transaction confirmed successfully",
+                "tx_id": confirm_data.tx_id,
+                "amount": float(transaction["amount"]),
+                "receiver_balance": float(receiver_balance["balance"]) if receiver_balance else None
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_confirm)
+
+@app.post("/api/transaction/cancel")
+async def cancel_transaction(cancel_data: TransactionCancel, user_id: str = Depends(get_current_user)):
+    """Cancel a delayed transaction and refund the sender"""
+    def _cancel():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Get transaction details
+            cur.execute(
+                """
+                SELECT tx_id, user_id, amount, recipient_vpa, action, db_status
+                FROM transactions 
+                WHERE tx_id = %s AND user_id = %s AND db_status = 'pending'
+                """,
+                (cancel_data.tx_id, user_id)
+            )
+            
+            transaction = cur.fetchone()
+            if not transaction:
+                raise HTTPException(status_code=404, detail="Transaction not found or not pending")
+            
+            # Refund sender
+            cur.execute(
+                """
+                UPDATE users 
+                SET balance = balance + %s, updated_at = NOW()
+                WHERE user_id = %s
+                RETURNING balance
+                """,
+                (float(transaction["amount"]), user_id)
+            )
+            
+            sender_balance = cur.fetchone()
+            
+            # Log refund operation in ledger
+            cur.execute(
+                """
+                INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                VALUES (%s, 'REFUND', %s, %s, %s)
+                """,
+                (cancel_data.tx_id, user_id, float(transaction["amount"]), "Cancelled delayed transaction")
+            )
+            
+            # Update transaction status
+            cur.execute(
+                """
+                UPDATE transactions 
+                SET db_status = 'cancelled', 
+                    action = 'BLOCK',
+                    updated_at = NOW()
+                WHERE tx_id = %s
+                """,
+                (cancel_data.tx_id,)
+            )
+            
+            conn.commit()
+            
+            # Emit WebSocket events
+            try:
+                # Transaction cancelled event
+                asyncio.create_task(
+                    ws_manager.send_to_user(user_id, {
+                        "type": "transaction_cancelled",
+                        "tx_id": cancel_data.tx_id,
+                        "amount": float(transaction["amount"]),
+                        "refunded": True
+                    })
+                )
+                    
+            except Exception as e:
+                print(f"WebSocket emit error: {e}")
+            
+            return {
+                "status": "success",
+                "message": "Transaction cancelled and refunded successfully",
+                "tx_id": cancel_data.tx_id,
+                "amount": float(transaction["amount"]),
+                "refunded_balance": float(sender_balance["balance"])
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_cancel)
+
+@app.get("/api/transaction/{tx_id}")
+async def get_transaction(tx_id: str, user_id: str = Depends(get_current_user)):
+    """Get transaction details"""
+    def _get_transaction():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Get transaction details (user must be sender or receiver)
+            cur.execute(
+                """
+                SELECT t.*, 
+                       u.name as sender_name, u.phone as sender_phone,
+                       r.name as receiver_name, r.phone as receiver_phone
+                FROM transactions t
+                LEFT JOIN users u ON t.user_id = u.user_id
+                LEFT JOIN users r ON t.receiver_user_id = r.user_id
+                WHERE t.tx_id = %s AND (t.user_id = %s OR t.receiver_user_id = %s)
+                """,
+                (tx_id, user_id, user_id)
+            )
+            
+            transaction = cur.fetchone()
+            if not transaction:
+                raise HTTPException(status_code=404, detail="Transaction not found")
+            
+            return {
+                "status": "success",
+                "transaction": dict_to_json_serializable(dict(transaction))
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_get_transaction)
+
+@app.websocket("/ws/user/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    """WebSocket endpoint for real-time updates"""
+    await ws_manager.connect(websocket, user_id)
+    
+    try:
+        while True:
+            # Receive and handle incoming messages
+            data = await websocket.receive_text()
+            try:
+                message = json.loads(data)
+                
+                # Handle different message types
+                if message.get("type") == "ping":
+                    await ws_manager.send_personal_message(websocket, {"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+                elif message.get("type") == "confirm_transaction":
+                    # Handle confirm transaction via WebSocket
+                    tx_id = message.get("tx_id")
+                    # This would trigger the same logic as /api/transaction/confirm
+                    await ws_manager.send_personal_message(websocket, {
+                        "type": "confirm_received",
+                        "tx_id": tx_id,
+                        "status": "processing"
+                    })
+                elif message.get("type") == "cancel_transaction":
+                    # Handle cancel transaction via WebSocket
+                    tx_id = message.get("tx_id")
+                    # This would trigger the same logic as /api/transaction/cancel
+                    await ws_manager.send_personal_message(websocket, {
+                        "type": "cancel_received", 
+                        "tx_id": tx_id,
+                        "status": "processing"
+                    })
+                    
+            except json.JSONDecodeError:
+                await ws_manager.send_personal_message(websocket, {"type": "error", "message": "Invalid JSON format"})
+            except Exception as e:
+                await ws_manager.send_personal_message(websocket, {"type": "error", "message": str(e)})
+                
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception as e:
+        print(f"WebSocket error for user {user_id}: {e}")
+        ws_manager.disconnect(websocket)
 
 # ============================================================================
 # API ENDPOINTS - HEALTH & INFO
