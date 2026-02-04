@@ -47,13 +47,15 @@ JWT_EXPIRATION_HOURS = 24
 app = FastAPI(title="FDT API", version="1.0.0")
 scheduler = AsyncIOScheduler()
 
-# CORS Configuration - Allow all origins including preview URLs
+# CORS Configuration - Use environment variable for allowed origins
+# Set ALLOWED_ORIGINS="http://localhost:3000,https://yourdomain.com" in .env
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
     expose_headers=["*"],
 )
 
@@ -362,6 +364,12 @@ async def register_user(user_data: UserRegister):
             if cur.fetchone():
                 raise HTTPException(status_code=400, detail="Phone number already registered")
             
+            # Validate password complexity
+            if len(user_data.password) < 8:
+                raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+            if not any(c.isdigit() for c in user_data.password):
+                raise HTTPException(status_code=400, detail="Password must contain at least one number")
+            
             # Generate user ID
             user_id = f"user_{uuid.uuid4().hex[:8]}"
             
@@ -404,7 +412,6 @@ async def login_user(credentials: UserLogin):
             cur = conn.cursor()
             
             # Get user by phone
-            print(f"DEBUG: Attempting login with phone: {credentials.phone}")
             cur.execute(
                 "SELECT user_id, name, phone, email, password_hash, balance FROM users WHERE phone = %s AND is_active = TRUE",
                 (credentials.phone,)
@@ -412,19 +419,13 @@ async def login_user(credentials: UserLogin):
             user = cur.fetchone()
             
             if not user:
-                print(f"DEBUG: No user found for phone {credentials.phone}")
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
-            
-            print(f"DEBUG: Found user: {user['name']} (ID: {user['user_id']}, Phone: {user['phone']})")
             
             # Verify password
             try:
                 pwd_hasher.verify(user["password_hash"], credentials.password)
             except:
-                print(f"DEBUG: Password verification failed for {user['name']}")
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
-            
-            print(f"DEBUG: Password verified successfully for {user['name']}")
             
             # Create token
             token = create_access_token(user["user_id"])
@@ -432,8 +433,6 @@ async def login_user(credentials: UserLogin):
             # Remove password hash from response
             user_data = dict(user)
             del user_data["password_hash"]
-            
-            print(f"DEBUG: Returning user data: {user_data}")
             
             return {
                 "status": "success",
