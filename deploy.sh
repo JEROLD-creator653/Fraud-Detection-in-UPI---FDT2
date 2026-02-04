@@ -48,13 +48,13 @@ check_prerequisites() {
     fi
     print_success "Docker installed ($(docker --version))"
     
-    # Check docker-compose
-    if ! command -v docker-compose &> /dev/null; then
+    # Check docker compose (plugin)
+    if ! docker compose version &> /dev/null; then
         print_error "Docker Compose is not installed"
-        echo "Install from: https://github.com/docker/compose/releases"
+        echo "Install from: https://docs.docker.com/compose/install/"
         exit 1
     fi
-    print_success "Docker Compose installed ($(docker-compose --version))"
+    print_success "Docker Compose installed ($(docker compose version))"
     
     # Check if compose file exists
     if [ ! -f "$COMPOSE_FILE" ]; then
@@ -91,28 +91,28 @@ start_services() {
     
     # Validate docker-compose
     echo "Validating docker-compose.yml..."
-    if ! docker-compose config > /dev/null 2>&1; then
+    if ! docker compose config > /dev/null 2>&1; then
         print_error "Invalid docker-compose.yml"
-        docker-compose config
+        docker compose config
         exit 1
     fi
     print_success "Configuration valid"
     
     # Start services
     echo "Starting containers..."
-    docker-compose up -d
+    docker compose up -d
     
     # Wait for services
     echo "Waiting for services to be healthy..."
     sleep 5
     
     # Check status
-    docker-compose ps
+    docker compose ps
     
     print_success "Services started!"
     echo
     echo "Next steps:"
-    echo "  • Check logs: docker-compose logs -f"
+    echo "  • Check logs: docker compose logs -f"
     echo "  • API docs: http://localhost:8001/docs"
     echo "  • Admin: http://localhost:8000"
     echo
@@ -125,7 +125,7 @@ stop_services() {
     cd "$PROJECT_DIR"
     
     echo "Stopping containers..."
-    docker-compose stop
+    docker compose stop
     
     print_success "Services stopped"
     echo
@@ -138,12 +138,12 @@ restart_services() {
     cd "$PROJECT_DIR"
     
     echo "Restarting containers..."
-    docker-compose restart
+    docker compose restart
     
     sleep 3
     
     # Check status
-    docker-compose ps
+    docker compose ps
     
     print_success "Services restarted"
     echo
@@ -155,25 +155,25 @@ show_status() {
     
     cd "$PROJECT_DIR"
     
-    if ! docker-compose ps > /dev/null 2>&1; then
+    if ! docker compose ps > /dev/null 2>&1; then
         print_error "No services running"
         exit 1
     fi
     
-    docker-compose ps
+    docker compose ps
     
     echo
     echo "Service Health:"
     
     # Check database
-    if docker-compose exec -T db pg_isready -U fdt > /dev/null 2>&1; then
+    if docker compose exec -T db pg_isready -U fdt > /dev/null 2>&1; then
         print_success "PostgreSQL: Healthy"
     else
         print_error "PostgreSQL: Unhealthy"
     fi
     
     # Check redis
-    if docker-compose exec -T redis redis-cli ping > /dev/null 2>&1; then
+    if docker compose exec -T redis redis-cli ping > /dev/null 2>&1; then
         print_success "Redis: Healthy"
     else
         print_error "Redis: Unhealthy"
@@ -191,10 +191,10 @@ show_logs() {
     # Check which service to follow
     if [ -z "$2" ]; then
         echo "Following all services (Ctrl+C to stop)..."
-        docker-compose logs -f
+        docker compose logs -f
     else
         echo "Following $2 service..."
-        docker-compose logs -f "$2"
+        docker compose logs -f "$2"
     fi
 }
 
@@ -207,7 +207,7 @@ verify_deployment() {
     echo "Checking services..."
     
     # Get service status
-    services=$(docker-compose ps --services --filter "status=running")
+    services=$(docker compose ps --services --filter "status=running")
     
     expected_services=("db" "redis")
     
@@ -223,14 +223,14 @@ verify_deployment() {
     echo "Connection Tests:"
     
     # Test database
-    if docker-compose exec -T db psql -U fdt -d fdt_db -c "SELECT 1;" > /dev/null 2>&1; then
+    if docker compose exec -T db psql -U fdt -d fdt_db -c "SELECT 1;" > /dev/null 2>&1; then
         print_success "PostgreSQL connection successful"
     else
         print_error "PostgreSQL connection failed"
     fi
     
     # Test redis
-    if docker-compose exec -T redis redis-cli ping | grep -q "PONG"; then
+    if docker compose exec -T redis redis-cli ping | grep -q "PONG"; then
         print_success "Redis connection successful"
     else
         print_error "Redis connection failed"
