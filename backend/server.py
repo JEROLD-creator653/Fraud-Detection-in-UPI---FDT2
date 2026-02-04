@@ -26,6 +26,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 import psycopg2
 import psycopg2.extras
+import redis
 
 # Import WebSocket manager
 try:
@@ -39,9 +40,64 @@ load_dotenv()
 
 # Configuration
 DB_URL = os.getenv("DB_URL", "postgresql://user:password@host:port/dbname").strip()
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "fdt_jwt_secret_key_change_in_production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
+
+# =========================================================================
+# REDIS CACHE INITIALIZATION
+# =========================================================================
+redis_client = None
+
+def init_redis():
+    """Initialize Redis connection for caching"""
+    global redis_client
+    try:
+        redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        redis_client.ping()
+        print(f"✓ Redis cache connected: {REDIS_URL}")
+        return True
+    except Exception as e:
+        print(f"⚠ Redis unavailable ({e}). Caching disabled, using direct DB queries.")
+        redis_client = None
+        return False
+
+# Cache TTL constants (in seconds)
+CACHE_TTL_USER = 300  # 5 minutes
+CACHE_TTL_HISTORY = 180  # 3 minutes
+CACHE_TTL_STATS = 60  # 1 minute
+
+# =========================================================================
+# RATE LIMITING (In-memory implementation)
+# =========================================================================
+from collections import defaultdict
+from time import time
+
+class RateLimiter:
+    """Simple in-memory rate limiter"""
+    def __init__(self, max_requests: int = 100, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.requests = defaultdict(list)  # user_id -> list of request timestamps
+    
+    def is_allowed(self, user_id: str) -> bool:
+        """Check if request is allowed for user"""
+        now = time()
+        window_start = now - self.window_seconds
+        
+        # Clean old requests
+        self.requests[user_id] = [t for t in self.requests[user_id] if t > window_start]
+        
+        # Check limit
+        if len(self.requests[user_id]) >= self.max_requests:
+            return False
+        
+        # Add current request
+        self.requests[user_id].append(now)
+        return True
+
+rate_limiter = RateLimiter(max_requests=100, window_seconds=60)  # 100 requests per minute
 
 # Initialize FastAPI app and scheduler
 app = FastAPI(title="FDT API", version="1.0.0")
@@ -59,10 +115,39 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Startup event to initialize database schema
+# Rate limiting middleware
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Apply rate limiting to authenticated endpoints"""
+    # Skip rate limiting for public endpoints
+    if request.url.path in ["/docs", "/openapi.json", "/api/register", "/api/login"]:
+        return await call_next(request)
+    
+    # Try to get user_id from token
+    try:
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.replace("Bearer ", "")
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            user_id = payload.get("user_id")
+            
+            if user_id and not rate_limiter.is_allowed(user_id):
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Rate limit exceeded. Max 100 requests per minute."}
+                )
+    except Exception:
+        pass  # If token parsing fails, allow request (handled by auth later)
+    
+    return await call_next(request)
+
+# Startup event to initialize database schema and Redis cache
 @app.on_event("startup")
 def startup_event():
-    """Initialize database schema on startup"""
+    """Initialize database schema and Redis cache on startup"""
+    # Initialize Redis cache
+    init_redis()
+    
     try:
         conn = get_db_conn()
         cur = conn.cursor()
@@ -116,11 +201,20 @@ def startup_event():
             )
         """)
         
-        # Step 5: Create indexes
+        # Step 5: Create indexes for performance optimization
         indexes = [
+            # User queries
+            ("idx_users_phone", "users", "phone"),
+            ("idx_users_user_id", "users", "user_id"),
+            # Transaction queries
+            ("idx_transactions_user_id", "transactions", "user_id"),
+            ("idx_transactions_tx_id", "transactions", "tx_id"),
+            ("idx_transactions_created_at", "transactions", "created_at"),
             ("idx_transactions_receiver_user_id", "transactions", "receiver_user_id"),
+            # Transaction ledger
             ("idx_transaction_ledger_tx_id", "transaction_ledger", "tx_id"),
             ("idx_transaction_ledger_user_id", "transaction_ledger", "user_id"),
+            # User daily transactions
             ("idx_user_daily_transactions_user_date", "user_daily_transactions", "user_id, transaction_date")
         ]
         
@@ -259,6 +353,35 @@ async def auto_refund_delayed_transactions():
 def get_db_conn():
     """Get PostgreSQL database connection"""
     return psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+
+# =========================================================================
+# REDIS CACHING HELPERS
+# =========================================================================
+
+def cache_get(key: str):
+    """Get value from Redis cache"""
+    try:
+        if redis_client:
+            return redis_client.get(key)
+    except Exception as e:
+        print(f"⚠ Cache get error: {e}")
+    return None
+
+def cache_set(key: str, value: str, ttl: int = 300):
+    """Set value in Redis cache with TTL"""
+    try:
+        if redis_client:
+            redis_client.setex(key, ttl, value)
+    except Exception as e:
+        print(f"⚠ Cache set error: {e}")
+
+def cache_delete(key: str):
+    """Delete value from Redis cache"""
+    try:
+        if redis_client:
+            redis_client.delete(key)
+    except Exception as e:
+        print(f"⚠ Cache delete error: {e}")
 
 def dict_to_json_serializable(data):
     """Convert dict with Decimal to JSON serializable format"""
@@ -451,7 +574,13 @@ async def login_user(credentials: UserLogin):
 
 @app.get("/api/user/dashboard")
 async def get_user_dashboard(user_id: str = Depends(get_current_user)):
-    """Get user dashboard data"""
+    """Get user dashboard data (cached for 3 minutes)"""
+    # Try to get from cache first
+    cache_key = f"dashboard:{user_id}"
+    cached_data = cache_get(cache_key)
+    if cached_data:
+        return json.loads(cached_data)
+    
     def _get_dashboard():
         conn = get_db_conn()
         try:
@@ -500,12 +629,17 @@ async def get_user_dashboard(user_id: str = Depends(get_current_user)):
             )
             stats = cur.fetchone()
             
-            return {
+            result = {
                 "status": "success",
                 "user": dict_to_json_serializable(user_dict),
                 "recent_transactions": dict_to_json_serializable([dict(t) for t in recent_transactions]),
                 "stats": dict_to_json_serializable(dict(stats))
             }
+            
+            # Cache the result for 3 minutes
+            cache_set(cache_key, json.dumps(result), CACHE_TTL_HISTORY)
+            
+            return result
         finally:
             conn.close()
     
