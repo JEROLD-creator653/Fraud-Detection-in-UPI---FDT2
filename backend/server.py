@@ -28,7 +28,10 @@ import psycopg2
 import psycopg2.extras
 
 # Import WebSocket manager
-from .ws_manager import ws_manager
+try:
+    from backend.ws_manager import ws_manager
+except ImportError:
+    from ws_manager import ws_manager
 
 # Load environment variables
 from dotenv import load_dotenv
