@@ -1,20 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { getUserTransactions } from '../api';
 import { formatAmount, getRiskColor, getRiskLabel } from '../utils/helpers';
 import { useNotifications } from './NotificationSystem';
 
 const RiskAnalysis = () => {
-  const navigate = useNavigate();
   const { addNotification } = useNotifications();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30d');
   const [riskFilter, setRiskFilter] = useState('all');
-
-  useEffect(() => {
-    loadRiskData();
-  }, [timeRange, riskFilter]);
 
   const loadRiskData = async () => {
     try {
@@ -31,6 +26,10 @@ const RiskAnalysis = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadRiskData();
+  }, [timeRange, riskFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getFilteredTransactions = () => {
     let filtered = transactions;
