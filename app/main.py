@@ -64,10 +64,11 @@ DEFAULT_CFG = {
     "thresholds": {"delay": 0.30, "block": 0.60},
     # WARNING: change secret_key before production
     "secret_key": "dev-secret-change-me-please",
-    # default admin credentials (password hash can be overridden in config)
-    "admin_username": "admin",
-    # hashed password for "StrongAdmin123!" using pbkdf2_sha256
-    "admin_password_hash": pbkdf2_sha256.hash("StrongAdmin123!")
+    # Admin credentials - MUST be set in environment or config.yaml
+    "admin_username": os.getenv("ADMIN_USERNAME", "admin"),
+    # Admin password hash - load from environment or config.yaml
+    # Generate hash: python -c "from passlib.hash import pbkdf2_sha256; print(pbkdf2_sha256.hash('YourPassword'))"
+    "admin_password_hash": os.getenv("ADMIN_PASSWORD_HASH", "")
 }
 cfg = DEFAULT_CFG.copy()
 if os.path.exists(CFG_PATH):
@@ -1010,7 +1011,6 @@ def db_save_threshold_preset(admin_username: str, preset_slot: int, preset_name:
         conn.commit()
         cur.close()
         preset_id = result['id'] if result else None
-        print(f"DEBUG db_save: result={result}, preset_id={preset_id}")
         return preset_id
     except Exception as e:
         import traceback
@@ -1139,10 +1139,7 @@ async def save_threshold_preset(request: Request):
         preset_name = body.get("preset_name", f"Preset {preset_slot}")
         config = body.get("config")
         
-        print(f"DEBUG: Received preset_slot={preset_slot} (type={type(preset_slot).__name__}), preset_name={preset_name}")
-        
         if not preset_slot or preset_slot not in [1, 2, 3]:
-            print(f"ERROR: Invalid preset_slot: {preset_slot}")
             return JSONResponse({"detail": "preset_slot must be 1, 2, or 3"}, status_code=400)
         
         if not config:
