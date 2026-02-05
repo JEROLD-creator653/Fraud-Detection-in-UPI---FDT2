@@ -62,6 +62,8 @@ self.addEventListener('fetch', (event) => {
               headers: new Headers({
                 'Content-Type': 'text/plain'
               })
+            });
+          });
       })
   );
 });

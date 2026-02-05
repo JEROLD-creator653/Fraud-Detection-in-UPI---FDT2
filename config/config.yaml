@@ -1,6 +1,6 @@
 admin_password_hash: $pbkdf2-sha256$29000$Yay19v6fc26NsdYag/Beqw$Io.CbMOl.vrR.Oj/PowRYhIObd8Q643X6Wdo8zPyNXQ
 admin_username: admin
-db_url: postgresql://fdt:fdtpass@127.0.0.1:5433/fdt_db
+db_url: postgresql://fdt:fdtpass@127.0.0.1:5432/fdt_db
 secret_key: qdqBymrlHc4wrM_E2TfifjUjnEsjxh-9NGKCQaecrQw
 thresholds:
   allowMax: 0.5

@@ -5,7 +5,6 @@ import { useNotifications } from './NotificationSystem';
 import cacheManager from '../utils/cacheManager';
 import { exportToCSV, exportToJSON, exportToDetailedReport, exportToTXT, exportToXML } from '../utils/exportUtils';
 import { formatTimestamp } from '../utils/helpers';
-import { TableSkeleton } from './LoadingSkeleton';
 
 const TransactionHistory = ({ user }) => {
   const navigate = useNavigate();

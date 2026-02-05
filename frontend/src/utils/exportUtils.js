@@ -228,16 +228,6 @@ const getStatusLabel = (action) => {
 };
 
 /**
- * Helper function to get risk level
- */
-const getRiskLevel = (riskScore) => {
-  const score = parseFloat(riskScore) * 100;
-  if (score >= 60) return 'High';
-  if (score >= 30) return 'Medium';
-  return 'Low';
-};
-
-/**
  * Calculate statistics from transactions
  */
 const calculateTransactionStats = (transactions) => {

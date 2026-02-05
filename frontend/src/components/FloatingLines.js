@@ -254,30 +254,32 @@ export default function FloatingLines({
   const targetParallaxRef = useRef(new Vector2(0, 0));
   const currentParallaxRef = useRef(new Vector2(0, 0));
 
-  const getLineCount = waveType => {
-    if (typeof lineCount === 'number') return lineCount;
-    if (!enabledWaves.includes(waveType)) return 0;
-    const index = enabledWaves.indexOf(waveType);
-    return lineCount[index] ?? 6;
-  };
-
-  const getLineDistance = waveType => {
-    if (typeof lineDistance === 'number') return lineDistance;
-    if (!enabledWaves.includes(waveType)) return 0.1;
-    const index = enabledWaves.indexOf(waveType);
-    return lineDistance[index] ?? 0.1;
-  };
-
-  const topLineCount = enabledWaves.includes('top') ? getLineCount('top') : 0;
-  const middleLineCount = enabledWaves.includes('middle') ? getLineCount('middle') : 0;
-  const bottomLineCount = enabledWaves.includes('bottom') ? getLineCount('bottom') : 0;
-
-  const topLineDistance = enabledWaves.includes('top') ? getLineDistance('top') * 0.01 : 0.01;
-  const middleLineDistance = enabledWaves.includes('middle') ? getLineDistance('middle') * 0.01 : 0.01;
-  const bottomLineDistance = enabledWaves.includes('bottom') ? getLineDistance('bottom') * 0.01 : 0.01;
-
   useEffect(() => {
     if (!containerRef.current) return;
+
+    // Helper functions
+    const getLineCount = waveType => {
+      if (typeof lineCount === 'number') return lineCount;
+      if (!enabledWaves.includes(waveType)) return 0;
+      const index = enabledWaves.indexOf(waveType);
+      return lineCount[index] ?? 6;
+    };
+
+    const getLineDistance = waveType => {
+      if (typeof lineDistance === 'number') return lineDistance;
+      if (!enabledWaves.includes(waveType)) return 0.1;
+      const index = enabledWaves.indexOf(waveType);
+      return lineDistance[index] ?? 0.1;
+    };
+
+    // Calculate line counts and distances inside effect
+    const topLineCount = enabledWaves.includes('top') ? getLineCount('top') : 0;
+    const middleLineCount = enabledWaves.includes('middle') ? getLineCount('middle') : 0;
+    const bottomLineCount = enabledWaves.includes('bottom') ? getLineCount('bottom') : 0;
+
+    const topLineDistance = enabledWaves.includes('top') ? getLineDistance('top') * 0.01 : 0.01;
+    const middleLineDistance = enabledWaves.includes('middle') ? getLineDistance('middle') * 0.01 : 0.01;
+    const bottomLineDistance = enabledWaves.includes('bottom') ? getLineDistance('bottom') * 0.01 : 0.01;
 
     const scene = new Scene();
 
@@ -435,9 +437,10 @@ export default function FloatingLines({
     };
     renderLoop();
 
+    const container = containerRef.current;
     return () => {
       cancelAnimationFrame(raf);
-      if (ro && containerRef.current) {
+      if (ro && container) {
         ro.disconnect();
       }
 

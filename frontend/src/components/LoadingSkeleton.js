@@ -103,7 +103,7 @@ export const TableSkeleton = ({ rows = 5 }) => (
   </div>
 );
 
-export default {
+const LoadingSkeletons = {
   CardSkeleton,
   TransactionSkeleton,
   ListSkeleton,
@@ -111,3 +111,5 @@ export default {
   TableSkeleton,
   TableRowSkeleton
 };
+
+export default LoadingSkeletons;

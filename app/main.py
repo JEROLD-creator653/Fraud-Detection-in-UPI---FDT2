@@ -22,6 +22,23 @@ from passlib.hash import pbkdf2_sha256
 from dotenv import load_dotenv
 load_dotenv()
 
+# =========================================================================
+# UTILITY FUNCTIONS
+# =========================================================================
+
+def to_json_serializable(obj):
+    """Convert datetime objects to ISO format for consistent timezone handling"""
+    if isinstance(obj, dict):
+        return {k: to_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [to_json_serializable(item) for item in obj]
+    elif isinstance(obj, datetime):
+        # If no timezone, assume UTC
+        if obj.tzinfo is None:
+            obj = obj.replace(tzinfo=timezone.utc)
+        return obj.isoformat()
+    return obj
+
 # --- time range helper ---
 def parse_time_range(time_range: str):
     now = datetime.now(timezone.utc)
@@ -752,9 +769,11 @@ async def recent_transactions(limit: int = 300, time_range: str = "24h"):
         # Enrich confidence_level from explainability if missing
         for r in rows:
             r["confidence_level"] = extract_confidence_level(r, "HIGH")
-        return rows
+        # Convert to JSON serializable (handles datetime objects)
+        return to_json_serializable(rows)
 
-    return {"transactions": await run_in_threadpool(query)}
+    result = await run_in_threadpool(query)
+    return {"transactions": result}
 
 @app.post("/transactions")
 async def new_transaction(request: Request):

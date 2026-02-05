@@ -47,10 +47,33 @@ except ImportError:
 
 # Load environment variables
 from dotenv import load_dotenv
+import yaml
+from pathlib import Path
 load_dotenv()
 
 # Configuration
-DB_URL = os.getenv("DB_URL", "postgresql://user:password@host:port/dbname").strip()
+DEFAULT_DB_URL = "postgresql://fdt:fdtpass@host.docker.internal:5432/fdt_db"
+CFG_PATH = Path(__file__).resolve().parent.parent / "config" / "config.yaml"
+
+def _load_cfg_db_url() -> str:
+    """Load DB URL from config/config.yaml, handling UTF-8 BOM."""
+    if not CFG_PATH.exists():
+        return ""
+    try:
+        raw = CFG_PATH.read_bytes()
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            text = raw.decode("utf-8-sig")
+        cfg = yaml.safe_load(text) or {}
+        return str(cfg.get("db_url", "")).strip()
+    except Exception as e:
+        print(f"⚠ Failed to load config.yaml DB URL: {e}")
+        return ""
+
+env_db_url = os.getenv("DB_URL")
+cfg_db_url = _load_cfg_db_url()
+DB_URL = (env_db_url or cfg_db_url or DEFAULT_DB_URL).strip()
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "fdt_jwt_secret_key_change_in_production")
 JWT_ALGORITHM = "HS256"
