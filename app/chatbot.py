@@ -159,8 +159,42 @@ class FraudDetectionChatbot:
     
     def generate_fallback_response(self, message: str, context: Dict[str, Any]) -> str:
         """Generate a response without AI (rule-based fallback)"""
+        import re
         message_lower = message.lower()
         stats = context.get("stats", {})
+        
+        # Check for transaction ID first (UUID pattern)
+        tx_id_match = re.search(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', message_lower)
+        if tx_id_match:
+            tx_id = tx_id_match.group(0)
+            tx = self.get_transaction_details(tx_id)
+            if tx:
+                response = f"=== Transaction Details ===\n\n"
+                response += f"Transaction ID: {tx.get('tx_id')}\n"
+                response += f"User ID: {tx.get('user_id')}\n"
+                response += f"Amount: Rs. {tx.get('amount', 0):,.2f}\n"
+                response += f"Risk Score: {tx.get('risk_score', 0):.3f}\n"
+                response += f"Action Taken: {tx.get('action', 'UNKNOWN')}\n"
+                response += f"Created At: {tx.get('created_at')}\n"
+                
+                # Add fraud reason if available
+                if tx.get('fraud_reason'):
+                    response += f"\n=== Fraud Analysis ===\n\n"
+                    response += f"{tx.get('fraud_reason')}\n"
+                
+                # Add explainability if available
+                if tx.get('explainability'):
+                    response += f"\n=== Risk Factors ===\n\n"
+                    exp = tx.get('explainability')
+                    if isinstance(exp, dict):
+                        for key, value in list(exp.items())[:5]:
+                            response += f"- {key}: {value}\n"
+                    else:
+                        response += f"{exp}\n"
+                
+                return response
+            else:
+                return f"Transaction ID '{tx_id}' not found in the database."
         
         # Statistics queries
         if any(word in message_lower for word in ["total", "how many", "count"]):
@@ -169,27 +203,45 @@ class FraudDetectionChatbot:
             delayed = stats.get("delayed", 0)
             allowed = stats.get("allowed", 0)
             return (f"In the last {context.get('time_range', '24h')}, there were:\n"
-                   f"• Total transactions: {total}\n"
-                   f"• Blocked: {blocked} ({blocked/max(total,1)*100:.1f}%)\n"
-                   f"• Delayed: {delayed} ({delayed/max(total,1)*100:.1f}%)\n"
-                   f"• Allowed: {allowed} ({allowed/max(total,1)*100:.1f}%)")
+                   f"- Total transactions: {total}\n"
+                   f"- Blocked: {blocked} ({blocked/max(total,1)*100:.1f}%)\n"
+                   f"- Delayed: {delayed} ({delayed/max(total,1)*100:.1f}%)\n"
+                   f"- Allowed: {allowed} ({allowed/max(total,1)*100:.1f}%)")
         
         # Risk score queries
         elif any(word in message_lower for word in ["risk", "score", "average"]):
             avg_risk = stats.get("avg_risk_score", 0)
             max_risk = stats.get("max_risk_score", 0)
             return (f"Risk Score Analytics:\n"
-                   f"• Average risk score: {avg_risk:.3f}\n"
-                   f"• Maximum risk score: {max_risk:.3f}\n"
-                   f"• High-risk transactions (>0.7): {len(context.get('high_risk_transactions', []))}")
+                   f"- Average risk score: {avg_risk:.3f}\n"
+                   f"- Maximum risk score: {max_risk:.3f}\n"
+                   f"- High-risk transactions (>0.7): {len(context.get('high_risk_transactions', []))}")
         
         # Amount/money queries
-        elif any(word in message_lower for word in ["amount", "money", "rupees", "₹"]):
+        elif any(word in message_lower for word in ["amount", "money", "rupees", "rs"]):
             total_amount = stats.get("total_amount", 0)
             avg_amount = stats.get("avg_amount", 0)
             return (f"Transaction Amounts:\n"
-                   f"• Total transaction volume: ₹{total_amount:,.2f}\n"
-                   f"• Average transaction: ₹{avg_amount:,.2f}")
+                   f"- Total transaction volume: Rs. {total_amount:,.2f}\n"
+                   f"- Average transaction: Rs. {avg_amount:,.2f}")
+        
+        # Fraud rate query (check BEFORE high-risk to avoid "fraud" keyword conflict)
+        elif any(phrase in message_lower for phrase in ["fraud rate", "rate", "percentage"]):
+            total = stats.get("total", 0)
+            blocked = stats.get("blocked", 0)
+            delayed = stats.get("delayed", 0)
+            flagged = blocked + delayed
+            
+            if total == 0:
+                return "No transactions to analyze for fraud rate."
+            
+            response = f"=== Fraud Detection Rate ===\n\n"
+            response += f"Time Period: Last {context.get('time_range', '24h')}\n\n"
+            response += f"Total Transactions: {total}\n"
+            response += f"Blocked (High Risk): {blocked} ({blocked/total*100:.1f}%)\n"
+            response += f"Delayed (Medium Risk): {delayed} ({delayed/total*100:.1f}%)\n"
+            response += f"Flagged Total: {flagged} ({flagged/total*100:.1f}%)\n"
+            return response
         
         # High-risk queries
         elif any(word in message_lower for word in ["high risk", "dangerous", "suspicious", "fraud"]):
@@ -199,8 +251,8 @@ class FraudDetectionChatbot:
             
             response = f"Found {len(high_risk)} high-risk transactions:\n\n"
             for tx in high_risk[:5]:
-                response += (f"• TX {tx.get('tx_id')}: Risk {tx.get('risk_score', 0):.3f}, "
-                           f"Amount ₹{tx.get('amount', 0):,.2f}, "
+                response += (f"- TX {tx.get('tx_id')}: Risk {tx.get('risk_score', 0):.3f}, "
+                           f"Amount Rs. {tx.get('amount', 0):,.2f}, "
                            f"Action: {tx.get('action')}\n")
             return response
         
@@ -212,9 +264,9 @@ class FraudDetectionChatbot:
             
             recent = trends[0] if trends else {}
             return (f"Recent Trends:\n"
-                   f"• Latest hour: {recent.get('total', 0)} transactions\n"
-                   f"• Blocked: {recent.get('blocked', 0)}\n"
-                   f"• Overall trend shows {len(trends)} data points in {context.get('time_range', '24h')}")
+                   f"- Latest hour: {recent.get('total', 0)} transactions\n"
+                   f"- Blocked: {recent.get('blocked', 0)}\n"
+                   f"- Overall trend shows {len(trends)} data points in {context.get('time_range', '24h')}")
         
         # Top users queries
         elif any(word in message_lower for word in ["user", "top", "most active"]):
@@ -228,22 +280,59 @@ class FraudDetectionChatbot:
                            f"Avg risk: {user.get('avg_risk', 0):.3f}\n")
             return response
         
+        # Analyse last N transactions
+        elif any(word in message_lower for word in ["analyse", "analyze", "last", "recent"]):
+            # Extract number if present
+            num_match = re.search(r'(\d+)', message)
+            n = int(num_match.group(1)) if num_match else 5
+            n = min(n, 10)  # Cap at 10
+            
+            transactions = self.get_last_n_transactions(n)
+            if not transactions:
+                return "No recent transactions found."
+            
+            response = f"=== Last {len(transactions)} Transactions ===\n\n"
+            for i, tx in enumerate(transactions, 1):
+                risk = tx.get('risk_score', 0)
+                risk_label = "HIGH" if risk > 0.7 else "MEDIUM" if risk > 0.3 else "LOW"
+                response += (f"{i}. {tx.get('tx_id', 'N/A')[:8]}...\n"
+                           f"   Amount: Rs. {tx.get('amount', 0):,.2f} | Risk: {risk:.3f} ({risk_label})\n"
+                           f"   Action: {tx.get('action', 'N/A')}\n\n")
+            return response
+        
+        # Show blocked transactions
+        elif any(word in message_lower for word in ["blocked", "block"]):
+            # Get blocked transactions from context or fetch
+            high_risk = context.get("high_risk_transactions", [])
+            blocked = [tx for tx in high_risk if tx.get('action') == 'BLOCK']
+            
+            if not blocked:
+                return f"No blocked transactions in the last {context.get('time_range', '24h')}."
+            
+            response = f"=== Blocked Transactions ===\n\n"
+            response += f"Found {len(blocked)} blocked transactions:\n\n"
+            for tx in blocked[:5]:
+                response += (f"- {tx.get('tx_id', 'N/A')[:8]}...\n"
+                           f"  Amount: Rs. {tx.get('amount', 0):,.2f}\n"
+                           f"  Risk: {tx.get('risk_score', 0):.3f}\n\n")
+            return response
+        
         # Help/greeting
         elif any(word in message_lower for word in ["hello", "hi", "help", "what can"]):
-            return ("👋 Welcome to UPI Fraud Detection Assistant!\n\n"
+            return ("Welcome to UPI Fraud Detection Assistant!\n\n"
                    "Your Synara is here to help you understand fraud patterns and transaction analytics.\n\n"
-                   "═══ What I Can Help You With ═══\n\n"
-                   "• 📊 Transaction statistics and counts\n"
-                   "• 💻 Risk score analysis\n"
-                   "• 🚫 High-risk transaction details\n"
-                   "• 💰 Transaction amounts and volumes\n"
-                   "• 👥 User activity patterns\n"
-                   "• 📈 Trends over time\n\n"
-                   "═══ Try Asking ═══\n\n"
-                   "• \"Analyse last 5 transactions\"\n"
-                   "• \"What's the fraud rate?\"\n"
-                   "• \"Show blocked transactions\"\n"
-                   "• \"Explain transaction [ID]\"\n\n"
+                   "=== What I Can Help You With ===\n\n"
+                   "- Transaction statistics and counts\n"
+                   "- Risk score analysis\n"
+                   "- High-risk transaction details\n"
+                   "- Transaction amounts and volumes\n"
+                   "- User activity patterns\n"
+                   "- Trends over time\n\n"
+                   "=== Try Asking ===\n\n"
+                   "- \"Analyse last 5 transactions\"\n"
+                   "- \"What's the fraud rate?\"\n"
+                   "- \"Show blocked transactions\"\n"
+                   "- \"Explain transaction [ID]\"\n\n"
                    "Just ask me anything about fraud detection!")
         
         # Default response
@@ -304,7 +393,7 @@ EXPLANATION OF ACTION:
                     for i, tx in enumerate(last_txs, 1):
                         transaction_detail += f"""
 {i}. TX ID: {tx.get('tx_id')}
-   User: {tx.get('user_id')} | Amount: ₹{tx.get('amount', 0):,.2f}
+   User: {tx.get('user_id')} | Amount: Rs. {tx.get('amount', 0):,.2f}
    Risk Score: {tx.get('risk_score', 0):.3f} | Action: {tx.get('action')}
    Type: {tx.get('tx_type')} | Channel: {tx.get('channel')}
    Created: {tx.get('created_at')}"""
@@ -319,7 +408,7 @@ Current Analytics (Time Range: {context.get('time_range', '24h')}):
 - Delayed: {context['stats'].get('delayed', 0)}
 - Allowed: {context['stats'].get('allowed', 0)}
 - Average Risk Score: {context['stats'].get('avg_risk_score', 0):.3f}
-- Total Amount: ₹{context['stats'].get('total_amount', 0):,.2f}
+- Total Amount: Rs. {context['stats'].get('total_amount', 0):,.2f}
 - High-Risk Transactions: {len(context.get('high_risk_transactions', []))}
 
 FRAUD DETECTION RULES:
@@ -345,15 +434,15 @@ Your role is to:
 7. Use the provided data to give accurate, specific answers
 
 FORMATTING INSTRUCTIONS:
-- Use decorative section headers like ━━━ SECTION NAME ━━━ (or === SECTION NAME === if needed)
-- Use bullet points (•) for lists and details
+- Use decorative section headers like === SECTION NAME === or --- SECTION NAME ---
+- Use bullet points (-) for lists and details
 - Add blank lines between major sections (press Enter twice)
 - Keep paragraphs short (2-3 lines max)
 - Use numbers for sequential items (1. 2. 3.)
 - DO NOT use markdown headers (no ## or # symbols)
 - Focus on readability with proper spacing
 
-When discussing amounts, use Indian Rupee (₹) format."""
+When discussing amounts, use Indian Rupee (Rs.) format."""
 
             # Use Groq AI
             messages = [
@@ -379,7 +468,7 @@ When discussing amounts, use Indian Rupee (₹) format."""
                 if line.startswith('##') or line.startswith('#'):
                     title = line.lstrip('#').strip()
                     normalized.append('')
-                    normalized.append(f'━━━ {title.upper()} ━━━')
+                    normalized.append(f'=== {title.upper()} ===')
                     normalized.append('')
                     continue
                 # === SECTION === pattern
@@ -388,7 +477,7 @@ When discussing amounts, use Indian Rupee (₹) format."""
                 if m:
                     title = m.group(1)
                     normalized.append('')
-                    normalized.append(f'━━━ {title.upper()} ━━━')
+                    normalized.append(f'=== {title.upper()} ===')
                     normalized.append('')
                     continue
                 normalized.append(line)

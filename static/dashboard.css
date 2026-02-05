@@ -490,6 +490,7 @@ body.dark-mode .chatbot-messages::-webkit-scrollbar-thumb {
   line-height: 1.6;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   word-wrap: break-word;
+  white-space: pre-line;
 }
 
 .chatbot-message.user .chatbot-message-content {

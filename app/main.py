@@ -189,7 +189,7 @@ if not cfg.get("admin_users"):
 print("=" * 60)
 print("Loaded Admin Users:")
 for username, data in ADMIN_USERS.items():
-    print(f"  ✓ {username:12} - {data['role']}")
+    print(f"  [OK] {username:12} - {data['role']}")
 print(f"Total: {len(ADMIN_USERS)} admin users configured")
 print("=" * 60)
 
@@ -746,6 +746,10 @@ def root():
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/chatbot-test", response_class=HTMLResponse)
+def chatbot_test(request: Request):
+    return templates.TemplateResponse("chatbot_test.html", {"request": request})
 
 @app.get("/dashboard-data")
 async def dashboard_data(time_range: str = "24h"):

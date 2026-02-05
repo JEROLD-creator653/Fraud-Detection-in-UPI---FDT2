@@ -1017,7 +1017,15 @@ function setupWebSocket() {
 }
 
 // Chatbot functions
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 function addChatMessage(content, isUser = false) {
+  console.log('[CHATBOT] addChatMessage called, isUser:', isUser, 'content length:', content?.length);
+  
   const messageDiv = document.createElement('div');
   messageDiv.className = `chatbot-message ${isUser ? 'user' : 'bot'}`;
   
@@ -1027,20 +1035,21 @@ function addChatMessage(content, isUser = false) {
   // Format with proper line breaks
   let formatted = content.trim();
   
-  // Detect and style section headers (supports ──, ───, ━━, ━━━, ==, ===)
-  if (formatted.includes('─') || formatted.includes('━') || /={2,}/.test(formatted)) {
+  // Detect and style section headers (supports ===)
+  if (/={3}.*={3}/.test(formatted)) {
+    console.log('[CHATBOT] Formatting with section headers');
     const lines = formatted.split('\n');
     let htmlContent = '';
     
     lines.forEach(line => {
-      line = line.trim();
+      const trimmed = line.trim();
       
-      // Section header detection - matches 2+ separator chars on each side
-      if (/^[─━=]{2,}.*[─━=]{2,}$/.test(line)) {
-        const title = line.replace(/[─━=]/g, '').trim();
-        htmlContent += `<div class="msg-section-header">${title}</div>`;
-      } else if (line) {
-        htmlContent += `<div>${line}</div>`;
+      // Section header detection - matches === TITLE ===
+      if (/^={3,}\s+.*\s+={3,}$/.test(trimmed)) {
+        const title = trimmed.replace(/=/g, '').trim();
+        htmlContent += `<div class="msg-section-header">${escapeHtml(title)}</div>`;
+      } else if (trimmed) {
+        htmlContent += `<div>${escapeHtml(trimmed)}</div>`;
       } else {
         htmlContent += '<br>';
       }
@@ -1048,12 +1057,20 @@ function addChatMessage(content, isUser = false) {
     
     contentDiv.innerHTML = htmlContent;
   } else {
+    console.log('[CHATBOT] Plain text format');
+    // Use textContent for security, CSS white-space: pre-line will handle newlines
     contentDiv.textContent = formatted;
   }
   
   messageDiv.appendChild(contentDiv);
-  document.getElementById('chatbotMessages').appendChild(messageDiv);
-  document.getElementById('chatbotMessages').scrollTop = document.getElementById('chatbotMessages').scrollHeight;
+  const messagesContainer = document.getElementById('chatbotMessages');
+  if (!messagesContainer) {
+    console.error('[CHATBOT] CRITICAL: chatbotMessages element not found!');
+    return;
+  }
+  messagesContainer.appendChild(messageDiv);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  console.log('[CHATBOT] Message added successfully');
 }
 
 function showTypingIndicator() {
@@ -1091,6 +1108,7 @@ async function sendChatMessage() {
   showTypingIndicator();
   
   try {
+    console.log('[CHATBOT] Sending message:', message);
     const response = await fetch('/api/chatbot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1101,17 +1119,35 @@ async function sendChatMessage() {
       })
     });
     
-    if (!response.ok) throw new Error('Chatbot request failed');
+    console.log('[CHATBOT] Response status:', response.status);
+    if (!response.ok) {
+      console.error('[CHATBOT] Response not OK:', response.status, response.statusText);
+      throw new Error('Chatbot request failed: ' + response.status);
+    }
     
     const data = await response.json();
+    console.log('[CHATBOT] Response data:', data);
+    console.log('[CHATBOT] Response keys:', Object.keys(data));
+    
     removeTypingIndicator();
-    addChatMessage(data.response, false);
-    chatHistory.push({ role: 'assistant', content: data.response });
+    
+    if (data.response) {
+      console.log('[CHATBOT] Adding response of length:', data.response.length);
+      addChatMessage(data.response, false);
+      chatHistory.push({ role: 'assistant', content: data.response });
+    } else if (data.error) {
+      console.error('[CHATBOT] Server returned error:', data.error);
+      addChatMessage('Error: ' + data.error, false);
+    } else {
+      console.error('[CHATBOT] Unexpected response format:', data);
+      addChatMessage('Unexpected response from server', false);
+    }
   } catch (error) {
-    console.error('Chatbot error:', error);
+    console.error('[CHATBOT] Exception caught:', error);
+    console.error('[CHATBOT] Error stack:', error.stack);
     removeTypingIndicator();
-    addChatMessage('Sorry, I encountered an error. Please try again.', false);
-    showToast('error', 'Unable to reach AI assistant - Please check your connection and try again', 'Chatbot Error');
+    addChatMessage('Error: ' + error.message + ' (check console for details)', false);
+    showToast('error', 'Chatbot error: ' + error.message, 'Chatbot Error');
   } finally {
     chatbotSend.disabled = false;
     chatbotInput.disabled = false;
