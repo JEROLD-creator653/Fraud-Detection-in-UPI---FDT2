@@ -1,34 +1,24 @@
 {
   "buildCommand": "cd frontend && npm install && npm run build",
-  "installCommand": "pip install -r requirements.txt && cd frontend && npm install",
   "outputDirectory": "frontend/build",
   "env": {
-    "PYTHON_VERSION": "3.13"
+    "REACT_APP_BACKEND_URL": "@react_app_backend_url"
   },
-  "functions": {
-    "app/**/*.py": {
-      "runtime": "python3.13"
-    },
-    "backend/**/*.py": {
-      "runtime": "python3.13"
+  "headers": [
+    {
+      "source": "/api/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
     }
-  },
-  "routes": [
+  ],
+  "rewrites": [
     {
-      "src": "^/api/(.*)",
-      "dest": "app/main.py"
-    },
-    {
-      "src": "^/backend/(.*)",
-      "dest": "backend/server.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "frontend/build/$1"
-    },
-    {
-      "src": "/",
-      "dest": "frontend/build/index.html"
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ]
 }
