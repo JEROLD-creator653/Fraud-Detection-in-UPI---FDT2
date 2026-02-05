@@ -13,6 +13,79 @@
     * {
       font-family: 'Inter', sans-serif;
     }
+
+    /* Dashboard Button Shine Effect */
+    button, a[class*="bg-gradient"] {
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    button::before, a[class*="bg-gradient"]::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    button:hover::before, a[class*="bg-gradient"]:hover::before {
+      left: 100%;
+    }
+
+    button:hover, a[class*="bg-gradient"]:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    /* Card Shine Effect - Stat Cards & Metric Cards */
+    .card.accent-border, [class*="bg-gradient-to-br"][class*="from-"] {
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .card.accent-border::before, [class*="bg-gradient-to-br"][class*="from-"]::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+      transition: left 0.6s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .card.accent-border:hover::before, [class*="bg-gradient-to-br"][class*="from-"]:hover::before {
+      left: 100%;
+    }
+
+    .card.accent-border:hover, [class*="bg-gradient-to-br"][class*="from-"]:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    /* Dark mode adjustments for cards */
+    body.dark-mode .card.accent-border, body.dark-mode [class*="bg-gradient-to-br"][class*="from-"] {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    body.dark-mode .card.accent-border::before, body.dark-mode [class*="bg-gradient-to-br"][class*="from-"]::before {
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+    }
+
+    body.dark-mode .card.accent-border:hover, body.dark-mode [class*="bg-gradient-to-br"][class*="from-"]:hover {
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
   </style>
 </head>
 
@@ -597,6 +670,205 @@
     </div>
   </div>
 
+  <!-- Toast Container -->
+  <div id="toastContainer" style="position: fixed; bottom: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column-reverse; gap: 12px; pointer-events: none;"></div>
+
+  <style>
+    /* Toast Notifications */
+    .toast {
+      pointer-events: auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      padding: 16px;
+      min-width: 320px;
+      max-width: 420px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+      transform: translateX(400px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
+    
+    /* Dark mode support for toasts */
+    body.dark-mode .toast {
+      background: #1e293b;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    
+    body.dark-mode .toast__title {
+      color: #e5e7eb;
+    }
+    
+    body.dark-mode .toast__message {
+      color: #cbd5e1;
+    }
+    
+    body.dark-mode .toast__close {
+      color: #64748b;
+    }
+    
+    body.dark-mode .toast__close:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #e5e7eb;
+    }
+    
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.hide { opacity: 0; transform: translateX(8px); }
+    
+    .toast__icon { width: 44px; height: 44px; flex: 0 0 44px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 18px; }
+    .toast__content { flex: 1 1 auto; min-width: 0; }
+    .toast__title { font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 4px; }
+    .toast__message { font-weight: 500; color: #475569; font-size: 13px; line-height: 1.4; word-break: break-word; }
+    .toast__close { margin-left: 8px; background: transparent; border: 0; color: #94a3b8; cursor: pointer; padding: 6px; border-radius: 6px; font-size: 20px; line-height: 1; }
+    .toast__close:hover { background: rgba(15, 23, 42, 0.04); color: #0f172a; }
+    .toast__progress { position: absolute; left: 0; bottom: 0; height: 3px; background: linear-gradient(90deg, #60a5fa, #3b82f6); width: 100%; transform-origin: left center; transform: scaleX(1); transition: transform linear; }
+    
+    .toast--success .toast__icon { background: linear-gradient(135deg, #ecfdf5, #bbf7d0); color: #065f46; }
+    .toast--error .toast__icon { background: linear-gradient(135deg, #fff1f2, #fecaca); color: #7f1d1d; }
+    .toast--info .toast__icon { background: linear-gradient(135deg, #eff6ff, #bfdbfe); color: #1e3a8a; }
+    .toast--warning .toast__icon { background: linear-gradient(135deg, #fefce8, #fde047); color: #713f12; }
+
+    /* Footer Styles */
+    .footer {
+      margin-top: 60px;
+      padding: 32px 0;
+      border-top: 1px solid #e5e7eb;
+      background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.02));
+    }
+
+    body.dark-mode .footer {
+      border-top-color: #334155;
+      background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.02));
+    }
+
+    .footer-content {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      align-items: center;
+      text-align: center;
+    }
+
+    .footer-social {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .footer-social a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+      color: #4b5563;
+      text-decoration: none;
+      font-size: 18px;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .footer-social a::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .footer-social a:hover::before {
+      left: 100%;
+    }
+
+    .footer-social a:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    .footer-social a.email { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; }
+    .footer-social a.github { background: linear-gradient(135deg, #f3f4f6, #e5e7eb); color: #1f2937; }
+    .footer-social a.linkedin { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; }
+    .footer-social a.twitter { background: linear-gradient(135deg, #dbeafe, #93c5fd); color: #1d4ed8; }
+    .footer-social a.website { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); color: #4338ca; }
+
+    body.dark-mode .footer-social a {
+      background: linear-gradient(135deg, #334155, #475569);
+      color: #cbd5e1;
+    }
+
+    body.dark-mode .footer-social a.email { background: linear-gradient(135deg, #7f1d1d, #991b1b); color: #fecaca; }
+    body.dark-mode .footer-social a.github { background: linear-gradient(135deg, #1f2937, #374151); color: #f3f4f6; }
+    body.dark-mode .footer-social a.linkedin { background: linear-gradient(135deg, #1e40af, #2563eb); color: #dbeafe; }
+    body.dark-mode .footer-social a.twitter { background: linear-gradient(135deg, #1e3a8a, #1d4ed8); color: #bfdbfe; }
+    body.dark-mode .footer-social a.website { background: linear-gradient(135deg, #4338ca, #6366f1); color: #e0e7ff; }
+
+    .footer-copyright {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    body.dark-mode .footer-copyright {
+      color: #9ca3af;
+    }
+
+    .footer-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    body.dark-mode .footer-title {
+      color: #e5e7eb;
+    }
+  </style>
+
   <script src="/static/dashboard.js"></script>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="footer-content">
+        <div>
+          <h3 class="footer-title">Connect With Us</h3>
+          <div class="footer-social">
+            <a href="mailto:teamfdt2@gmail.com" class="email" title="Email" aria-label="Email">
+              📧
+            </a>
+            <a href="https://github.com/JEROLD-creator653" target="_blank" rel="noopener noreferrer" class="github" title="GitHub" aria-label="GitHub">
+              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            </a>
+            <a href="https://linkedin.com/in/jerold-christoper-g-992052327" target="_blank" rel="noopener noreferrer" class="linkedin" title="LinkedIn" aria-label="LinkedIn">
+              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            </a>
+            <a href="https://twitter.com/yourhandle" target="_blank" rel="noopener noreferrer" class="twitter" title="Twitter" aria-label="Twitter">
+              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>
+            </a>
+            <a href="https://yourwebsite.com" target="_blank" rel="noopener noreferrer" class="website" title="Website" aria-label="Website">
+              🌐
+            </a>
+          </div>
+        </div>
+        <div class="footer-copyright">
+          © 2026 UPI Fraud Detection System | All rights reserved | Powered by FDT2
+        </div>
+      </div>
+    </div>
+  </footer>
+
 </body>
 </html>
