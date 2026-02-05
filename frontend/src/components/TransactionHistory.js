@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { getUserTransactions, confirmTransaction, cancelTransaction } from '../api';
 import { useNotifications } from './NotificationSystem';
 import cacheManager from '../utils/cacheManager';
-import { exportToCSV, exportToJSON, exportToDetailedReport } from '../utils/exportUtils';
+import { exportToCSV, exportToJSON, exportToDetailedReport, exportToTXT, exportToXML } from '../utils/exportUtils';
+import { formatTimestamp } from '../utils/helpers';
+import { TableSkeleton } from './LoadingSkeleton';
 
 const TransactionHistory = ({ user }) => {
   const navigate = useNavigate();
@@ -24,6 +26,14 @@ const TransactionHistory = ({ user }) => {
   const [riskFilter, setRiskFilter] = useState('all'); // all, low, medium, high
   const [sortBy, setSortBy] = useState('newest'); // newest, oldest, amount-high, amount-low
 
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportDateRange, setExportDateRange] = useState('all');
+  const [exportFormat, setExportFormat] = useState('csv');
+  const [exportCustomStart, setExportCustomStart] = useState('');
+  const [exportCustomEnd, setExportCustomEnd] = useState('');
+  const [exportError, setExportError] = useState('');
+
   // Apply all filters and search when transactions or filters change
   useEffect(() => {
     applyFiltersAndSearch();
@@ -35,19 +45,30 @@ const TransactionHistory = ({ user }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
-  const loadTransactions = async () => {
+  const loadTransactions = async (forceRefresh = false) => {
     try {
       setLoading(true);
+      setError(''); // Clear any previous errors
       const statusFilter = filter === 'all' ? null : filter.toUpperCase();
-      const data = await getUserTransactions(50, statusFilter);
+      // Reduced from 50 to 20 for faster initial load - users can load more if needed
+      const data = await getUserTransactions(20, statusFilter, forceRefresh);
       setTransactions(data.transactions || []);
     } catch (err) {
-      setError('Failed to load transactions');
-      console.error(err);
+      console.error('TransactionHistory load error:', err);
+      setError('Failed to load transactions. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadTransactions(true);
+    }, 30000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -57,7 +78,7 @@ const TransactionHistory = ({ user }) => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('en-IN', {
+    return formatTimestamp(dateString, 'en-IN', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -206,51 +227,135 @@ const TransactionHistory = ({ user }) => {
     setExpandedTransaction(expandedTransaction === txId ? null : txId);
   };
 
-const handleQuickAction = async (txId, decision) => {
-      setProcessingAction(`${txId}-${decision}`);
-      try {
-        let response;
-        
-        if (decision === 'confirm') {
-          response = await confirmTransaction(txId);
-        } else if (decision === 'cancel') {
-          response = await cancelTransaction(txId);
-        }
-        
-        // Clear transaction cache to ensure fresh data on next load
-        cacheManager.invalidateCategory('transactions');
-        cacheManager.invalidateCategory('dashboard');
-        
-        // Update the transaction locally immediately with response from backend
-        const updatedAction = response.transaction?.action || (decision === 'confirm' ? 'ALLOW' : 'BLOCK');
-        
-        setTransactions(prevTransactions =>
-          prevTransactions.map(tx =>
-            tx.tx_id === txId
-              ? { ...tx, action: updatedAction }
-              : tx
-          )
-        );
-        
-        addNotification({
-          type: 'transaction_resolved',
-          title: `Transaction ${decision === 'confirm' ? 'Confirmed' : 'Rejected'}`,
-          message: `Transaction has been processed successfully.`,
-          category: 'success'
-        });
-        setExpandedTransaction(null);
-      } catch (error) {
-        console.error('Decision error:', error);
-        addNotification({
-          type: 'error',
-          title: 'Action Failed',
-          message: 'Unable to process your decision. Please try again.',
-          category: 'error'
-        });
-      } finally {
-        setProcessingAction(null);
+  const handleQuickAction = async (txId, decision) => {
+    setProcessingAction(`${txId}-${decision}`);
+    try {
+      let response;
+      
+      if (decision === 'confirm') {
+        response = await confirmTransaction(txId);
+      } else if (decision === 'cancel') {
+        response = await cancelTransaction(txId);
       }
-    };
+      
+      // Clear transaction cache to ensure fresh data on next load
+      cacheManager.invalidateCategory('transactions');
+      cacheManager.invalidateCategory('dashboard');
+      
+      // Update the transaction locally immediately with response from backend
+      const updatedAction = response.transaction?.action || (decision === 'confirm' ? 'ALLOW' : 'BLOCK');
+      
+      setTransactions(prevTransactions =>
+        prevTransactions.map(tx =>
+          tx.tx_id === txId
+            ? { ...tx, action: updatedAction }
+            : tx
+        )
+      );
+      
+      addNotification({
+        type: 'transaction_resolved',
+        title: `Transaction ${decision === 'confirm' ? 'Confirmed' : 'Rejected'}`,
+        message: `Transaction has been processed successfully.`,
+        category: 'success'
+      });
+      setExpandedTransaction(null);
+    } catch (error) {
+      console.error('Decision error:', error);
+      addNotification({
+        type: 'error',
+        title: 'Action Failed',
+        message: 'Unable to process your decision. Please try again.',
+        category: 'error'
+      });
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  const openExportModal = () => {
+    setExportDateRange('all');
+    setExportFormat('csv');
+    setExportCustomStart('');
+    setExportCustomEnd('');
+    setExportError('');
+    setShowExportModal(true);
+  };
+
+  const filterTransactionsForExport = (baseTransactions) => {
+    if (!baseTransactions || baseTransactions.length === 0) {
+      return { transactions: [], error: null };
+    }
+
+    const now = new Date();
+    const txDate = (tx) => new Date(tx.created_at);
+
+    if (exportDateRange === 'today') {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return { transactions: baseTransactions.filter(tx => txDate(tx) >= today), error: null };
+    }
+
+    if (exportDateRange === 'week') {
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return { transactions: baseTransactions.filter(tx => txDate(tx) >= weekAgo), error: null };
+    }
+
+    if (exportDateRange === 'month') {
+      const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      return { transactions: baseTransactions.filter(tx => txDate(tx) >= monthAgo), error: null };
+    }
+
+    if (exportDateRange === 'custom') {
+      if (!exportCustomStart || !exportCustomEnd) {
+        return { transactions: [], error: 'Please select both start and end dates.' };
+      }
+
+      const startDate = new Date(`${exportCustomStart}T00:00:00`);
+      const endDate = new Date(`${exportCustomEnd}T23:59:59`);
+
+      if (startDate > endDate) {
+        return { transactions: [], error: 'Start date must be before end date.' };
+      }
+
+      return {
+        transactions: baseTransactions.filter(tx => {
+          const createdAt = txDate(tx);
+          return createdAt >= startDate && createdAt <= endDate;
+        }),
+        error: null
+      };
+    }
+
+    return { transactions: baseTransactions, error: null };
+  };
+
+  const handleExport = () => {
+    setExportError('');
+    const baseTransactions = filteredTransactions;
+    const { transactions: exportTransactions, error } = filterTransactionsForExport(baseTransactions);
+
+    if (error) {
+      setExportError(error);
+      return;
+    }
+
+    if (!exportTransactions || exportTransactions.length === 0) {
+      setExportError('No transactions found for the selected range.');
+      return;
+    }
+
+    if (exportFormat === 'csv') {
+      exportToCSV(exportTransactions, 'FDT_Transactions');
+    } else if (exportFormat === 'json') {
+      exportToJSON(exportTransactions, 'FDT_Transactions');
+    } else if (exportFormat === 'txt') {
+      exportToTXT(exportTransactions, 'FDT_Transactions');
+    } else if (exportFormat === 'xml') {
+      exportToXML(exportTransactions, 'FDT_Transactions');
+    }
+
+    setShowExportModal(false);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 pb-6" data-testid="transaction-history-screen">
@@ -274,33 +379,22 @@ const handleQuickAction = async (txId, decision) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h1 className="text-2xl font-bold">Security Monitor</h1>
+            <h1 className="text-2xl font-bold">Transaction monitor</h1>
           </div>
           
           {/* Export Buttons */}
           {transactions.length > 0 && (
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => exportToCSV(filteredTransactions.length > 0 ? filteredTransactions : transactions, 'FDT_Transactions')}
-                className="flex items-center space-x-2 px-3 py-2 bg-green-600/80 hover:bg-green-600 text-white text-sm rounded-lg transition-colors"
-                title="Export as CSV"
-                data-testid="export-csv-button"
+                onClick={openExportModal}
+                className="flex items-center space-x-2 px-3 py-2 bg-indigo-600/80 hover:bg-indigo-600 text-white text-sm rounded-lg transition-colors"
+                title="Export transactions"
+                data-testid="export-button"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span>CSV</span>
-              </button>
-              <button
-                onClick={() => exportToJSON(filteredTransactions.length > 0 ? filteredTransactions : transactions, 'FDT_Transactions')}
-                className="flex items-center space-x-2 px-3 py-2 bg-blue-600/80 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
-                title="Export as JSON"
-                data-testid="export-json-button"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span>JSON</span>
+                <span>Export</span>
               </button>
               <button
                 onClick={() => exportToDetailedReport(filteredTransactions.length > 0 ? filteredTransactions : transactions, 'FDT_Report')}
@@ -317,6 +411,107 @@ const handleQuickAction = async (txId, decision) => {
           )}
         </div>
       </div>
+
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-900 rounded-2xl p-6 max-w-lg w-full mx-4 border border-white/20">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white text-lg font-semibold">Export Transactions</h3>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-purple-300 hover:text-white transition"
+                aria-label="Close export modal"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-purple-300 mb-2">Date Range</label>
+                <select
+                  value={exportDateRange}
+                  onChange={(e) => {
+                    setExportDateRange(e.target.value);
+                    setExportError('');
+                  }}
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                >
+                  <option value="all" className="text-gray-900">All Time</option>
+                  <option value="today" className="text-gray-900">Today</option>
+                  <option value="week" className="text-gray-900">Last 7 Days</option>
+                  <option value="month" className="text-gray-900">Last 30 Days</option>
+                  <option value="custom" className="text-gray-900">Custom Date Range</option>
+                </select>
+              </div>
+
+              {exportDateRange === 'custom' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-purple-300 mb-2">Start Date</label>
+                    <input
+                      type="date"
+                      value={exportCustomStart}
+                      onChange={(e) => {
+                        setExportCustomStart(e.target.value);
+                        setExportError('');
+                      }}
+                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-purple-300 mb-2">End Date</label>
+                    <input
+                      type="date"
+                      value={exportCustomEnd}
+                      onChange={(e) => {
+                        setExportCustomEnd(e.target.value);
+                        setExportError('');
+                      }}
+                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-purple-300 mb-2">Format</label>
+                <select
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value)}
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                >
+                  <option value="csv" className="text-gray-900">CSV</option>
+                  <option value="json" className="text-gray-900">JSON</option>
+                  <option value="txt" className="text-gray-900">Text (TXT)</option>
+                  <option value="xml" className="text-gray-900">XML</option>
+                </select>
+              </div>
+
+              {exportError && (
+                <div className="text-sm text-red-300">{exportError}</div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 mt-6">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-600 text-white text-sm rounded-lg transition"
+              >
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="px-6 -mt-4">
         {/* Search Bar */}
@@ -490,6 +685,26 @@ const handleQuickAction = async (txId, decision) => {
         )}
 
         {/* Transactions List */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-lg flex items-start justify-between">
+            <div className="flex items-start space-x-3">
+              <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-red-300 font-semibold">Failed to load transactions</p>
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            </div>
+            <button
+              onClick={loadTransactions}
+              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors flex-shrink-0"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full spinner"></div>

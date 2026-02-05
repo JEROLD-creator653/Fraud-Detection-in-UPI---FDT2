@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getUserDashboard } from '../api';
 import { useNotifications } from './NotificationSystem';
-import { formatUPIId } from '../utils/helpers';
+import { formatTimestamp, formatUPIId } from '../utils/helpers';
+import { DashboardSkeleton } from './LoadingSkeleton';
 
 const Dashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
@@ -16,17 +17,29 @@ const Dashboard = ({ user, onLogout }) => {
     loadDashboard();
   }, [location]);
 
-  const loadDashboard = async () => {
+  const loadDashboard = async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const data = await getUserDashboard();
+      console.log('📊 Loading dashboard...');
+      const data = await getUserDashboard(forceRefresh);
+      console.log('✓ Dashboard data loaded:', data);
       setDashboardData(data);
     } catch (err) {
-      console.error('Failed to load dashboard:', err);
+      console.error('❌ Failed to load dashboard:', err);
+      console.error('Error status:', err.response?.status);
+      console.error('Error message:', err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadDashboard(true);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
@@ -43,7 +56,7 @@ const Dashboard = ({ user, onLogout }) => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('en-IN', {
+    return formatTimestamp(dateString, 'en-IN', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -63,11 +76,17 @@ const Dashboard = ({ user, onLogout }) => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full spinner"></div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <div className="bg-black/20 backdrop-blur-xl border-b border-white/10 text-white p-6">
+          <div className="h-8 bg-white/10 rounded w-48 animate-pulse"></div>
+        </div>
+        <div className="p-6">
+          <DashboardSkeleton />
+        </div>
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 pb-20" data-testid="dashboard-screen">
@@ -167,7 +186,7 @@ const Dashboard = ({ user, onLogout }) => {
          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
            <Link
              to="/transactions"
-             className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/20"
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.025] border border-white/20"
              data-testid="transaction-history-button"
            >
              <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,7 +198,7 @@ const Dashboard = ({ user, onLogout }) => {
 
            <Link
              to="/risk-analysis"
-             className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/20"
+            className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.025] border border-white/20"
            >
              <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />

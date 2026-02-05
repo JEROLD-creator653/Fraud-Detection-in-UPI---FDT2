@@ -1,9 +1,28 @@
 // API utilities for backend communication
 import axios from 'axios';
 import cacheManager from './utils/cacheManager';
+import sessionStorage from './utils/sessionStorageManager';
 
-// Use explicit backend URL
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+// Determine backend URL - with fallback for devtunnel deployments
+const getBackendUrl = () => {
+  // First, try environment variable
+  if (process.env.REACT_APP_BACKEND_URL) {
+    return process.env.REACT_APP_BACKEND_URL;
+  }
+  
+  // If running on devtunnel domain, infer backend URL from current location
+  if (window.location.hostname.includes('devtunnels.ms')) {
+    // Extract the unique ID from devtunnel domain
+    // e.g., "w1r757gb-8001.inc1.devtunnels.ms" -> infer backend is same domain but on 8001
+    const devtunnelDomain = window.location.hostname;
+    return `https://${devtunnelDomain}`;
+  }
+  
+  // Default fallback for local development
+  return 'http://localhost:8001';
+};
+
+const API_BASE_URL = getBackendUrl();
 
 // Log the API URL being used
 if (process.env.NODE_ENV === 'development') {
@@ -11,7 +30,9 @@ if (process.env.NODE_ENV === 'development') {
   console.log('  Backend URL:', API_BASE_URL);
   console.log('  Environment:', process.env.NODE_ENV);
   console.log('  REACT_APP_BACKEND_URL:', process.env.REACT_APP_BACKEND_URL);
+  console.log('  Current Hostname:', window.location.hostname);
 }
+
 
 // Create axios instance
 const api = axios.create({
@@ -19,13 +40,13 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 10000 // 10 second timeout
+  timeout: 30000 // 30 second timeout for better reliability on slow connections
 });
 
 // Add auth token to requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('fdt_token');
+    const token = sessionStorage.getItem('fdt_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -58,9 +79,18 @@ api.interceptors.response.use(
     
     if (error.response?.status === 401) {
       // Token expired or invalid
-      localStorage.removeItem('fdt_token');
-      localStorage.removeItem('fdt_user');
-      window.location.href = '/login';
+      console.warn('⚠ Received 401 - token invalid or expired');
+      sessionStorage.removeItem('fdt_token');
+      sessionStorage.removeItem('fdt_user');
+      cacheManager.clear();
+      
+      // Dispatch custom event so App component can respond
+      window.dispatchEvent(new Event('logout'));
+      
+      // Only redirect if not already on login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -78,9 +108,9 @@ export const loginUser = async (credentials) => {
 };
 
 // User APIs
-export const getUserDashboard = async () => {
+export const getUserDashboard = async (forceRefresh = false) => {
   const cacheKey = 'user_dashboard';
-  const cachedData = cacheManager.get(cacheKey);
+  const cachedData = forceRefresh ? null : cacheManager.get(cacheKey);
   
   if (cachedData) {
     return cachedData;
@@ -92,12 +122,12 @@ export const getUserDashboard = async () => {
   return data;
 };
 
-export const getUserTransactions = async (limit = 20, statusFilter = null) => {
+export const getUserTransactions = async (limit = 20, statusFilter = null, forceRefresh = false) => {
   const params = { limit };
   if (statusFilter) params.status_filter = statusFilter;
   
   const cacheKey = `transactions_${limit}_${statusFilter || 'all'}`;
-  const cachedData = cacheManager.get(cacheKey);
+  const cachedData = forceRefresh ? null : cacheManager.get(cacheKey);
   
   if (cachedData) {
     return cachedData;

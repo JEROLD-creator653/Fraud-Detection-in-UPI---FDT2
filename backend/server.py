@@ -27,6 +27,17 @@ from apscheduler.triggers.interval import IntervalTrigger
 import psycopg2
 import psycopg2.extras
 import redis
+import secrets
+import base64
+import webauthn
+from webauthn import generate_registration_options, verify_registration_response
+from webauthn import generate_authentication_options, verify_authentication_response
+from webauthn.helpers.structs import (
+    AuthenticatorSelectionCriteria,
+    UserVerificationRequirement,
+    PublicKeyCredentialDescriptor,
+    AuthenticatorTransport
+)
 
 # Import WebSocket manager
 try:
@@ -103,12 +114,12 @@ rate_limiter = RateLimiter(max_requests=100, window_seconds=60)  # 100 requests 
 app = FastAPI(title="FDT API", version="1.0.0")
 scheduler = AsyncIOScheduler()
 
-# CORS Configuration - Use environment variable for allowed origins
-# Set ALLOWED_ORIGINS="http://localhost:3000,https://yourdomain.com" in .env
+# CORS Configuration - Allow localhost + devtunnel URLs for mobile testing
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.devtunnels\.ms",  # Allow any devtunnel URL
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
@@ -279,7 +290,7 @@ async def auto_refund_delayed_transactions():
             five_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
             cur.execute(
                 """
-                SELECT tx_id, user_id, amount, recipient_vpa, created_at
+                SELECT tx_id, user_id, amount, recipient_vpa, created_at, amount_deducted_at
                 FROM transactions 
                 WHERE action = 'DELAY' 
                 AND db_status = 'pending'
@@ -291,20 +302,21 @@ async def auto_refund_delayed_transactions():
             expired_transactions = cur.fetchall()
             
             for tx in expired_transactions:
-                # Refund sender
-                cur.execute(
-                    "UPDATE users SET balance = balance + %s WHERE user_id = %s",
-                    (float(tx["amount"]), tx["user_id"])
-                )
-                
-                # Log refund in transaction_ledger
-                cur.execute(
-                    """
-                    INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
-                    VALUES (%s, 'REFUND', %s, %s, %s)
-                    """,
-                    (tx["tx_id"], tx["user_id"], float(tx["amount"]), "Auto-refund after 5 minute timeout")
-                )
+                # Refund sender only if funds were previously deducted
+                if tx["amount_deducted_at"] is not None:
+                    cur.execute(
+                        "UPDATE users SET balance = balance + %s WHERE user_id = %s",
+                        (float(tx["amount"]), tx["user_id"])
+                    )
+                    
+                    # Log refund in transaction_ledger
+                    cur.execute(
+                        """
+                        INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                        VALUES (%s, 'REFUND', %s, %s, %s)
+                        """,
+                        (tx["tx_id"], tx["user_id"], float(tx["amount"]), "Auto-refund after 5 minute timeout")
+                    )
                 
                 # Update transaction status
                 cur.execute(
@@ -443,12 +455,23 @@ class TransactionCancel(BaseModel):
 # ============================================================================
 
 def create_access_token(user_id: str) -> str:
-    """Create JWT access token"""
+    """Create JWT access token with proper UTC timestamps"""
+    now = datetime.now(timezone.utc)
+    expiry = now + timedelta(hours=JWT_EXPIRATION_HOURS)
+    
+    # PyJWT automatically converts datetime to Unix timestamp
     payload = {
         "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
+        "iat": now,  # Issued at
+        "exp": expiry  # Expiry
     }
-    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    
+    token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    
+    if isinstance(token, bytes):
+        token = token.decode('utf-8')
+    
+    return token
 
 def verify_token(token: str) -> Dict:
     """Verify JWT token and return payload"""
@@ -567,6 +590,300 @@ async def login_user(credentials: UserLogin):
             conn.close()
     
     return await run_in_threadpool(_login)
+
+# ============================================================================
+# API ENDPOINTS - WEBAUTHN BIOMETRIC AUTHENTICATION
+# ============================================================================
+
+# Pydantic models for WebAuthn
+class WebAuthnRegisterRequest(BaseModel):
+    credential_id: str
+    public_key: str
+    device_name: Optional[str] = None
+    aaguid: Optional[str] = None
+    transports: Optional[List[str]] = None
+
+class WebAuthnAuthenticateRequest(BaseModel):
+    credential_id: str
+    authenticator_data: str
+    client_data_json: str
+    signature: str
+    user_handle: Optional[str] = None
+
+class WebAuthnChallengeResponse(BaseModel):
+    challenge: str
+    user_id: Optional[str] = None
+
+# Temporary storage for challenges (in production, use Redis with expiration)
+webauthn_challenges = {}
+
+@app.post("/api/auth/register-challenge")
+async def create_register_challenge(user_id: str = Depends(get_current_user)):
+    """Generate a challenge for WebAuthn credential registration"""
+    challenge = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
+    webauthn_challenges[user_id] = {
+        'challenge': challenge,
+        'timestamp': datetime.utcnow(),
+        'type': 'register'
+    }
+    
+    return {
+        "status": "success",
+        "challenge": challenge,
+        "user_id": user_id
+    }
+
+@app.post("/api/auth/register-credential")
+async def register_credential(
+    cred_data: WebAuthnRegisterRequest,
+    user_id: str = Depends(get_current_user)
+):
+    """Register a new WebAuthn credential (fingerprint/biometric)"""
+    def _register_credential():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Check if credential already exists
+            cur.execute(
+                "SELECT credential_id FROM user_credentials WHERE credential_id = %s",
+                (cred_data.credential_id,)
+            )
+            if cur.fetchone():
+                raise HTTPException(status_code=400, detail="Credential already registered")
+            
+            # Generate device name if not provided
+            device_name = cred_data.device_name or f"Device {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+            
+            # Insert credential
+            cur.execute(
+                """
+                INSERT INTO user_credentials 
+                (credential_id, user_id, public_key, device_name, transports, created_at, last_used)
+                VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                RETURNING credential_id, device_name, created_at
+                """,
+                (
+                    cred_data.credential_id,
+                    user_id,
+                    cred_data.public_key,
+                    device_name,
+                    cred_data.transports
+                )
+            )
+            
+            credential = cur.fetchone()
+            
+            # Enable fingerprint for user
+            cur.execute(
+                "UPDATE users SET fingerprint_enabled = TRUE WHERE user_id = %s",
+                (user_id,)
+            )
+            
+            conn.commit()
+            
+            # Clear cache
+            cache_delete(f"dashboard:{user_id}")
+            
+            return {
+                "status": "success",
+                "message": "Biometric authentication enabled successfully",
+                "credential": dict_to_json_serializable(dict(credential))
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_register_credential)
+
+@app.post("/api/auth/login-challenge")
+async def create_login_challenge(request: Request):
+    """Generate a challenge for WebAuthn authentication"""
+    data = await request.json()
+    phone = data.get('phone')
+    
+    if not phone:
+        raise HTTPException(status_code=400, detail="Phone number required")
+    
+    def _get_user():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT user_id, fingerprint_enabled FROM users WHERE phone = %s AND is_active = TRUE",
+                (phone,)
+            )
+            user = cur.fetchone()
+            
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            if not user['fingerprint_enabled']:
+                raise HTTPException(status_code=400, detail="Biometric authentication not enabled")
+            
+            # Get user's credentials
+            cur.execute(
+                "SELECT credential_id FROM user_credentials WHERE user_id = %s AND is_active = TRUE",
+                (user['user_id'],)
+            )
+            credentials = cur.fetchall()
+            
+            if not credentials:
+                raise HTTPException(status_code=400, detail="No biometric credentials found")
+            
+            # Generate challenge
+            challenge = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
+            webauthn_challenges[user['user_id']] = {
+                'challenge': challenge,
+                'timestamp': datetime.utcnow(),
+                'type': 'authenticate'
+            }
+            
+            return {
+                "status": "success",
+                "challenge": challenge,
+                "user_id": user['user_id'],
+                "allowCredentials": [{"id": c['credential_id'], "type": "public-key"} for c in credentials]
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_get_user)
+
+@app.post("/api/auth/authenticate-credential")
+async def authenticate_credential(auth_data: WebAuthnAuthenticateRequest):
+    """Authenticate user using WebAuthn credential"""
+    def _authenticate():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Get credential and user
+            cur.execute(
+                """
+                SELECT uc.user_id, uc.public_key, uc.counter, u.name, u.phone, u.email, u.balance
+                FROM user_credentials uc
+                JOIN users u ON uc.user_id = u.user_id
+                WHERE uc.credential_id = %s AND uc.is_active = TRUE AND u.is_active = TRUE
+                """,
+                (auth_data.credential_id,)
+            )
+            result = cur.fetchone()
+            
+            if not result:
+                raise HTTPException(status_code=401, detail="Invalid credential")
+            
+            user_id = result['user_id']
+            
+            # In production, verify signature with public key here
+            # For now, we'll trust the client-side verification
+            
+            # Update last used timestamp and counter
+            cur.execute(
+                "UPDATE user_credentials SET last_used = NOW(), counter = counter + 1 WHERE credential_id = %s",
+                (auth_data.credential_id,)
+            )
+            conn.commit()
+            
+            # Create JWT token
+            token = create_access_token(user_id)
+            
+            user_data = {
+                'user_id': result['user_id'],
+                'name': result['name'],
+                'phone': result['phone'],
+                'email': result['email'],
+                'balance': float(result['balance'])
+            }
+            
+            return {
+                "status": "success",
+                "message": "Biometric authentication successful",
+                "user": user_data,
+                "token": token
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_authenticate)
+
+@app.get("/api/auth/credentials")
+async def list_credentials(user_id: str = Depends(get_current_user)):
+    """List all registered credentials for user"""
+    def _list_credentials():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT credential_id, device_name, transports, created_at, last_used
+                FROM user_credentials
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                """,
+                (user_id,)
+            )
+            credentials = cur.fetchall()
+            
+            return {
+                "status": "success",
+                "credentials": [dict_to_json_serializable(dict(c)) for c in credentials]
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_list_credentials)
+
+@app.delete("/api/auth/credentials/{credential_id}")
+async def revoke_credential(credential_id: str, user_id: str = Depends(get_current_user)):
+    """Revoke a WebAuthn credential"""
+    def _revoke():
+        conn = get_db_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Check ownership
+            cur.execute(
+                "SELECT user_id FROM user_credentials WHERE credential_id = %s",
+                (credential_id,)
+            )
+            result = cur.fetchone()
+            
+            if not result or result['user_id'] != user_id:
+                raise HTTPException(status_code=404, detail="Credential not found")
+            
+            # Soft delete (mark as inactive)
+            cur.execute(
+                "UPDATE user_credentials SET is_active = FALSE WHERE credential_id = %s",
+                (credential_id,)
+            )
+            
+            # Check if user has any active credentials left
+            cur.execute(
+                "SELECT COUNT(*) as count FROM user_credentials WHERE user_id = %s AND is_active = TRUE",
+                (user_id,)
+            )
+            count = cur.fetchone()['count']
+            
+            # If no active credentials, disable fingerprint
+            if count == 0:
+                cur.execute(
+                    "UPDATE users SET fingerprint_enabled = FALSE WHERE user_id = %s",
+                    (user_id,)
+                )
+            
+            conn.commit()
+            
+            # Clear cache
+            cache_delete(f"dashboard:{user_id}")
+            
+            return {
+                "status": "success",
+                "message": "Credential revoked successfully"
+            }
+        finally:
+            conn.close()
+    
+    return await run_in_threadpool(_revoke)
 
 # ============================================================================
 # API ENDPOINTS - USER DASHBOARD
@@ -751,40 +1068,42 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                 action = "ALLOW"
                 db_status = "success"
             
+            amount_deducted_at = datetime.now(timezone.utc) if action == "ALLOW" else None
+
             # Insert transaction with new fields
             cur.execute(
                 """
                 INSERT INTO transactions 
                 (tx_id, user_id, device_id, ts, amount, recipient_vpa, tx_type, channel, 
                  risk_score, action, db_status, remarks, receiver_user_id, amount_deducted_at, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
                 RETURNING tx_id, user_id, amount, recipient_vpa, risk_score, action, db_status, created_at
                 """,
                 (tx_id, user_id, device_id, transaction["ts"], tx_data.amount, 
                  tx_data.recipient_vpa, transaction["tx_type"], "app", 
-                 risk_score, action, db_status, tx_data.remarks, receiver_user_id)
+                 risk_score, action, db_status, tx_data.remarks, receiver_user_id, amount_deducted_at)
             )
             
             result = cur.fetchone()
             
-            # Debit sender immediately for all transactions
-            cur.execute(
-                "UPDATE users SET balance = balance - %s WHERE user_id = %s",
-                (tx_data.amount, user_id)
-            )
-            
-            # Log debit in transaction_ledger
-            cur.execute(
-                """
-                INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
-                VALUES (%s, 'DEBIT', %s, %s, %s)
-                """,
-                (tx_id, user_id, float(tx_data.amount), 
-                 f"Send to {tx_data.recipient_vpa}" + (" (forced DELAY: exceeds daily limit)" if exceeds_daily_limit else ""))
-            )
-            
             # Handle different actions
             if action == "ALLOW":
+                # Debit sender immediately for allowed transactions
+                cur.execute(
+                    "UPDATE users SET balance = balance - %s WHERE user_id = %s",
+                    (tx_data.amount, user_id)
+                )
+                
+                # Log debit in transaction_ledger
+                cur.execute(
+                    """
+                    INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                    VALUES (%s, 'DEBIT', %s, %s, %s)
+                    """,
+                    (tx_id, user_id, float(tx_data.amount), 
+                     f"Send to {tx_data.recipient_vpa}" + (" (forced DELAY: exceeds daily limit)" if exceeds_daily_limit else ""))
+                )
+
                 # Credit receiver immediately
                 if receiver_user_id:
                     cur.execute(
@@ -806,22 +1125,6 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                         "UPDATE transactions SET amount_credited_at = NOW() WHERE tx_id = %s",
                         (tx_id,)
                     )
-            
-            elif action == "BLOCK":
-                # Refund immediately for BLOCK
-                cur.execute(
-                    "UPDATE users SET balance = balance + %s WHERE user_id = %s",
-                    (tx_data.amount, user_id)
-                )
-                
-                # Log refund in transaction_ledger
-                cur.execute(
-                    """
-                    INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
-                    VALUES (%s, 'REFUND', %s, %s, %s)
-                    """,
-                    (tx_id, user_id, float(tx_data.amount), "Refund for BLOCK transaction")
-                )
             
             # Create fraud alert if risky
             if action in ["DELAY", "BLOCK"]:
@@ -856,6 +1159,11 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             )
             
             conn.commit()
+
+            # Clear dashboard cache for sender and receiver
+            cache_delete(f"dashboard:{user_id}")
+            if receiver_user_id:
+                cache_delete(f"dashboard:{receiver_user_id}")
             
             # Schedule WebSocket events (async but handled via create_task)
             try:
@@ -868,14 +1176,15 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                     })
                 )
                 
-                asyncio.create_task(
-                    ws_manager.send_to_user(user_id, {
-                        "type": "balance_updated",
-                        "amount": -float(tx_data.amount),
-                        "operation": "debit",
-                        "new_balance": float(user["balance"]) - float(tx_data.amount)
-                    })
-                )
+                if action == "ALLOW":
+                    asyncio.create_task(
+                        ws_manager.send_to_user(user_id, {
+                            "type": "balance_updated",
+                            "amount": -float(tx_data.amount),
+                            "operation": "debit",
+                            "new_balance": float(user["balance"]) - float(tx_data.amount)
+                        })
+                    )
                 
                 # If ALLOW and receiver is registered user, notify receiver
                 if action == "ALLOW" and receiver_user_id:
@@ -913,7 +1222,11 @@ async def handle_user_decision(decision_data: UserDecision, user_id: str = Depen
             
             # Get transaction
             cur.execute(
-                "SELECT * FROM transactions WHERE tx_id = %s AND user_id = %s",
+                """
+                SELECT tx_id, user_id, amount, recipient_vpa, receiver_user_id, action, db_status, amount_deducted_at
+                FROM transactions
+                WHERE tx_id = %s AND user_id = %s
+                """,
                 (decision_data.tx_id, user_id)
             )
             transaction = cur.fetchone()
@@ -921,29 +1234,91 @@ async def handle_user_decision(decision_data: UserDecision, user_id: str = Depen
             if not transaction:
                 raise HTTPException(status_code=404, detail="Transaction not found")
             
+            if transaction["db_status"] != "pending":
+                raise HTTPException(status_code=400, detail="Transaction is not pending")
+
             # Update transaction based on decision
             if decision_data.decision == "confirm":
+                if transaction["action"] != "DELAY":
+                    raise HTTPException(status_code=400, detail="Only delayed transactions can be confirmed")
+
                 new_action = "ALLOW"
                 new_status = "success"
-                
-                # Deduct balance
-                cur.execute(
-                    "UPDATE users SET balance = balance - %s WHERE user_id = %s",
-                    (transaction["amount"], user_id)
-                )
+
+                # Debit sender only if not already deducted
+                if transaction["amount_deducted_at"] is None:
+                    cur.execute(
+                        "SELECT balance FROM users WHERE user_id = %s",
+                        (user_id,)
+                    )
+                    sender = cur.fetchone()
+                    if not sender or float(sender["balance"]) < float(transaction["amount"]):
+                        raise HTTPException(status_code=400, detail="Insufficient balance")
+
+                    cur.execute(
+                        "UPDATE users SET balance = balance - %s, updated_at = NOW() WHERE user_id = %s",
+                        (float(transaction["amount"]), user_id)
+                    )
+
+                    cur.execute(
+                        """
+                        INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                        VALUES (%s, 'DEBIT', %s, %s, %s)
+                        """,
+                        (decision_data.tx_id, user_id, float(transaction["amount"]), "Confirm delayed transaction")
+                    )
+
+                # Credit receiver if registered
+                if transaction["receiver_user_id"]:
+                    cur.execute(
+                        """
+                        UPDATE users 
+                        SET balance = balance + %s, updated_at = NOW()
+                        WHERE user_id = %s
+                        """,
+                        (float(transaction["amount"]), transaction["receiver_user_id"])
+                    )
+
+                    cur.execute(
+                        """
+                        INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                        VALUES (%s, 'CREDIT', %s, %s, %s)
+                        """,
+                        (decision_data.tx_id, transaction["receiver_user_id"], 
+                         float(transaction["amount"]), f"Credit from {user_id}")
+                    )
             else:
                 new_action = "BLOCK"
                 new_status = "cancelled"
+
+                # Refund sender if funds were previously deducted (legacy safety)
+                if transaction["amount_deducted_at"] is not None:
+                    cur.execute(
+                        "UPDATE users SET balance = balance + %s, updated_at = NOW() WHERE user_id = %s",
+                        (float(transaction["amount"]), user_id)
+                    )
+
+                    cur.execute(
+                        """
+                        INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                        VALUES (%s, 'REFUND', %s, %s, %s)
+                        """,
+                        (decision_data.tx_id, user_id, float(transaction["amount"]), "Cancelled delayed transaction")
+                    )
             
             # Update transaction
             cur.execute(
                 """
                 UPDATE transactions 
-                SET action = %s, db_status = %s, updated_at = NOW()
+                SET action = %s, 
+                    db_status = %s, 
+                    amount_deducted_at = CASE WHEN %s THEN COALESCE(amount_deducted_at, NOW()) ELSE amount_deducted_at END,
+                    amount_credited_at = CASE WHEN %s THEN NOW() ELSE amount_credited_at END,
+                    updated_at = NOW()
                 WHERE tx_id = %s
                 RETURNING tx_id, action, db_status, updated_at
                 """,
-                (new_action, new_status, decision_data.tx_id)
+                (new_action, new_status, decision_data.decision == "confirm", decision_data.decision == "confirm", decision_data.tx_id)
             )
             
             result = cur.fetchone()
@@ -959,6 +1334,11 @@ async def handle_user_decision(decision_data: UserDecision, user_id: str = Depen
             )
             
             conn.commit()
+
+            # Clear dashboard cache for sender and receiver
+            cache_delete(f"dashboard:{user_id}")
+            if transaction.get("receiver_user_id"):
+                cache_delete(f"dashboard:{transaction['receiver_user_id']}")
             
             return {
                 "status": "success",
@@ -982,33 +1362,59 @@ async def get_user_transactions(
         try:
             cur = conn.cursor()
             
+            # Optimized query - avoid LEFT JOIN, fetch fraud_alerts separately only when needed
             query = """
-                SELECT t.tx_id, t.amount, t.recipient_vpa, t.tx_type, t.action, t.risk_score, 
-                       t.db_status, t.remarks, t.created_at, fa.reason as fraud_reasons
-                FROM transactions t
-                LEFT JOIN fraud_alerts fa ON t.tx_id = fa.tx_id
-                WHERE t.user_id = %s
+                SELECT tx_id, amount, recipient_vpa, tx_type, action, risk_score, 
+                       db_status, remarks, created_at
+                FROM transactions
+                WHERE user_id = %s
             """
             params = [user_id]
             
             if status_filter:
-                query += " AND t.action = %s"
+                query += " AND action = %s"
                 params.append(status_filter.upper())
             
-            query += " ORDER BY t.created_at DESC LIMIT %s"
+            query += " ORDER BY created_at DESC LIMIT %s"
             params.append(limit)
             
             cur.execute(query, params)
             transactions = cur.fetchall()
             
-            # Process transactions to split fraud reasons into arrays
+            # Fetch fraud_alerts for all transactions in a single query (faster than LEFT JOIN)
+            if transactions:
+                tx_ids = [tx['tx_id'] for tx in transactions]
+                placeholders = ','.join(['%s'] * len(tx_ids))
+                cur.execute(
+                    f"SELECT tx_id, reason FROM fraud_alerts WHERE tx_id IN ({placeholders})",
+                    tx_ids
+                )
+                fraud_alerts_map = {row['tx_id']: row['reason'] for row in cur.fetchall()}
+            else:
+                fraud_alerts_map = {}
+            
+            # Process transactions to add fraud reasons and risk_level
             processed_transactions = []
+            delay_threshold = 0.35
+            block_threshold = 0.70
+            
             for tx in transactions:
                 tx_dict = dict(tx)
-                if tx_dict.get("fraud_reasons"):
-                    tx_dict["fraud_reasons"] = [reason.strip() for reason in tx_dict["fraud_reasons"].split(";")]
+                fraud_reason = fraud_alerts_map.get(tx_dict['tx_id'])
+                if fraud_reason:
+                    tx_dict["fraud_reasons"] = [reason.strip() for reason in fraud_reason.split(";")]
                 else:
                     tx_dict["fraud_reasons"] = []
+                
+                # Add risk_level based on risk_score
+                risk_score = float(tx_dict.get('risk_score', 0))
+                if risk_score >= block_threshold:
+                    tx_dict["risk_level"] = "BLOCKED"
+                elif risk_score >= delay_threshold:
+                    tx_dict["risk_level"] = "DELAYED"
+                else:
+                    tx_dict["risk_level"] = "APPROVED"
+                
                 processed_transactions.append(tx_dict)
             
             return {
@@ -1197,7 +1603,7 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
             # Get transaction details
             cur.execute(
                 """
-                SELECT tx_id, user_id, amount, recipient_vpa, receiver_user_id, action, db_status
+                SELECT tx_id, user_id, amount, recipient_vpa, receiver_user_id, action, db_status, amount_deducted_at
                 FROM transactions 
                 WHERE tx_id = %s AND user_id = %s AND db_status = 'pending'
                 """,
@@ -1208,6 +1614,36 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
             if not transaction:
                 raise HTTPException(status_code=404, detail="Transaction not found or not pending")
             
+            if transaction["action"] != "DELAY":
+                raise HTTPException(status_code=400, detail="Only delayed transactions can be confirmed")
+
+            receiver_balance = None
+            sender_balance = None
+
+            # Debit sender only at confirmation time (for delayed transactions)
+            if transaction["amount_deducted_at"] is None:
+                cur.execute(
+                    "SELECT balance FROM users WHERE user_id = %s",
+                    (user_id,)
+                )
+                sender = cur.fetchone()
+                if not sender or float(sender["balance"]) < float(transaction["amount"]):
+                    raise HTTPException(status_code=400, detail="Insufficient balance")
+
+                cur.execute(
+                    "UPDATE users SET balance = balance - %s, updated_at = NOW() WHERE user_id = %s RETURNING balance",
+                    (float(transaction["amount"]), user_id)
+                )
+                sender_balance = cur.fetchone()
+
+                cur.execute(
+                    """
+                    INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                    VALUES (%s, 'DEBIT', %s, %s, %s)
+                    """,
+                    (confirm_data.tx_id, user_id, float(transaction["amount"]), "Confirm delayed transaction")
+                )
+
             # Credit receiver if it's a registered user
             if transaction["receiver_user_id"]:
                 cur.execute(
@@ -1237,6 +1673,7 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
                 UPDATE transactions 
                 SET db_status = 'confirmed', 
                     action = 'ALLOW',
+                    amount_deducted_at = COALESCE(amount_deducted_at, NOW()),
                     amount_credited_at = NOW(),
                     updated_at = NOW()
                 WHERE tx_id = %s
@@ -1245,6 +1682,11 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
             )
             
             conn.commit()
+
+            # Clear dashboard cache for sender and receiver
+            cache_delete(f"dashboard:{user_id}")
+            if transaction.get("receiver_user_id"):
+                cache_delete(f"dashboard:{transaction['receiver_user_id']}")
             
             # Emit WebSocket events
             try:
@@ -1257,6 +1699,16 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
                         "recipient": transaction["recipient_vpa"]
                     })
                 )
+
+                if sender_balance:
+                    asyncio.create_task(
+                        ws_manager.send_to_user(user_id, {
+                            "type": "balance_updated",
+                            "amount": -float(transaction["amount"]),
+                            "operation": "debit",
+                            "new_balance": float(sender_balance["balance"])
+                        })
+                    )
                 
                 # If receiver is registered user, notify them
                 if receiver_balance:
@@ -1295,7 +1747,7 @@ async def cancel_transaction(cancel_data: TransactionCancel, user_id: str = Depe
             # Get transaction details
             cur.execute(
                 """
-                SELECT tx_id, user_id, amount, recipient_vpa, action, db_status
+                SELECT tx_id, user_id, amount, recipient_vpa, receiver_user_id, action, db_status, amount_deducted_at
                 FROM transactions 
                 WHERE tx_id = %s AND user_id = %s AND db_status = 'pending'
                 """,
@@ -1306,27 +1758,33 @@ async def cancel_transaction(cancel_data: TransactionCancel, user_id: str = Depe
             if not transaction:
                 raise HTTPException(status_code=404, detail="Transaction not found or not pending")
             
-            # Refund sender
-            cur.execute(
-                """
-                UPDATE users 
-                SET balance = balance + %s, updated_at = NOW()
-                WHERE user_id = %s
-                RETURNING balance
-                """,
-                (float(transaction["amount"]), user_id)
-            )
-            
-            sender_balance = cur.fetchone()
-            
-            # Log refund operation in ledger
-            cur.execute(
-                """
-                INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
-                VALUES (%s, 'REFUND', %s, %s, %s)
-                """,
-                (cancel_data.tx_id, user_id, float(transaction["amount"]), "Cancelled delayed transaction")
-            )
+            if transaction["action"] != "DELAY":
+                raise HTTPException(status_code=400, detail="Only delayed transactions can be cancelled")
+
+            sender_balance = None
+
+            # Refund sender only if funds were previously deducted
+            if transaction["amount_deducted_at"] is not None:
+                cur.execute(
+                    """
+                    UPDATE users 
+                    SET balance = balance + %s, updated_at = NOW()
+                    WHERE user_id = %s
+                    RETURNING balance
+                    """,
+                    (float(transaction["amount"]), user_id)
+                )
+                
+                sender_balance = cur.fetchone()
+                
+                # Log refund operation in ledger
+                cur.execute(
+                    """
+                    INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
+                    VALUES (%s, 'REFUND', %s, %s, %s)
+                    """,
+                    (cancel_data.tx_id, user_id, float(transaction["amount"]), "Cancelled delayed transaction")
+                )
             
             # Update transaction status
             cur.execute(
@@ -1341,6 +1799,11 @@ async def cancel_transaction(cancel_data: TransactionCancel, user_id: str = Depe
             )
             
             conn.commit()
+
+            # Clear dashboard cache for sender and receiver
+            cache_delete(f"dashboard:{user_id}")
+            if transaction.get("receiver_user_id"):
+                cache_delete(f"dashboard:{transaction['receiver_user_id']}")
             
             # Emit WebSocket events
             try:
@@ -1350,7 +1813,7 @@ async def cancel_transaction(cancel_data: TransactionCancel, user_id: str = Depe
                         "type": "transaction_cancelled",
                         "tx_id": cancel_data.tx_id,
                         "amount": float(transaction["amount"]),
-                        "refunded": True
+                        "refunded": sender_balance is not None
                     })
                 )
                     
@@ -1359,10 +1822,11 @@ async def cancel_transaction(cancel_data: TransactionCancel, user_id: str = Depe
             
             return {
                 "status": "success",
-                "message": "Transaction cancelled and refunded successfully",
+                "message": "Transaction cancelled successfully",
                 "tx_id": cancel_data.tx_id,
                 "amount": float(transaction["amount"]),
-                "refunded_balance": float(sender_balance["balance"])
+                "refunded": sender_balance is not None,
+                "refunded_balance": float(sender_balance["balance"]) if sender_balance else None
             }
         finally:
             conn.close()

@@ -107,8 +107,8 @@ const FraudAlert = () => {
     );
   }
 
-  const riskLevel = getRiskColor(transaction.risk_score);
-  const riskLabel = getRiskLabel(transaction.risk_score);
+  const riskLevel = getRiskColor(transaction.risk_score, transaction.risk_level);
+  const riskLabel = getRiskLabel(transaction.risk_score, transaction.risk_level);
   
   // Determine action based on transaction status
   const isDelayed = transaction.action === 'DELAY' || transaction.db_status === 'pending';
@@ -137,7 +137,7 @@ const FraudAlert = () => {
           }`}>
            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {isBlocked ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 0018.364 5.636m-9 9a9 9 0 11-12.728 0m12.728 0a9 9 0 00-12.728 0M9 15h6m-3-3h.01M9 12h6" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               ) : (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               )}
@@ -177,7 +177,7 @@ const FraudAlert = () => {
             <div>
               <p className="text-white/60 text-sm mb-2">Time</p>
               <p className="text-lg text-white/80">
-                {new Date(transaction.created_at).toLocaleString()}
+                {new Date(transaction.created_at + 'Z').toLocaleString()}
               </p>
             </div>
           </div>
@@ -280,7 +280,7 @@ const FraudAlert = () => {
          {isBlocked && (
            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
              <svg className="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 0018.364 5.636m-9 9a9 9 0 11-12.728 0m12.728 0a9 9 0 00-12.728 0M9 15h6m-3-3h.01M9 12h6" />
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
              </svg>
              <h3 className="text-xl font-bold text-red-400 mb-2">Transaction Blocked</h3>
              <p className="text-white/80 mb-4">
@@ -293,9 +293,12 @@ const FraudAlert = () => {
                >
                  Go to Dashboard
                </Link>
-               <button className="flex-1 bg-gradient-to-r from-red-500 to-pink-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-red-600 hover:to-pink-700 transition duration-200">
-                 Contact Support
-               </button>
+              <a
+                href="mailto:teamfdt2@gmail.com"
+                className="flex-1 bg-gradient-to-r from-red-500 to-pink-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-red-600 hover:to-pink-700 transition duration-200 text-center"
+              >
+                Contact Support
+              </a>
              </div>
            </div>
          )}
