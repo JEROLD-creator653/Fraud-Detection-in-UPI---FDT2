@@ -9,7 +9,7 @@ const TransactionResult = ({ result, onBack, senderUser }) => {
       return (
         <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
           <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2l-2-2m0 4l6.518-6.324a1.258 1.258 0 00-.351.676-2.472A9.001 9.001 0 0012 16c4.382 0 8.436-2.596 9.506a9.003 9.003 0 018.412-.493 2.373-1.042-.618l-4.177-1.537-1.53-2.958" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
           </svg>
         </div>
       );
@@ -73,7 +73,7 @@ const TransactionResult = ({ result, onBack, senderUser }) => {
   const message = getStatusMessage();
 
   const handleGoToDashboard = () => {
-    onBack();
+    navigate('/dashboard');
   };
 
   const handleGoToFraudInterface = () => {
@@ -188,7 +188,7 @@ const TransactionResult = ({ result, onBack, senderUser }) => {
                 onClick={handleGoToDashboard}
                 className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transition duration-200"
               >
-                Go to Dashboard
+                Go to Fraud Interface
               </button>
             )}
             

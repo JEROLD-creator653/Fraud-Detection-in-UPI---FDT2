@@ -1,6 +1,6 @@
 /**
  * Export utilities for transactions
- * Supports CSV and JSON formats
+ * Supports CSV, JSON, TXT, XML, and HTML report formats
  */
 
 /**
@@ -15,28 +15,29 @@ export const exportToCSV = (transactions, fileName = 'transactions') => {
   }
 
   // Define CSV headers
-  const headers = [
-    'Transaction ID',
-    'Recipient',
-    'Amount',
-    'Date',
-    'Status',
-    'Risk Score',
-    'Risk Level',
-    'Remarks'
-  ];
+    const headers = [
+        'Date & Time',
+        'Transaction ID',
+        'Recipient',
+        'Amount',
+        'Risk Score',
+        'Status',
+        'Remarks'
+    ];
 
   // Map transactions to CSV rows
-  const rows = transactions.map(tx => [
-    tx.tx_id,
-    tx.recipient_vpa,
-    `₹${tx.amount.toLocaleString('en-IN')}`,
-    new Date(tx.created_at).toLocaleString('en-IN'),
-    getStatusLabel(tx.action),
-    (parseFloat(tx.risk_score) * 100).toFixed(2) + '%',
-    getRiskLevel(tx.risk_score),
-    tx.remarks || '-'
-  ]);
+    const rows = transactions.map(tx => {
+        const createdAt = new Date(tx.created_at);
+        return [
+            createdAt.toLocaleString('en-IN'),
+            tx.tx_id,
+            tx.recipient_vpa,
+            `₹${tx.amount.toLocaleString('en-IN')}`,
+            (parseFloat(tx.risk_score) * 100).toFixed(2) + '%',
+            getStatusLabel(tx.action),
+            tx.remarks || '-'
+        ];
+    });
 
   // Combine headers and rows
   const csvContent = [
@@ -69,16 +70,18 @@ export const exportToJSON = (transactions, fileName = 'transactions') => {
   const exportData = {
     exportedAt: new Date().toISOString(),
     totalTransactions: transactions.length,
-    transactions: transactions.map(tx => ({
-      transactionId: tx.tx_id,
-      recipient: tx.recipient_vpa,
-      amount: tx.amount,
-      date: new Date(tx.created_at).toLocaleString('en-IN'),
-      status: getStatusLabel(tx.action),
-      riskScore: (parseFloat(tx.risk_score) * 100).toFixed(2) + '%',
-      riskLevel: getRiskLevel(tx.risk_score),
-      remarks: tx.remarks || null
-    }))
+        transactions: transactions.map(tx => {
+            const createdAt = new Date(tx.created_at);
+            return {
+                dateTime: createdAt.toLocaleString('en-IN'),
+                transactionId: tx.tx_id,
+                recipient: tx.recipient_vpa,
+                amount: tx.amount,
+                riskScore: (parseFloat(tx.risk_score) * 100).toFixed(2) + '%',
+                status: getStatusLabel(tx.action),
+                remarks: tx.remarks || null
+            };
+        })
   };
 
   // Create and download file
@@ -116,6 +119,100 @@ export const exportToDetailedReport = (transactions, fileName = 'transaction_rep
   document.body.appendChild(element);
   element.click();
   document.body.removeChild(element);
+};
+
+/**
+ * Export transactions to TXT format
+ * @param {Array} transactions - Array of transaction objects
+ * @param {string} fileName - Name of the file (without extension)
+ */
+export const exportToTXT = (transactions, fileName = 'transactions') => {
+    if (!transactions || transactions.length === 0) {
+        alert('No transactions to export');
+        return;
+    }
+
+    const lines = transactions.map((tx, index) => {
+        const createdAt = new Date(tx.created_at);
+        const riskScore = (parseFloat(tx.risk_score) * 100).toFixed(2) + '%';
+        return [
+            `#${index + 1}`,
+            `Date & Time: ${createdAt.toLocaleString('en-IN')}`,
+            `Transaction ID: ${tx.tx_id}`,
+            `Recipient: ${tx.recipient_vpa}`,
+            `Amount: ₹${tx.amount.toLocaleString('en-IN')}`,
+            `Risk Score: ${riskScore}`,
+            `Status: ${getStatusLabel(tx.action)}`,
+            `Remarks: ${tx.remarks || '-'} `
+        ].join('\n');
+    });
+
+    const content = [
+        'FDT Secure Transactions Export',
+        `Generated: ${new Date().toLocaleString('en-IN')}`,
+        `Total: ${transactions.length}`,
+        '',
+        ...lines
+    ].join('\n\n');
+
+    const element = document.createElement('a');
+    const file = new Blob([content], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = `${fileName}_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+};
+
+/**
+ * Export transactions to XML format
+ * @param {Array} transactions - Array of transaction objects
+ * @param {string} fileName - Name of the file (without extension)
+ */
+export const exportToXML = (transactions, fileName = 'transactions') => {
+    if (!transactions || transactions.length === 0) {
+        alert('No transactions to export');
+        return;
+    }
+
+    const escapeXml = (value) => {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+    };
+
+    const transactionNodes = transactions.map(tx => {
+        const createdAt = new Date(tx.created_at);
+        const riskScore = (parseFloat(tx.risk_score) * 100).toFixed(2) + '%';
+        return `  <transaction>
+        <dateTime>${escapeXml(createdAt.toLocaleString('en-IN'))}</dateTime>
+        <transactionId>${escapeXml(tx.tx_id)}</transactionId>
+        <recipient>${escapeXml(tx.recipient_vpa)}</recipient>
+        <amount>${escapeXml(tx.amount)}</amount>
+        <riskScore>${escapeXml(riskScore)}</riskScore>
+        <status>${escapeXml(getStatusLabel(tx.action))}</status>
+        <remarks>${escapeXml(tx.remarks || '')}</remarks>
+    </transaction>`;
+    }).join('\n');
+
+    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<transactions>
+    <exportedAt>${new Date().toISOString()}</exportedAt>
+    <totalTransactions>${transactions.length}</totalTransactions>
+${transactionNodes}
+</transactions>`;
+
+    const element = document.createElement('a');
+    const file = new Blob([xmlContent], { type: 'application/xml' });
+    element.href = URL.createObjectURL(file);
+    element.download = `${fileName}_${new Date().toISOString().split('T')[0]}.xml`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
 };
 
 /**
@@ -184,17 +281,20 @@ const calculateTransactionStats = (transactions) => {
 const generateHTMLReport = (transactions, stats) => {
   const reportDate = new Date().toLocaleString('en-IN');
   
-  const transactionRows = transactions.map(tx => `
-    <tr>
-      <td style="padding: 10px; border: 1px solid #ddd; font-family: monospace; font-size: 12px;">${tx.tx_id.substring(0, 12)}...</td>
-      <td style="padding: 10px; border: 1px solid #ddd;">${tx.recipient_vpa}</td>
-      <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">₹${tx.amount.toLocaleString('en-IN')}</td>
-      <td style="padding: 10px; border: 1px solid #ddd;">${new Date(tx.created_at).toLocaleString('en-IN')}</td>
-      <td style="padding: 10px; border: 1px solid #ddd;">${getStatusLabel(tx.action)}</td>
-      <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${getRiskLevel(tx.risk_score)}</td>
-      <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${(parseFloat(tx.risk_score) * 100).toFixed(2)}%</td>
-    </tr>
-  `).join('');
+    const transactionRows = transactions.map(tx => {
+        const createdAt = new Date(tx.created_at);
+        return `
+        <tr>
+            <td style="padding: 10px; border: 1px solid #ddd;">${createdAt.toLocaleString('en-IN')}</td>
+            <td style="padding: 10px; border: 1px solid #ddd; font-family: monospace; font-size: 12px;">${tx.tx_id}</td>
+            <td style="padding: 10px; border: 1px solid #ddd;">${tx.recipient_vpa}</td>
+            <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">₹${tx.amount.toLocaleString('en-IN')}</td>
+            <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${(parseFloat(tx.risk_score) * 100).toFixed(2)}%</td>
+            <td style="padding: 10px; border: 1px solid #ddd;">${getStatusLabel(tx.action)}</td>
+            <td style="padding: 10px; border: 1px solid #ddd;">${tx.remarks || '-'}</td>
+        </tr>
+    `;
+    }).join('');
 
   return `
 <!DOCTYPE html>
@@ -389,13 +489,13 @@ const generateHTMLReport = (transactions, stats) => {
         <table>
             <thead>
                 <tr>
+                    <th>Date &amp; Time</th>
                     <th>Transaction ID</th>
                     <th>Recipient</th>
                     <th>Amount</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Risk Level</th>
                     <th>Risk Score</th>
+                    <th>Status</th>
+                    <th>Remarks</th>
                 </tr>
             </thead>
             <tbody>

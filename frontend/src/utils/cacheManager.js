@@ -4,11 +4,11 @@ class CacheManager {
     this.currentUserId = null;
     this.cacheConfig = {
       transactions: {
-        ttl: 5 * 60 * 1000, // 5 minutes
+        ttl: 10 * 60 * 1000, // 10 minutes - increased for better performance
         maxSize: 100
       },
       dashboard: {
-        ttl: 2 * 60 * 1000, // 2 minutes
+        ttl: 5 * 60 * 1000, // 5 minutes - increased to reduce API calls
         maxSize: 50
       },
       userProfile: {
