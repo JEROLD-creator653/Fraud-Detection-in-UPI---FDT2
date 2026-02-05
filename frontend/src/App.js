@@ -11,6 +11,28 @@ import RiskAnalysis from './components/RiskAnalysis';
 import NotificationPanel from './components/NotificationPanel';
 import { NotificationProvider } from './components/NotificationSystem';
 import cacheManager from './utils/cacheManager';
+import sessionStorage from './utils/sessionStorageManager';
+
+/**
+ * Decode and validate JWT token expiry without verifying signature
+ * (Signature verification happens on backend)
+ */
+const isTokenExpired = (token) => {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    
+    const decoded = JSON.parse(atob(parts[1]));
+    const expiryTime = decoded.exp * 1000; // exp is in seconds
+    const currentTime = Date.now();
+    
+    // Consider token expired if less than 1 minute remaining
+    return currentTime > expiryTime - 60000;
+  } catch (error) {
+    console.warn('Could not decode token:', error);
+    return true;
+  }
+};
 
 function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
@@ -18,20 +40,58 @@ function AppContent() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Clear any existing authentication to force login
-    localStorage.removeItem('fdt_token');
-    localStorage.removeItem('fdt_user');
-    
-    // Don't auto-authenticate - always show login screen
-    setIsLoading(false);
+    // Restore session from storage on app load
+    const restoreSession = () => {
+      try {
+        const token = sessionStorage.getItem('fdt_token');
+        const userData = sessionStorage.getItem('fdt_user');
+
+        // Only restore if both token and user data exist
+        if (token && userData) {
+          // Check if token is expired
+          if (isTokenExpired(token)) {
+            console.warn('⚠ Token has expired, clearing session');
+            sessionStorage.removeItem('fdt_token');
+            sessionStorage.removeItem('fdt_user');
+            setIsLoading(false);
+            return;
+          }
+
+          setUser(userData);
+          setIsAuthenticated(true);
+          console.log('✓ Session restored from storage');
+        } else {
+          console.log('ℹ No session data found in storage');
+        }
+      } catch (error) {
+        console.error('Error restoring session:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
+
+  // Listen for logout events from API interceptor
+  useEffect(() => {
+    const handleLogoutEvent = () => {
+      console.log('🚪 Logout event received from API');
+      setUser(null);
+      setIsAuthenticated(false);
+    };
+
+    window.addEventListener('logout', handleLogoutEvent);
+    return () => window.removeEventListener('logout', handleLogoutEvent);
   }, []);
 
   const handleLogin = (userData, token) => {
     // Clear all cache when logging in to prevent stale data
     cacheManager.clear();
     
-    localStorage.setItem('fdt_token', token);
-    localStorage.setItem('fdt_user', JSON.stringify(userData));
+    // Use robust storage that works on mobile
+    sessionStorage.setItem('fdt_token', token);
+    sessionStorage.setItem('fdt_user', userData);
     setUser(userData);
     setIsAuthenticated(true);
   };
@@ -40,8 +100,9 @@ function AppContent() {
     // Clear all cache when logging out
     cacheManager.clear();
     
-    localStorage.removeItem('fdt_token');
-    localStorage.removeItem('fdt_user');
+    // Use robust storage that works on mobile
+    sessionStorage.removeItem('fdt_token');
+    sessionStorage.removeItem('fdt_user');
     setUser(null);
     setIsAuthenticated(false);
   };
