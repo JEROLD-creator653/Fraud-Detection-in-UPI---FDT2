@@ -3,6 +3,73 @@
 
 console.log('=== Dashboard.js loading ===');
 
+// Toast Notification System
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function getToastIcon(type) {
+  if (type === 'success') return '✓';
+  if (type === 'error') return '✕';
+  if (type === 'warning') return '⚠';
+  return 'ℹ';
+}
+
+function showToast(type, message, title) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  
+  const toast = document.createElement('div');
+  toast.setAttribute('role', 'status');
+  toast.className = `toast toast--${type || 'info'}`;
+  toast.innerHTML = `
+    <div class="toast__icon" aria-hidden="true">${getToastIcon(type)}</div>
+    <div class="toast__content">
+      <div class="toast__title">${escapeHtml(title || (type === 'success' ? 'Success' : type === 'error' ? 'Error' : type === 'warning' ? 'Warning' : 'Notice'))}</div>
+      <div class="toast__message">${escapeHtml(message)}</div>
+    </div>
+    <button class="toast__close" aria-label="Dismiss">×</button>
+    <div class="toast__progress" aria-hidden="true"></div>
+  `;
+  container.appendChild(toast);
+  
+  const closeBtn = toast.querySelector('.toast__close');
+  const progressEl = toast.querySelector('.toast__progress');
+  
+  requestAnimationFrame(() => toast.classList.add('show'));
+  
+  const duration = 4000;
+  const start = Date.now();
+  let raf = null;
+  
+  function tick() {
+    const elapsed = Date.now() - start;
+    const pct = Math.max(0, 1 - elapsed / duration);
+    if (progressEl) progressEl.style.transform = `scaleX(${pct})`;
+    if (elapsed >= duration) return remove();
+    raf = requestAnimationFrame(tick);
+  }
+  
+  function remove() {
+    if (raf) cancelAnimationFrame(raf);
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+    setTimeout(() => {
+      try { toast.remove(); } catch (e) {}
+    }, 220);
+  }
+  
+  closeBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    remove();
+  });
+  
+  toast.addEventListener('click', () => remove());
+  tick();
+}
+
 // Global state
 let currentTimeRange = '24h';
 let txCache = window.txCache || [];
@@ -32,39 +99,23 @@ let timelineChart, riskPie, fraudBar;
 
 // Sort table function - MUST be defined immediately for onclick handlers
 console.log('Defining window.sortTable...');
-window.sortTable = function(column) {
-  console.log('✓✓✓ REAL sortTable called with column:', column);
-  console.log('Current sortState:', sortState);
-  console.log('txCache length:', txCache.length);
-  
-  // Toggle direction if same column, otherwise default to descending
-  if (sortState.column === column) {
-    sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
-  } else {
-    sortState.column = column;
-    sortState.direction = 'desc';
-  }
 
-  console.log('New sortState:', sortState);
-
-  // Update arrow indicators - remove all active classes first
+function updateSortArrows(column, direction) {
   document.querySelectorAll('.sort-arrow').forEach(arrow => {
     arrow.classList.remove('active-asc', 'active-desc');
   });
-  
-  // Add appropriate classes based on sort direction
+
   const arrows = document.querySelectorAll(`.sort-arrow[data-column="${column}"]`);
   arrows.forEach(arrow => {
-    if (sortState.direction === 'asc') {
+    if (direction === 'asc') {
       arrow.classList.add('active-asc');
     } else {
       arrow.classList.add('active-desc');
     }
   });
-  
-  console.log('Arrows updated for column:', column, 'direction:', sortState.direction);
+}
 
-  // Sort the cache
+function sortTxCache(column, direction) {
   txCache.sort((a, b) => {
     let aVal, bVal;
 
@@ -102,14 +153,36 @@ window.sortTable = function(column) {
         return 0;
     }
 
-    if (aVal < bVal) return sortState.direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortState.direction === 'asc' ? 1 : -1;
+    if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return direction === 'asc' ? 1 : -1;
     return 0;
   });
+}
+
+function applyCurrentSort() {
+  updateSortArrows(sortState.column, sortState.direction);
+  sortTxCache(sortState.column, sortState.direction);
+  renderTransactionTable();
+}
+
+window.sortTable = function(column) {
+  console.log('✓✓✓ REAL sortTable called with column:', column);
+  console.log('Current sortState:', sortState);
+  console.log('txCache length:', txCache.length);
+  
+  // Toggle direction if same column, otherwise default to descending
+  if (sortState.column === column) {
+    sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortState.column = column;
+    sortState.direction = 'desc';
+  }
+
+  console.log('New sortState:', sortState);
+  console.log('Arrows updated for column:', column, 'direction:', sortState.direction);
 
   console.log('Table sorted, calling renderTransactionTable');
-  // Re-render the table
-  renderTransactionTable();
+  applyCurrentSort();
   console.log('renderTransactionTable completed');
 };
 
@@ -298,6 +371,17 @@ async function cachedFetch(url, cacheName, cacheMaxAge = 30000) {
   return data;
 }
 
+function invalidateCache(cacheName, urlStartsWith = null) {
+  if (!_responseCache[cacheName]) return;
+  if (!urlStartsWith) {
+    _responseCache[cacheName] = {};
+    return;
+  }
+  Object.keys(_responseCache[cacheName]).forEach((key) => {
+    if (key.startsWith(urlStartsWith)) delete _responseCache[cacheName][key];
+  });
+}
+
 // Debounce helper - prevents rapid duplicate function calls
 function debounce(func, delayMs = 500) {
   let timeoutId = null;
@@ -476,6 +560,7 @@ async function loadDashboardData() {
     }
   } catch (e) {
     console.error('loadDashboardData error', e);
+    showToast('error', 'Failed to load dashboard statistics - Data may be outdated. Refresh the page to try again.', 'Data Load Error');
   }
 }
 
@@ -561,8 +646,11 @@ async function loadRecentTransactions() {
     txCache = Array.isArray(j.transactions) ? j.transactions : [];
     console.log(`[loadRecentTransactions] Loaded ${txCache.length} transactions`);
 
-    // Sort and render table
-    if (window.sortTable) {
+    // Sort and render table without toggling sort direction
+    if (typeof applyCurrentSort === 'function') {
+      console.log('[loadRecentTransactions] Applying current sort state');
+      applyCurrentSort();
+    } else if (window.sortTable) {
       console.log('[loadRecentTransactions] Calling window.sortTable');
       window.sortTable(sortState.column);
     } else {
@@ -577,6 +665,7 @@ async function loadRecentTransactions() {
     console.log('[loadRecentTransactions] Complete');
   } catch (e) {
     console.error('loadRecentTransactions error', e);
+    showToast('error', 'Unable to fetch recent transactions - Please check your connection and refresh the page', 'Transaction Load Failed');
   }
 }
 
@@ -855,7 +944,10 @@ function setupWebSocket() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
 
-  ws.onopen = () => console.log('WebSocket connected');
+  ws.onopen = () => {
+    console.log('WebSocket connected');
+    showToast('success', 'Connected to real-time data stream - You\'ll receive instant updates for new transactions', 'Live Updates Active');
+  };
 
   ws.onmessage = (ev) => {
     try {
@@ -905,6 +997,9 @@ function setupWebSocket() {
       }
 
       if (msgType === 'tx_updated') {
+        invalidateCache('recent-transactions', '/recent-transactions');
+        invalidateCache('dashboard-data', '/dashboard-data');
+        invalidateCache('pattern-analytics', '/pattern-analytics');
         loadRecentTransactions();
         debounce('dashboardData', () => loadDashboardData(), 100);
         debounce('patternAnalytics', () => loadPatternAnalytics(), 150);
@@ -914,7 +1009,10 @@ function setupWebSocket() {
     }
   };
 
-  ws.onclose = () => setTimeout(setupWebSocket, 2000);
+  ws.onclose = () => {
+    showToast('warning', 'Lost connection to real-time updates - Attempting to reconnect...', 'Connection Lost');
+    setTimeout(setupWebSocket, 2000);
+  };
   ws.onerror = () => ws.close();
 }
 
@@ -1013,6 +1111,7 @@ async function sendChatMessage() {
     console.error('Chatbot error:', error);
     removeTypingIndicator();
     addChatMessage('Sorry, I encountered an error. Please try again.', false);
+    showToast('error', 'Unable to reach AI assistant - Please check your connection and try again', 'Chatbot Error');
   } finally {
     chatbotSend.disabled = false;
     chatbotInput.disabled = false;
@@ -1067,7 +1166,9 @@ document.addEventListener('DOMContentLoaded', () => {
     showTableLoading();
     showAlertsLoading();
     
-    // Clear chart data immediately
+    // Clear chart data AND transaction cache immediately to prevent stale data rendering
+    txCache = []; // Clear cache to prevent updateTimelineFromCache from using old data
+    
     if (timelineChart) {
       timelineChart.data.labels = [];
       timelineChart.data.datasets.forEach(ds => ds.data = []);
@@ -1096,6 +1197,9 @@ document.addEventListener('DOMContentLoaded', () => {
       loadPatternAnalytics()
     ]);
     
+    const rangeLabel = currentTimeRange === '1h' ? 'last hour' : currentTimeRange === '24h' ? 'last 24 hours' : currentTimeRange === '7d' ? 'last 7 days' : 'last 30 days';
+    showToast('info', `Dashboard updated with data from ${rangeLabel}`, 'Time Range Changed');
+    
     // Hide loading state when done
     hideAllChartsLoading();
   });
@@ -1118,8 +1222,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Transaction filter
-  document.getElementById('txFilter').addEventListener('change', () => {
+  document.getElementById('txFilter').addEventListener('change', (e) => {
+    const filter = e.target.value;
     renderTransactionTable();
+    const filterLabel = filter === 'ALL' ? 'all transactions' : filter === 'BLOCK' ? 'blocked transactions' : filter === 'DELAY' ? 'delayed transactions' : 'allowed transactions';
+    const count = filter === 'ALL' ? txCache.length : txCache.filter(tx => (tx.action || tx.tx_type || tx.type || '') === filter).length;
+    showToast('info', `Displaying ${count} ${filterLabel}`, 'Filter Applied');
   });
 
   // Risk Score Modal
@@ -1185,9 +1293,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Chatbot
   document.getElementById('chatbotToggle').addEventListener('click', () => {
     const chatbotWindow = document.getElementById('chatbotWindow');
+    const wasOpen = chatbotWindow.classList.contains('open');
     chatbotWindow.classList.toggle('open');
     if (chatbotWindow.classList.contains('open')) {
       document.getElementById('chatbotInput').focus();
+      if (!wasOpen) {
+        showToast('info', 'Ask me about transaction patterns, risk scores, or fraud detection insights', 'AI Assistant Ready');
+      }
     }
   });
 
@@ -1209,6 +1321,7 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('darkMode', isDarkMode);
     updateDarkModeButton(isDarkMode);
     updateChartColors(isDarkMode);
+    showToast('info', isDarkMode ? 'Dark mode enabled - Easier on the eyes in low light' : 'Light mode enabled - Bright and clear display', 'Display Mode Changed');
   });
 });
 
@@ -1321,7 +1434,8 @@ async function performExport() {
     });
 
     if (filteredTx.length === 0) {
-      alert('No transactions found for the selected date range');
+      const rangeLabel = timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : timeRange === '30d' ? 'last 30 days' : 'selected date range';
+      showToast('warning', `No transaction data available for ${rangeLabel}. Try selecting a different time period.`, 'No Data Found');
       return;
     }
 
@@ -1337,8 +1451,6 @@ async function performExport() {
       'Confidence Level',
       'Recipient VPA',
       'Device ID',
-      'Location',
-      'Remarks',
       'Created At'
     ];
 
@@ -1356,8 +1468,6 @@ async function performExport() {
         clean((tx.confidence_level || '').toUpperCase()),
         clean(tx.recipient_vpa),
         clean(tx.device_id),
-        clean(tx.location),
-        clean(tx.remarks),
         formatDateTime(tx.created_at || tx.timestamp)
     ]);
   });
@@ -1408,10 +1518,12 @@ async function performExport() {
 
     // Close modal and show success
     document.getElementById('exportModal').style.display = 'none';
-    alert(`✅ Exported ${filteredTx.length} transactions as ${format.toUpperCase()}`);
+    const formatName = format === 'csv' ? 'CSV' : format === 'json' ? 'JSON' : format === 'txt' ? 'TXT' : 'XLSX';
+    const rangeLabel = timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : timeRange === '30d' ? 'last 30 days' : 'selected period';
+    showToast('success', `Successfully exported ${filteredTx.length} transaction records from ${rangeLabel} to ${fileName}`, `${formatName} Export Complete`);
   } catch (error) {
     console.error('Export failed:', error);
-    alert(`❌ Export failed: ${error.message}`);
+    showToast('error', `Unable to export transactions - ${error.message}. Please check your browser settings and try again.`, 'Export Failed');
   } finally {
     // Reset button state
     const exportSubmitBtn = document.getElementById('exportSubmitBtn');
