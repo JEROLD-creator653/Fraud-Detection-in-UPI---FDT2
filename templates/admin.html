@@ -66,11 +66,21 @@
       border-radius: 24px;
       padding: 24px;
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-      transition: all 0.3s ease;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       border: 1px solid #e5e7eb;
       display: flex;
       flex-direction: column;
       min-height: 600px;
+    }
+
+    .admin-card.tx-card-loading {
+      min-height: 300px !important;
+      max-height: 300px !important;
+    }
+
+    .admin-card.tx-card-loaded {
+      min-height: 600px !important;
+      max-height: none !important;
     }
     
     body.dark-mode .admin-card {
@@ -199,6 +209,11 @@
       border-color: #667eea;
       box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
     }
+
+    .input-modern:hover:not(:focus) {
+      border-color: #667eea;
+      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.08);
+    }
     
     body.dark-mode .input-modern {
       background: #334155;
@@ -209,6 +224,11 @@
     body.dark-mode .input-modern:focus {
       border-color: #818cf8;
       box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.2);
+    }
+
+    body.dark-mode .input-modern:hover:not(:focus) {
+      border-color: #818cf8;
+      box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.15);
     }
     
     select.input-modern {
@@ -230,43 +250,82 @@
     
     /* Buttons */
     .btn-modern {
-      padding: 12px 20px;
+      padding: 12px 24px;
       border-radius: 12px;
       font-size: 14px;
       font-weight: 600;
-      transition: all 0.3s ease;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       cursor: pointer;
       border: none;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .btn-modern::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+    }
+    
+    .btn-modern:hover::before {
+      left: 100%;
     }
     
     .btn-modern:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
     
     .btn-modern:active {
-      transform: translateY(0);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
     }
     
     .btn-primary-modern {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #a855f7 100%);
       color: white;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
+    .btn-primary-modern:hover {
+      box-shadow: 0 12px 28px rgba(102, 126, 234, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
     
     .btn-blue-modern {
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
       color: white;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
+    .btn-blue-modern:hover {
+      box-shadow: 0 12px 28px rgba(59, 130, 246, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
     
     .btn-green-modern {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
       color: white;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
+    .btn-green-modern:hover {
+      box-shadow: 0 12px 28px rgba(16, 185, 129, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
     
     .btn-red-modern {
-      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
       color: white;
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
+    .btn-red-modern:hover {
+      box-shadow: 0 12px 28px rgba(239, 68, 68, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
     
     .btn-modern:disabled {
@@ -276,20 +335,42 @@
     }
     
     /* Dark mode button visibility fixes */
+    body.dark-mode .btn-primary-modern {
+      background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #d946ef 100%);
+      box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+    
+    body.dark-mode .btn-primary-modern:hover {
+      box-shadow: 0 12px 28px rgba(139, 92, 246, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
     body.dark-mode .btn-blue-modern {
-      background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+      background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #2563eb 100%);
       color: white;
-      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+      box-shadow: 0 4px 15px rgba(96, 165, 250, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+    
+    body.dark-mode .btn-blue-modern:hover {
+      box-shadow: 0 12px 28px rgba(96, 165, 250, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
+    body.dark-mode .btn-green-modern {
+      background: linear-gradient(135deg, #34d399 0%, #10b981 50%, #059669 100%);
+      box-shadow: 0 4px 15px rgba(52, 211, 153, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+    
+    body.dark-mode .btn-green-modern:hover {
+      box-shadow: 0 12px 28px rgba(52, 211, 153, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
     
     body.dark-mode .btn-red-modern {
-      background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+      background: linear-gradient(135deg, #f87171 0%, #ef4444 50%, #dc2626 100%);
       color: white;
-      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+      box-shadow: 0 4px 15px rgba(248, 113, 113, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
     
-    body.dark-mode .btn-modern:hover {
-      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+    body.dark-mode .btn-red-modern:hover {
+      box-shadow: 0 12px 28px rgba(248, 113, 113, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
     
     /* Transaction Details Box */
@@ -472,9 +553,65 @@
     .health-item-label {
       color: #374151;
       font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
     body.dark-mode .health-item-label {
       color: #d1d5db;
+    }
+
+    .info-btn-inline {
+      cursor: pointer;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      font-size: 12px;
+      color: white;
+      padding: 3px 8px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .info-btn-inline::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .info-btn-inline:hover::before {
+      left: 100%;
+    }
+
+    .info-btn-inline:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .info-btn-inline:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+    }
+
+    body.dark-mode .info-btn-inline {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.4);
+    }
+
+    body.dark-mode .info-btn-inline:hover {
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.5);
     }
 
     .health-status {
@@ -585,11 +722,23 @@
     /* Professional Transaction Table Styles */
     .professional-tx-table-wrapper {
       overflow-x: auto;
-      overflow-y: auto;
+      overflow-y: hidden;
       border-radius: 12px;
       border: 1px solid #e5e7eb;
-      max-height: 600px;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      height: 150px;
+      transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .professional-tx-table-wrapper.loading-state {
+      height: 150px !important;
+      overflow-y: hidden !important;
+    }
+
+    .professional-tx-table-wrapper.loaded-state {
+      height: auto !important;
+      max-height: 600px !important;
+      overflow-y: auto !important;
     }
     
     body.dark-mode .professional-tx-table-wrapper {
@@ -935,29 +1084,52 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.2s ease;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       font-weight: 600;
       outline: none;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
+    .quick-action-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+    
+    .quick-action-btn:hover::before {
+      left: 100%;
     }
     
     .quick-action-btn:hover {
-      transform: translateY(-2px) scale(1.1);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      transform: translateY(-3px) scale(1.15);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
     
     .explain-btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #a855f7 100%);
       color: white;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
     
     .view-btn {
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
       color: white;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
     
     .allow-btn {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
       color: white;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
     
     .delay-btn {
@@ -1112,16 +1284,36 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.3s ease;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       border-radius: 50%;
       opacity: 0.8;
       flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .explainability-close-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .explainability-close-btn:hover::before {
+      left: 100%;
     }
 
     .explainability-close-btn:hover {
       opacity: 1;
-      background: rgba(255, 255, 255, 0.2);
-      transform: scale(1.1);
+      background: rgba(255, 255, 255, 0.25);
+      transform: scale(1.15);
+      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
     }
 
     .explainability-modal-content {
@@ -1707,6 +1899,13 @@
       background-color: #475569 !important;
       border-color: #818cf8 !important;
     }
+
+    body.dark-mode select:hover:not(:focus),
+    body.dark-mode .input-modern:hover:not(:focus) {
+      border-color: #818cf8 !important;
+      box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.15) !important;
+    }
+
     body.dark-mode h3 { color: #f1f5f9 !important; }
     body.dark-mode label { color: #e5e7eb !important; }
     body.dark-mode #confirmModal .bg-white { background-color: #1e293b !important; color: #e5e7eb; }
@@ -1795,56 +1994,137 @@
     }
     
     /* Model Accuracy Modal Dark Mode */
+    body.dark-mode #modelAccuracyModal {
+      background: rgba(15, 23, 42, 0.85) !important;
+    }
+    
     body.dark-mode #modelAccuracyModal .info-modal {
       background: #1e293b !important;
+      border: 1px solid #334155;
+    }
+
+    body.dark-mode #modelAccuracyModal .info-modal-header {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+      border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal .close-btn {
+      background: rgba(255, 255, 255, 0.15) !important;
+      color: white !important;
+    }
+
+    body.dark-mode #modelAccuracyModal .close-btn:hover {
+      background: rgba(255, 255, 255, 0.25) !important;
+    }
+
+    body.dark-mode #modelAccuracyModal .info-modal-content {
+      color: #cbd5e1 !important;
+    }
+    
+    body.dark-mode #modelAccuracyModal h2,
+    body.dark-mode #modelAccuracyModal h3 {
       color: #e5e7eb !important;
     }
     
-    body.dark-mode #modelAccuracyModal h2 {
-      color: #60a5fa !important;
-    }
-    
-    body.dark-mode #modelAccuracyModal h3 {
-      color: #f1f5f9 !important;
-    }
-    
     body.dark-mode #modelAccuracyModal p,
-    body.dark-mode #modelAccuracyModal li {
+    body.dark-mode #modelAccuracyModal li,
+    body.dark-mode #modelAccuracyModal span {
       color: #cbd5e1 !important;
     }
     
     body.dark-mode #modelAccuracyModal strong {
-      color: #e5e7eb !important;
+      color: #f1f5f9 !important;
     }
     
-    body.dark-mode #modelAccuracyModal .info-section {
-      color: #e5e7eb !important;
+    /* Blue gradient sections */
+    body.dark-mode #modelAccuracyModal .info-section[style*="linear-gradient(135deg, #f0f9ff"] {
+      background: linear-gradient(135deg, #1e3a5f 0%, #1e4d6e 100%) !important;
+      border-color: #2563eb !important;
     }
-    
-    body.dark-mode #modelAccuracyModal .close-btn {
-      color: #94a3b8 !important;
+
+    body.dark-mode #modelAccuracyModal .info-section[style*="linear-gradient(135deg, #f0f9ff"] h3 {
+      color: #93c5fd !important;
     }
-    
-    body.dark-mode #modelAccuracyModal [style*="background: #f0f9ff"] {
-      background: #1e3a5f !important;
+
+    body.dark-mode #modelAccuracyModal .info-section[style*="linear-gradient(135deg, #f0f9ff"] p {
+      color: #bfdbfe !important;
     }
-    
-    body.dark-mode #modelAccuracyModal [style*="background: white"] {
+
+    /* Model cards */
+    body.dark-mode #modelAccuracyModal div[style*="background: #fafafa"] {
       background: #334155 !important;
+    }
+
+    /* White backgrounds in ensemble section */
+    body.dark-mode #modelAccuracyModal div[style*="background: white"] {
+      background: #334155 !important;
+      border-color: #475569 !important;
+    }
+
+    /* Weight list items */
+    body.dark-mode #modelAccuracyModal li[style*="background: white"] {
+      background: #334155 !important;
+      border-color: #475569 !important;
+    }
+
+    /* Note paragraph in ensemble section */
+    body.dark-mode #modelAccuracyModal p[style*="color: #64748b"] {
+      color: #cbd5e1 !important;
+      background: #334155 !important;
+      border-left-color: #64748b !important;
+    }
+
+    body.dark-mode #modelAccuracyModal p[style*="color: #64748b"] strong {
       color: #e5e7eb !important;
     }
+
+    body.dark-mode #modelAccuracyModal p[style*="color: #64748b"] em {
+      color: #cbd5e1 !important;
+    }
     
+    /* Pro tip section */
     body.dark-mode #modelAccuracyModal .pro-tip-section {
-      background: #1e4d3a !important;
+      background: linear-gradient(135deg, #064e3b 0%, #065f46 100%) !important;
       border-left-color: #10b981 !important;
     }
     
     body.dark-mode #modelAccuracyModal .pro-tip-section strong {
-      color: #34d399 !important;
+      color: #6ee7b7 !important;
     }
     
     body.dark-mode #modelAccuracyModal .pro-tip-section span {
       color: #a7f3d0 !important;
+    }
+
+    /* Specific color overrides */
+    body.dark-mode #modelAccuracyModal strong[style*="color: #065f46"],
+    body.dark-mode #modelAccuracyModal strong[style*="color: #10b981"] {
+      color: #6ee7b7 !important;
+    }
+
+    body.dark-mode #modelAccuracyModal strong[style*="color: #92400e"],
+    body.dark-mode #modelAccuracyModal strong[style*="color: #f59e0b"] {
+      color: #fbbf24 !important;
+    }
+
+    body.dark-mode #modelAccuracyModal strong[style*="color: #1e40af"],
+    body.dark-mode #modelAccuracyModal strong[style*="color: #3b82f6"] {
+      color: #93c5fd !important;
+    }
+
+    body.dark-mode #modelAccuracyModal span[style*="color: #059669"],
+    body.dark-mode #modelAccuracyModal span[style*="color: #10b981"] {
+      color: #6ee7b7 !important;
+    }
+
+    body.dark-mode #modelAccuracyModal span[style*="color: #d97706"],
+    body.dark-mode #modelAccuracyModal span[style*="color: #f59e0b"] {
+      color: #fbbf24 !important;
+    }
+
+    body.dark-mode #modelAccuracyModal span[style*="color: #2563eb"],
+    body.dark-mode #modelAccuracyModal span[style*="color: #3b82f6"] {
+      color: #93c5fd !important;
     }
 
     /* Floating Action Button Styles */
@@ -1892,22 +2172,48 @@
       width: 64px;
       height: 64px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #a855f7 100%);
       color: white;
       border: none;
       font-size: 28px;
       cursor: pointer;
-      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
       transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       z-index: 1000;
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
+    }
+
+    .chatbot-toggle::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      animation: chatbot-shine 3s ease-in-out infinite;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    @keyframes chatbot-shine {
+      0% {
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+      }
+      50% {
+        transform: translateX(100%) translateY(100%) rotate(45deg);
+      }
+      100% {
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+      }
     }
 
     .chatbot-toggle:hover {
-      transform: scale(1.1) rotate(10deg);
-      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.5);
+      transform: scale(1.12) rotate(10deg);
+      box-shadow: 0 16px 40px rgba(102, 126, 234, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 30px rgba(102, 126, 234, 0.5);
     }
 
     .chatbot-toggle:active {
@@ -1915,11 +2221,11 @@
     }
 
     body.dark-mode .chatbot-toggle {
-      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
 
     body.dark-mode .chatbot-toggle:hover {
-      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.6);
+      box-shadow: 0 16px 40px rgba(102, 126, 234, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 30px rgba(102, 126, 234, 0.6);
     }
 
     .chatbot-window {
@@ -2120,19 +2426,39 @@
 
     .chatbot-send-btn {
       padding: 12px 20px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #a855f7 100%);
       color: white;
       border: none;
       border-radius: 12px;
       cursor: pointer;
       font-weight: 600;
       font-size: 14px;
-      transition: all 0.3s ease;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .chatbot-send-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .chatbot-send-btn:hover::before {
+      left: 100%;
     }
 
     .chatbot-send-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
 
     .chatbot-send-btn:active {
@@ -2206,7 +2532,7 @@
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #a855f7 100%);
       color: white;
       border: none;
       font-size: 16px;
@@ -2214,14 +2540,33 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
       font-weight: 600;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .threshold-info-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .threshold-info-btn:hover::before {
+      left: 100%;
     }
 
     .threshold-info-btn:hover {
-      transform: scale(1.15) rotate(10deg);
-      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+      transform: scale(1.2) rotate(10deg);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
 
     .threshold-info-btn:active {
@@ -2373,38 +2718,64 @@
       font-weight: 600;
       cursor: pointer;
       font-size: 14px;
-      transition: all 0.2s ease;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .threshold-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .threshold-btn:hover::before {
+      left: 100%;
     }
 
     .threshold-btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #a855f7 100%);
       color: white;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
 
     .threshold-btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
 
     .threshold-btn-secondary {
-      background: white;
+      background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
       color: #667eea;
       border: 2px solid #667eea;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 
     .threshold-btn-secondary:hover {
-      background: #f0f4ff;
+      background: linear-gradient(135deg, #f0f4ff 0%, #e8ecff 100%);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.6);
     }
 
     .threshold-btn-danger {
-      background: white;
+      background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
       color: #ef4444;
       border: 2px solid #ef4444;
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 
     .threshold-btn-danger:hover {
-      background: #fef2f2;
+      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(239, 68, 68, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.6);
     }
 
     .live-preview {
@@ -2723,23 +3094,29 @@
     }
 
     body.dark-mode .threshold-btn-secondary {
-      background: #334155;
+      background: linear-gradient(135deg, #334155 0%, #425563 100%);
       color: #60a5fa;
       border-color: #60a5fa;
+      box-shadow: 0 4px 15px rgba(96, 165, 250, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
     }
 
     body.dark-mode .threshold-btn-secondary:hover {
-      background: #475569;
+      background: linear-gradient(135deg, #475569 0%, #556575 100%);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(96, 165, 250, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
 
     body.dark-mode .threshold-btn-danger {
-      background: #334155;
+      background: linear-gradient(135deg, #334155 0%, #425563 100%);
       color: #f87171;
       border-color: #f87171;
+      box-shadow: 0 4px 15px rgba(248, 113, 113, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
     }
 
     body.dark-mode .threshold-btn-danger:hover {
-      background: #475569;
+      background: linear-gradient(135deg, #475569 0%, #556575 100%);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(248, 113, 113, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
 
     body.dark-mode .live-preview {
@@ -2798,10 +3175,33 @@
       border-bottom-color: #475569;
     }
 
-    .modal-header h2 {
-      font-size: 20px;
-      font-weight: 700;
-      margin: 0;
+    .modal-close {
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .modal-close::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(107, 114, 128, 0.2), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .modal-close:hover::before {
+      left: 100%;
+    }
+
+    .modal-close:hover {
+      background: #f3f4f6;
+      transform: scale(1.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1)
     }
 
     .modal-close {
@@ -2922,22 +3322,287 @@
       background: #64748b;
     }
 
+    .btn-export-gradient {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #8b5cf6 100%);
+      color: white;
+      box-shadow: 0 6px 18px rgba(102, 126, 234, 0.35);
+    }
+
+    .btn-export-gradient:hover {
+      box-shadow: 0 10px 24px rgba(124, 58, 237, 0.4);
+    }
+
+    .export-modal {
+      background: white;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      max-width: 520px;
+      width: 92%;
+      animation: modalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    @keyframes modalSlide {
+      from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .export-modal-close {
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .export-modal-close::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .export-modal-close:hover::before {
+      left: 100%;
+    }
+
+    .export-modal-close:hover {
+      background: rgba(255, 255, 255, 0.35);
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+    }
+
+    .export-modal-header {
+      padding: 22px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+
+    .export-modal-title {
+      font-size: 20px;
+      font-weight: 800;
+      margin: 0;
+      letter-spacing: 0.2px;
+    }
+
+    .export-modal-subtitle {
+      margin-top: 4px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.85);
+      font-weight: 500;
+    }
+
+    .export-modal-close {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .export-modal-close:hover {
+      background: rgba(255, 255, 255, 0.32);
+      transform: scale(1.05);
+    }
+
+    .export-modal-body {
+      padding: 24px;
+    }
+
+    .export-form-group {
+      margin-bottom: 18px;
+    }
+
+    .export-form-group label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #334155;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+    }
+
+    body.dark-mode .export-form-group label {
+      color: #e2e8f0;
+    }
+
+    .export-control {
+      width: 100%;
+      padding: 12px 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 14px;
+      background: white;
+      color: #0f172a;
+      transition: all 0.2s ease;
+    }
+
+    .export-control:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.18);
+    }
+
+    body.dark-mode .export-control {
+      background: #1e293b;
+      border-color: #334155;
+      color: #f1f5f9;
+    }
+
+    body.dark-mode .export-control:focus {
+      border-color: #818cf8;
+      box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.25);
+    }
+
+    .select-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .select-wrapper select {
+      appearance: none;
+      padding-right: 42px;
+    }
+
+    .select-arrow {
+      position: absolute;
+      right: 14px;
+      pointer-events: none;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    body.dark-mode .select-arrow {
+      color: #cbd5e1;
+    }
+
+    .export-modal-footer {
+      padding: 18px 24px 22px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+
+    body.dark-mode .export-modal-footer {
+      background: #0f172a;
+      border-top-color: #1e293b;
+    }
+
+    .export-btn-secondary {
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      border: 1px solid #d1d5db;
+      background: #f8fafc;
+      color: #334155;
+      transition: all 0.2s ease;
+    }
+
+    .export-btn-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    body.dark-mode .export-btn-secondary {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-color: #334155;
+    }
+
+    body.dark-mode .export-btn-secondary:hover {
+      background: #334155;
+    }
+
+    .export-btn-primary {
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 700;
+      border: none;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      box-shadow: 0 8px 18px rgba(102, 126, 234, 0.35);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .export-btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(118, 75, 162, 0.4);
+    }
+
+    .export-btn-primary.loading {
+      cursor: progress;
+      transform: none;
+      box-shadow: 0 8px 18px rgba(102, 126, 234, 0.25);
+      opacity: 0.9;
+    }
+
+    .export-btn-primary .export-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #ffffff;
+      border-radius: 9999px;
+      display: none;
+      animation: spin 1s linear infinite;
+    }
+
+    .export-btn-primary.loading .export-spinner {
+      display: inline-block;
+    }
+
     /* Export Audit Modal - Minimal Scoped Styles */
     #exportAuditModal {
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      bottom: 0 !important;
-      background: rgba(0, 0, 0, 0.5) !important;
-      display: none !important;
-      align-items: center !important;
-      justify-content: center !important;
-      z-index: 999 !important;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
     }
 
     #exportAuditModal[style*="display: flex"] {
       display: flex !important;
+    }
+
+    body.dark-mode .export-modal {
+      background: #1e293b;
+      border-color: #334155;
+    }
+
+    body.dark-mode .export-modal-body {
+      background: #1e293b;
     }
   </style>
 </head>
@@ -3050,8 +3715,9 @@
             
             <!-- Model Accuracy -->
             <div class="health-item">
-              <span class="health-item-label">Model Accuracy 
-                <button id="modelAccuracyInfoBtn" class="info-btn-inline" title="Model Info" style="cursor: pointer; background: none; border: none; font-size: 14px; color: #3b82f6; padding: 0 4px;">ℹ️</button>
+              <span class="health-item-label">
+                <span>Model Accuracy</span>
+                <button id="modelAccuracyInfoBtn" class="info-btn-inline" title="View Model Performance Metrics">ℹ️</button>
               </span>
               <span id="ep_models_health" class="health-status health-checking">
                 <span class="health-dot"></span>
@@ -3106,7 +3772,7 @@
       <div class="admin-card">
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-lg font-bold">Recent Admin Logs</h3>
-          <button id="exportAuditBtn" class="btn-modern btn-blue-modern" style="padding: 8px 16px; font-size: 13px;">
+          <button id="exportAuditBtn" class="btn-modern btn-export-gradient" style="padding: 8px 16px; font-size: 13px;">
             📥 Export Audit Trail
           </button>
         </div>
@@ -3504,7 +4170,7 @@
 
 
     <!-- Transactions -->
-    <div class="admin-card">
+    <div class="admin-card tx-card-loading" id="txAdminCard">
       <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
         <h3 class="text-lg font-bold">Transactions (Admin View)</h3>
         <div class="flex gap-3">
@@ -3522,7 +4188,7 @@
           </select>
         </div>
       </div>
-      <div class="professional-tx-table-wrapper">
+      <div class="professional-tx-table-wrapper loading-state">
         <table class="professional-tx-table" id="admin_recent"></table>
       </div>
     </div>
@@ -3532,56 +4198,99 @@
   <div id="toastContainer" class="fixed bottom-6 right-6 z-[1001] space-y-3"></div>
 
   <!-- Model Accuracy Info Modal -->
-  <div id="modelAccuracyModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center;">
-    <div class="info-modal" style="background: white; border-radius: 20px; max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto; padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-      <div class="info-modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-        <h2 style="font-size: 24px; font-weight: 800; margin: 0; color: #1f2937;">📊 Model Performance Metrics</h2>
-        <button id="closeModelAccuracyModal" class="close-btn" style="background: none; border: none; font-size: 32px; cursor: pointer; color: #1f2937; line-height: 1; padding: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">&times;</button>
+  <div id="modelAccuracyModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="info-modal" style="background: white; border-radius: 20px; max-width: 750px; width: 92%; max-height: 88vh; overflow: hidden; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4); display: flex; flex-direction: column;">
+      
+      <!-- Modal Header -->
+      <div class="info-modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 24px 32px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px 20px 0 0;">
+        <div>
+          <h2 style="font-size: 26px; font-weight: 800; margin: 0; color: white; letter-spacing: -0.5px;">📊 Model Performance Metrics</h2>
+          <p style="font-size: 13px; color: rgba(255, 255, 255, 0.9); margin: 6px 0 0 0; font-weight: 500;">Understanding our fraud detection models</p>
+        </div>
+        <button id="closeModelAccuracyModal" class="close-btn" style="background: rgba(255, 255, 255, 0.2); border: none; font-size: 24px; cursor: pointer; color: white; line-height: 1; padding: 0; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 10px; transition: all 0.2s ease;">&times;</button>
       </div>
       
-      <div class="info-modal-content" style="color: #1f2937; line-height: 1.7;">
-        <div class="info-section" style="margin-bottom: 24px;">
-          <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">🤖 What are Model Performance Metrics?</h3>
-          <p>Our fraud detection system uses an ensemble of three powerful machine learning models working together. These metrics show how accurately each model identifies fraudulent transactions.</p>
+      <!-- Modal Body -->
+      <div class="info-modal-content" style="color: #1f2937; line-height: 1.7; padding: 28px 32px; overflow-y: auto; flex: 1;">
+        
+        <div class="info-section" style="margin-bottom: 28px; padding: 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 14px; border-left: 5px solid #3b82f6;">
+          <h3 style="font-size: 19px; font-weight: 700; margin-bottom: 14px; color: #0c4a6e; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 24px;">🤖</span> What are Model Performance Metrics?
+          </h3>
+          <p style="color: #0369a1; font-size: 15px; margin: 0;">Our fraud detection system uses an ensemble of three powerful machine learning models working together. These metrics show how accurately each model identifies fraudulent transactions.</p>
         </div>
 
-        <div class="info-section" style="margin-bottom: 24px;">
-          <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">🧠 The Models</h3>
-          <ul style="list-style: none; padding: 0; margin: 0;">
-            <li style="padding: 8px 0;"><strong>Random Forest (🌲):</strong> Uses multiple decision trees to vote on fraud likelihood. Excellent at capturing complex patterns in transaction behavior.</li>
-            <li style="padding: 8px 0;"><strong>XGBoost (⚡):</strong> Advanced gradient boosting algorithm that learns from errors. Highly accurate for structured transaction data.</li>
-            <li style="padding: 8px 0;"><strong>Isolation Forest (🌳):</strong> Specialized in anomaly detection. Identifies transactions that deviate from normal patterns.</li>
-          </ul>
-        </div>
-
-        <div class="info-section" style="margin-bottom: 24px; background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 4px solid #3b82f6;">
-          <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">🎯 Ensemble Score Calculation</h3>
-          <p style="margin-bottom: 12px;"><strong>The ensemble score is calculated using a weighted average of all three models:</strong></p>
-          <div style="background: white; padding: 16px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 14px; margin: 12px 0; color: #1f2937;">
-            <strong>Ensemble Score = (w₁ × Random Forest) + (w₂ × XGBoost) + (w₃ × Isolation Forest)</strong>
+        <div class="info-section" style="margin-bottom: 28px;">
+          <h3 style="font-size: 19px; font-weight: 700; margin-bottom: 16px; color: #0f172a; display: flex; align-items: center; gap: 8px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+            <span style="font-size: 24px;">🧠</span> The Models
+          </h3>
+          <div style="display: grid; gap: 14px;">
+            <div style="padding: 16px; background: #fafafa; border-radius: 10px; border-left: 4px solid #10b981;">
+              <strong style="color: #065f46; font-size: 15px; display: block; margin-bottom: 6px;">🌲 Random Forest</strong>
+              <p style="margin: 0; color: #475569; font-size: 14px;">Uses multiple decision trees to vote on fraud likelihood. Excellent at capturing complex patterns in transaction behavior.</p>
+            </div>
+            <div style="padding: 16px; background: #fafafa; border-radius: 10px; border-left: 4px solid #f59e0b;">
+              <strong style="color: #92400e; font-size: 15px; display: block; margin-bottom: 6px;">⚡ XGBoost</strong>
+              <p style="margin: 0; color: #475569; font-size: 14px;">Advanced gradient boosting algorithm that learns from errors. Highly accurate for structured transaction data.</p>
+            </div>
+            <div style="padding: 16px; background: #fafafa; border-radius: 10px; border-left: 4px solid #3b82f6;">
+              <strong style="color: #1e40af; font-size: 15px; display: block; margin-bottom: 6px;">🌳 Isolation Forest</strong>
+              <p style="margin: 0; color: #475569; font-size: 14px;">Specialized in anomaly detection. Identifies transactions that deviate from normal patterns.</p>
+            </div>
           </div>
-          <p style="margin-top: 12px;"><strong>Default weights:</strong></p>
-          <ul style="list-style: disc; padding-left: 24px; margin: 8px 0;">
-            <li>Random Forest (w₁): 0.35 (35%)</li>
-            <li>XGBoost (w₂): 0.40 (40%)</li>
-            <li>Isolation Forest (w₃): 0.25 (25%)</li>
+        </div>
+
+        <div class="info-section" style="margin-bottom: 28px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 22px; border-radius: 14px; border: 1px solid #bae6fd;">
+          <h3 style="font-size: 19px; font-weight: 700; margin-bottom: 14px; color: #0c4a6e; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 24px;">🎯</span> Ensemble Score Calculation
+          </h3>
+          <p style="margin-bottom: 14px; color: #0369a1; font-size: 15px;"><strong>The ensemble score is calculated using a weighted average of all three models:</strong></p>
+          <div style="background: white; padding: 18px; border-radius: 10px; font-family: 'Courier New', monospace; font-size: 14px; margin: 14px 0; color: #1e293b; border: 2px solid #cbd5e1; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);">
+            <strong style="color: #3b82f6;">Ensemble Score = (w₁ × RF) + (w₂ × XGB) + (w₃ × IF)</strong>
+          </div>
+          <p style="margin: 14px 0 8px 0; color: #0369a1;"><strong>Default weights:</strong></p>
+          <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 8px;">
+            <li style="padding: 10px 14px; background: white; border-radius: 8px; color: #475569; display: flex; justify-content: space-between; border: 1px solid #e2e8f0;">
+              <span><strong style="color: #10b981;">Random Forest (w₁):</strong></span>
+              <span style="font-weight: 700; color: #059669;">35%</span>
+            </li>
+            <li style="padding: 10px 14px; background: white; border-radius: 8px; color: #475569; display: flex; justify-content: space-between; border: 1px solid #e2e8f0;">
+              <span><strong style="color: #f59e0b;">XGBoost (w₂):</strong></span>
+              <span style="font-weight: 700; color: #d97706;">40%</span>
+            </li>
+            <li style="padding: 10px 14px; background: white; border-radius: 8px; color: #475569; display: flex; justify-content: space-between; border: 1px solid #e2e8f0;">
+              <span><strong style="color: #3b82f6;">Isolation Forest (w₃):</strong></span>
+              <span style="font-weight: 700; color: #2563eb;">25%</span>
+            </li>
           </ul>
-          <p style="margin-top: 12px; font-size: 14px; color: #475569;"><em>Note: Weights sum to 1.0 and can be adjusted based on model performance during retraining.</em></p>
+          <p style="margin-top: 14px; font-size: 13px; color: #64748b; padding: 12px; background: white; border-radius: 8px; border-left: 3px solid #94a3b8;"><em><strong>Note:</strong> Weights sum to 1.0 and can be adjusted based on model performance during retraining.</em></p>
         </div>
 
-        <div class="info-section" style="margin-bottom: 24px;">
-          <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">📊 Understanding Accuracy</h3>
-          <p><strong>Accuracy Percentage:</strong> Shows what percentage of transactions the model correctly classifies as fraud or legitimate.</p>
-          <p style="margin-top: 8px;"><strong>Example:</strong> 97.21% accuracy means the model correctly identifies 9,721 out of 10,000 transactions.</p>
+        <div class="info-section" style="margin-bottom: 28px; padding: 20px; background: #fafafa; border-radius: 14px; border: 1px solid #e5e7eb;">
+          <h3 style="font-size: 19px; font-weight: 700; margin-bottom: 14px; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 24px;">📊</span> Understanding Accuracy
+          </h3>
+          <p style="color: #475569; font-size: 15px; margin-bottom: 10px;"><strong style="color: #1e293b;">Accuracy Percentage:</strong> Shows what percentage of transactions the model correctly classifies as fraud or legitimate.</p>
+          <div style="padding: 14px; background: white; border-radius: 10px; border-left: 4px solid #8b5cf6; margin-top: 12px;">
+            <p style="margin: 0; color: #475569; font-size: 14px;"><strong style="color: #6d28d9;">Example:</strong> 97.21% accuracy means the model correctly identifies 9,721 out of 10,000 transactions.</p>
+          </div>
         </div>
 
-        <div class="info-section" style="margin-bottom: 24px;">
-          <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">🎯 Why Ensemble Matters</h3>
-          <p>Using multiple models together (ensemble) reduces false positives and catches sophisticated fraud that single models might miss. Each model contributes its unique strength to the final decision.</p>
+        <div class="info-section" style="margin-bottom: 28px; padding: 20px; background: #fafafa; border-radius: 14px; border: 1px solid #e5e7eb;">
+          <h3 style="font-size: 19px; font-weight: 700; margin-bottom: 14px; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 24px;">🎯</span> Why Ensemble Matters
+          </h3>
+          <p style="color: #475569; font-size: 15px; margin: 0;">Using multiple models together (ensemble) reduces false positives and catches sophisticated fraud that single models might miss. Each model contributes its unique strength to the final decision.</p>
         </div>
 
-        <div class="pro-tip-section" style="background: #ecfdf5; padding: 16px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #10b981;">
-          <strong style="color: #059669;">💡 Pro Tip:</strong> <span style="color: #047857;">Model accuracy above 95% indicates excellent fraud detection capability. Regular retraining keeps models sharp.</span>
+        <div class="pro-tip-section" style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); padding: 18px 20px; border-radius: 12px; margin-top: 24px; border-left: 5px solid #10b981; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);">
+          <div style="display: flex; align-items: start; gap: 12px;">
+            <span style="font-size: 28px; line-height: 1;">💡</span>
+            <div>
+              <strong style="color: #065f46; font-size: 16px; display: block; margin-bottom: 6px;">Pro Tip</strong>
+              <span style="color: #047857; font-size: 14px; line-height: 1.6;">Model accuracy above 95% indicates excellent fraud detection capability. Regular retraining keeps models sharp and adaptive to new fraud patterns.</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -3602,6 +4311,19 @@ function getPrevAction(tx_id) {
   const detail = document.getElementById('qa_detail_action')?.textContent?.trim();
   if (detail) return detail;
   return null;
+}
+
+function updateAdminTxAction(tx_id, action, updatedTx = null) {
+  const idx = adminTxCache.findIndex(t => t.tx_id === tx_id);
+  if (idx >= 0) {
+    const current = adminTxCache[idx] || {};
+    adminTxCache[idx] = {
+      ...current,
+      ...(updatedTx || {}),
+      action: action
+    };
+  }
+  redrawAdminRecent();
 }
 
 function confidenceBadge(level) {
@@ -3693,7 +4415,7 @@ function showUndoToast(tx_id, newAction, prevAction){
   let start = Date.now(); const duration = 5000; let raf = null;
   function tick(){ const elapsed = Date.now()-start; const remain = Math.max(0, Math.ceil((duration-elapsed)/1000)); if(countdownEl) countdownEl.textContent = remain; const pct = Math.max(0,1-elapsed/duration); if(progressEl) progressEl.style.transform = `scaleX(${pct})`; if(elapsed>=duration) return remove(); raf = requestAnimationFrame(tick); }
   function remove(){ if(raf) cancelAnimationFrame(raf); try{ toast.remove(); }catch(e){} }
-  undoBtn.addEventListener('click', async (e)=>{ e.stopPropagation(); try{ const res = await fetch('/admin/action',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tx_id, action: prevAction }) }); const result = await res.json(); if(!res.ok){ showToast('error', result.detail || 'Undo failed'); } else { showToast('success', `Reverted to ${prevAction} for ${tx_id.slice(0,8)}...`); addAdminLog({ tx_id, user_id: (result && result.updated && result.updated.user_id) ? result.updated.user_id : 'unknown', action: prevAction, time: new Date().toISOString() }); fetchRecent(); } }catch(err){ showToast('error', err.message || 'Undo failed'); } finally { remove(); } });
+  undoBtn.addEventListener('click', async (e)=>{ e.stopPropagation(); try{ const res = await fetch('/admin/action',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tx_id, action: prevAction }) }); const result = await res.json(); if(!res.ok){ showToast('error', result.detail || `Failed to revert transaction ${tx_id.slice(0,8)}... to ${prevAction}`, 'Undo Failed'); } else { showToast('success', `Transaction ${tx_id.slice(0,8)}... reverted to ${prevAction}`, 'Action Undone'); addAdminLog({ tx_id, user_id: (result && result.updated && result.updated.user_id) ? result.updated.user_id : 'unknown', action: prevAction, time: new Date().toISOString() }); updateAdminTxAction(tx_id, prevAction, result.updated || null); } }catch(err){ showToast('error', err.message || 'Network error during undo operation', 'Undo Failed'); } finally { remove(); } });
   requestAnimationFrame(tick);
 }
 
@@ -3805,6 +4527,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nowDark = document.body.classList.toggle('dark-mode');
     localStorage.setItem('darkMode', nowDark);
     updateDarkModeButtonAdmin(nowDark);
+    showToast('info', nowDark ? 'Dark mode enabled - Reduced eye strain for extended admin sessions' : 'Light mode enabled - Full brightness display', 'Display Mode Changed');
   });
   
   // Setup modal buttons
@@ -3975,6 +4698,22 @@ function sortAdminTable(column) {
 
   // Redraw table (sort indicators will be applied during redraw)
   redrawAdminRecent();
+  
+  // Show toast notification for sort
+  const columnLabels = {
+    'tx-time': 'Timestamp',
+    'tx-id': 'Transaction ID',
+    'tx-user': 'User ID',
+    'tx-amount': 'Amount',
+    'tx-channel': 'Channel',
+    'tx-type': 'Transaction Type',
+    'tx-action': 'Action',
+    'tx-risk': 'Risk Score',
+    'tx-confidence': 'Confidence Level'
+  };
+  const colLabel = columnLabels[column] || column;
+  const dirLabel = adminTableSort.direction === 'asc' ? 'ascending' : 'descending';
+  showToast('info', `Sorted by ${colLabel} (${dirLabel} order)`, 'Table Sorted');
 }
 
 /* ---------- load recent ---------- */
@@ -3989,6 +4728,7 @@ async function fetchRecent() {
 
 function redrawAdminRecent() {
   const el = document.getElementById('admin_recent');
+  const wrapper = el?.closest('.professional-tx-table-wrapper');
   const filter = document.getElementById('adminFilter')?.value || 'ALL';
 
   el.innerHTML = '';
@@ -4070,13 +4810,34 @@ function redrawAdminRecent() {
   }
   
   el.appendChild(fragment);
+  
+  // Apply loaded state for smooth expansion
+  const txCard = document.getElementById('txAdminCard');
+  if (wrapper) {
+    wrapper.classList.remove('loading-state');
+    wrapper.classList.add('loaded-state');
+  }
+  if (txCard) {
+    txCard.classList.remove('tx-card-loading');
+    txCard.classList.add('tx-card-loaded');
+  }
 }
 
 function showAdminLoading() {
   const el = document.getElementById('admin_recent');
+  const wrapper = el?.closest('.professional-tx-table-wrapper');
+  const txCard = document.getElementById('txAdminCard');
+  if (wrapper) {
+    wrapper.classList.remove('loaded-state');
+    wrapper.classList.add('loading-state');
+  }
+  if (txCard) {
+    txCard.classList.remove('tx-card-loaded');
+    txCard.classList.add('tx-card-loading');
+  }
   el.innerHTML = `
-    <tr class="tx-table-row" style="height: 200px;">
-      <td colspan="10" style="text-align: center; padding: 60px 20px;">
+    <tr class="tx-table-row" style="height: 150px;">
+      <td colspan="10" style="text-align: center; padding: 40px 20px;">
         <div style="display: inline-flex; align-items: center; gap: 8px; color: #667eea;">
           <svg style="width: 20px; height: 20px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -4100,12 +4861,14 @@ function showExplain(tx_id) {
 
   const tx = adminTxCache.find(t => t.tx_id === tx_id);
   if (!tx) {
-    showToast('error', 'Transaction not found');
+    showToast('error', `Cannot display details - Transaction ${tx_id.substring(0, 8)}... not found`, 'Transaction Not Found');
     return;
   }
 
   console.log('showExplain - Full transaction data:', tx);
   console.log('showExplain - Explainability field:', tx.explainability);
+
+  showToast('info', `Displaying fraud detection analysis for transaction ${tx_id.substring(0, 12)}...`, 'Explainability Details');
 
   // Try multiple ways to get explainability data
   let expl = {};
@@ -4191,6 +4954,7 @@ function showThresholdInfo() {
   const modal = document.getElementById('thresholdInfoModal');
   if (modal) {
     modal.classList.remove('hidden');
+    showToast('info', 'Learn how to optimize risk thresholds, confidence levels, and model weights', 'Threshold Tuning Guide');
   }
 }
 
@@ -4267,7 +5031,7 @@ document.getElementById('qa_fetch_btn').onclick = async () => {
     const tx = (j.transactions || []).find(t => t.tx_id === tx_id);
 
     if (!tx) {
-      showToast('error', 'Transaction not found');
+      showToast('error', `Transaction ${tx_id.substring(0, 8)}... not found in recent transactions`, 'Not Found');
       document.getElementById('qa_result').textContent = 'Transaction not found';
       return;
     }
@@ -4337,6 +5101,7 @@ function fillAndScrollTx(tx_id) {
   if (quickActionCard) {
     quickActionCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+  showToast('info', `Transaction ${tx_id.substring(0, 12)}... loaded into Quick Action panel`, 'Transaction Selected');
 }
 
 /* ---------- fill TX ID and fetch details (View button) ---------- */
@@ -4348,6 +5113,7 @@ function fillAndFetchTx(tx_id) {
   if (quickActionCard) {
     quickActionCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+  showToast('info', `Fetching detailed information for transaction ${tx_id.substring(0, 12)}...`, 'Loading Details');
   // Auto-fetch details after a short delay to allow scroll
   setTimeout(() => {
     document.getElementById('qa_fetch_btn').click();
@@ -4360,6 +5126,29 @@ let pendingAction = null;
 
 function showConfirmation(tx_id, action) {
   console.log('showConfirmation called:', tx_id, action);
+  
+  // Check if transaction already has this action
+  const tx = adminTxCache.find(t => t.tx_id === tx_id);
+  if (tx) {
+    const currentAction = (tx.action || '').toUpperCase();
+    if (currentAction === action) {
+      const actionLabel = action === 'BLOCK' ? 'blocked' : action === 'DELAY' ? 'delayed' : 'allowed';
+      showToast('warning', `Transaction ${tx_id.substring(0, 12)}... is already ${actionLabel}. Choose a different action to update the status.`, 'Duplicate Action');
+      
+      // Reset Apply Action button state
+      const applyBtn = document.getElementById('qa_btn');
+      if (applyBtn) {
+        applyBtn.textContent = 'Apply Action';
+        applyBtn.disabled = false;
+      }
+      
+      // Update result text
+      document.getElementById('qa_result').textContent = `⚠️ Transaction is already ${actionLabel}. Choose a different action to apply.`;
+      
+      return;
+    }
+  }
+  
   pendingAction = { tx_id, action };
   document.getElementById('confirm_tx_id').textContent = tx_id;
   document.getElementById('confirm_action').textContent = action;
@@ -4444,14 +5233,15 @@ function setupModalButtons() {
         const result = await response.json();
         
         if (!response.ok) {
-          showToast('error', result.detail || 'Action failed');
+          showToast('error', result.detail || `Could not apply ${action} action to transaction ${tx_id.substring(0, 8)}...`, 'Action Failed');
           document.getElementById('qa_result').textContent = 'Error: ' + result.detail;
           return;
         }
         
         console.log('Action result:', result);
         // Show success toast and undo option
-        showToast('success', `${action} action applied for TX ${tx_id.substring(0, 8)}...`);
+        const actionVerb = action === 'BLOCK' ? 'Blocked' : action === 'ALLOW' ? 'Approved' : 'Delayed';
+        showToast('success', `Transaction ${tx_id.substring(0, 8)}... has been ${actionVerb.toLowerCase()} successfully`, `${actionVerb}`);
         const prev = result.updated?.previous_action || result.updated?.prev_action || prevAction;
         if (prev) {
           showUndoToast(tx_id, action, prev);
@@ -4732,6 +5522,11 @@ setupWS();
 // Load admin logs from server on page load (cross-device persistence)
 loadAdminLogsFromServer();
 
+// Welcome toast on page load
+setTimeout(() => {
+  showToast('success', 'Admin console loaded - Real-time transaction monitoring and management active', 'Welcome Back');
+}, 500);
+
 // Refresh admin logs every 30 seconds to catch updates from other admins
 setInterval(loadAdminLogsFromServer, 30000);
 
@@ -4866,10 +5661,21 @@ document.getElementById('chatbotClose')?.addEventListener('click', () => {
 });
 
 document.getElementById('adminFilter')
-  ?.addEventListener('change', redrawAdminRecent);
+  ?.addEventListener('change', (e) => {
+    const filter = e.target.value;
+    redrawAdminRecent();
+    const filterLabel = filter === 'ALL' ? 'all transactions' : filter === 'BLOCK' ? 'blocked transactions' : filter === 'DELAY' ? 'delayed transactions' : 'allowed transactions';
+    const count = filter === 'ALL' ? adminTxCache.length : adminTxCache.filter(tx => (tx.action || '').toUpperCase() === filter).length;
+    showToast('info', `Now displaying ${count} ${filterLabel}`, 'Filter Applied');
+  });
 
 document.getElementById('timeFilter')
-  ?.addEventListener('change', fetchRecent);
+  ?.addEventListener('change', async (e) => {
+    const timeRange = e.target.value;
+    const rangeLabel = timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days';
+    await fetchRecent();
+    showToast('info', `Transaction table updated with data from ${rangeLabel} (${adminTxCache.length} records loaded)`, 'Time Range Changed');
+  });
 
 // Model Accuracy Info Modal
 document.getElementById('modelAccuracyInfoBtn')?.addEventListener('click', () => {
@@ -4902,16 +5708,32 @@ document.getElementById('exportAuditBtn')?.addEventListener('click', () => {
     const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     document.getElementById('auditExportEndDate').value = now.toISOString().slice(0, 16);
     document.getElementById('auditExportStartDate').value = start.toISOString().slice(0, 16);
+    showToast('info', 'Select your preferred time range and format to export audit logs', 'Export Options');
   }
 });
 
-// Handle custom date range visibility for audit export
-document.getElementById('auditExportTimeRange')?.addEventListener('change', (e) => {
+// Handle custom date range visibility for audit export - ensure proper setup
+function setupAuditDateRangeListener() {
+  const timeRangeSelect = document.getElementById('auditExportTimeRange');
   const customRange = document.getElementById('auditCustomDateRange');
-  if (customRange) {
-    customRange.style.display = e.target.value === 'custom' ? 'block' : 'none';
+  
+  if (timeRangeSelect && customRange) {
+    // Set initial visibility
+    customRange.style.display = timeRangeSelect.value === 'custom' ? 'block' : 'none';
+    
+    // Add change listener
+    timeRangeSelect.addEventListener('change', (e) => {
+      customRange.style.display = e.target.value === 'custom' ? 'block' : 'none';
+    });
   }
-});
+}
+
+// Setup on DOM ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupAuditDateRangeListener);
+} else {
+  setupAuditDateRangeListener();
+}
 
 // Audit Export Function
 async function performAuditExport() {
@@ -4920,7 +5742,7 @@ async function performAuditExport() {
     if (!value) return '';
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return String(value).trim();
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} | ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
   };
   const clean = (value) => (value === null || value === undefined) ? '' : String(value).replace(/\s+/g, ' ').trim();
   const num = (value, digits = 2) => {
@@ -4928,6 +5750,17 @@ async function performAuditExport() {
     return Number.isFinite(n) ? n.toFixed(digits) : '';
   };
 
+  const exportBtn = document.getElementById('auditExportSubmit');
+  const setLoading = (isLoading) => {
+    if (!exportBtn) return;
+    exportBtn.disabled = isLoading;
+    exportBtn.classList.toggle('loading', isLoading);
+    exportBtn.setAttribute('aria-busy', String(isLoading));
+    const textEl = exportBtn.querySelector('.export-btn-text');
+    if (textEl) textEl.textContent = isLoading ? 'Exporting...' : 'Export';
+  };
+
+  setLoading(true);
   try {
     // Get selected options
     const timeRange = document.getElementById('auditExportTimeRange').value;
@@ -4984,18 +5817,12 @@ async function performAuditExport() {
       'Risk Score',
       'Confidence Level',
       'Recipient VPA',
-      'Device ID',
-      'Location',
-      'Remarks',
-      'Reason'
+      'Device ID'
     ];
 
     const rows = [headers];
     logs.forEach(log => {
       const tx = txMap.get(log.tx_id) || {};
-      const reason = Array.isArray(tx?.explainability?.reasons)
-        ? tx.explainability.reasons.join('; ')
-        : (tx.block_reason || '');
 
       rows.push([
         formatDateTime(log.created_at || log.time || log.timestamp),
@@ -5008,10 +5835,7 @@ async function performAuditExport() {
         num(tx.risk_score ?? tx.risk, 4),
         clean((tx.confidence_level || '').toUpperCase()),
         clean(tx.recipient_vpa),
-        clean(tx.device_id),
-        clean(tx.location),
-        clean(tx.remarks),
-        clean(reason)
+        clean(tx.device_id)
       ]);
     });
 
@@ -5059,10 +5883,12 @@ async function performAuditExport() {
     URL.revokeObjectURL(url);
 
     document.getElementById('exportAuditModal').style.display = 'none';
-    showToast(`Exported ${logs.length} audit logs as ${format.toUpperCase()}`, 'success');
+    showToast('success', `Successfully exported ${logs.length} audit log entries to ${fileName}`, 'Export Complete');
   } catch (e) {
     console.error('Audit export failed:', e);
     alert('Export failed. Please try again.');
+  } finally {
+    setLoading(false);
   }
 }
 
@@ -5082,8 +5908,10 @@ const DEFAULT_THRESHOLDS = {
   isoWeight: 25
 };
 
+const SERVER_THRESHOLDS = {{ initial_thresholds | tojson | safe }};
+
 // Current thresholds in memory
-let currentThresholds = { ...DEFAULT_THRESHOLDS };
+let currentThresholds = { ...DEFAULT_THRESHOLDS, ...(SERVER_THRESHOLDS || {}) };
 let activePresetSlot = null; // Track which preset is currently active
 let presets = {}; // Store loaded presets
 
@@ -5137,6 +5965,77 @@ function updatePresetBadge() {
 
   badge.textContent = label;
   badge.className = className;
+}
+
+function applyThresholdsToUI(nextThresholds) {
+  const incoming = nextThresholds && typeof nextThresholds === 'object' ? nextThresholds : {};
+  currentThresholds = { ...DEFAULT_THRESHOLDS, ...incoming };
+
+  if ((incoming.allowMax === undefined || incoming.allowMax === null) && typeof incoming.delay === 'number') {
+    currentThresholds.allowMax = Number(incoming.delay);
+  }
+  if ((incoming.blockMin === undefined || incoming.blockMin === null) && typeof incoming.block === 'number') {
+    currentThresholds.blockMin = Number(incoming.block);
+  }
+
+  currentThresholds.allowMax = Number(currentThresholds.allowMax);
+  currentThresholds.delayMax = Number(currentThresholds.delayMax);
+  currentThresholds.blockMin = Number(currentThresholds.blockMin);
+  currentThresholds.lowConfidence = Number(currentThresholds.lowConfidence);
+  currentThresholds.mediumConfidence = Number(currentThresholds.mediumConfidence);
+  currentThresholds.highConfidence = Number(currentThresholds.highConfidence);
+  currentThresholds.rfWeight = parseInt(currentThresholds.rfWeight);
+  currentThresholds.xgbWeight = parseInt(currentThresholds.xgbWeight);
+  currentThresholds.isoWeight = parseInt(currentThresholds.isoWeight);
+
+  if (document.getElementById('allowMaxSlider')) {
+    document.getElementById('allowMaxSlider').value = currentThresholds.allowMax;
+    document.getElementById('allowMaxVal').textContent = currentThresholds.allowMax.toFixed(2);
+  }
+  if (document.getElementById('delayMaxSlider')) {
+    document.getElementById('delayMaxSlider').value = currentThresholds.delayMax;
+    document.getElementById('delayMaxVal').textContent = currentThresholds.delayMax.toFixed(2);
+  }
+  if (document.getElementById('blockMinSlider')) {
+    document.getElementById('blockMinSlider').value = currentThresholds.blockMin;
+    document.getElementById('blockMinVal').textContent = currentThresholds.blockMin.toFixed(2);
+  }
+  if (document.getElementById('lowConfSlider')) {
+    document.getElementById('lowConfSlider').value = currentThresholds.lowConfidence;
+    document.getElementById('lowConfVal').textContent = currentThresholds.lowConfidence.toFixed(2);
+  }
+  if (document.getElementById('mediumConfSlider')) {
+    document.getElementById('mediumConfSlider').value = currentThresholds.mediumConfidence;
+    document.getElementById('mediumConfVal').textContent = currentThresholds.mediumConfidence.toFixed(2);
+  }
+  if (document.getElementById('rfWeightSlider')) {
+    document.getElementById('rfWeightSlider').value = currentThresholds.rfWeight;
+    document.getElementById('rfWeightVal').textContent = currentThresholds.rfWeight + '%';
+  }
+  if (document.getElementById('xgbWeightSlider')) {
+    document.getElementById('xgbWeightSlider').value = currentThresholds.xgbWeight;
+    document.getElementById('xgbWeightVal').textContent = currentThresholds.xgbWeight + '%';
+  }
+  if (document.getElementById('isoWeightSlider')) {
+    document.getElementById('isoWeightSlider').value = currentThresholds.isoWeight;
+    document.getElementById('isoWeightVal').textContent = currentThresholds.isoWeight + '%';
+  }
+
+  updateWeightSum();
+  updateLivePreview();
+  updatePresetBadge();
+}
+
+async function loadCurrentThresholds() {
+  try {
+    const response = await fetch('/admin/get-thresholds');
+    if (!response.ok) throw new Error('Failed to load thresholds');
+    const data = await response.json();
+    applyThresholdsToUI(data?.thresholds || DEFAULT_THRESHOLDS);
+  } catch (e) {
+    console.error('Error loading thresholds:', e);
+    applyThresholdsToUI(currentThresholds);
+  }
 }
 
 // Load presets from server on page load
@@ -5242,6 +6141,7 @@ function togglePresets() {
   if (content.style.display === 'none') {
     content.style.display = 'block';
     icon.style.transform = 'rotate(0deg)';
+    showToast('info', 'Manage saved threshold configurations - Load, save, or delete presets', 'Preset Manager Opened');
   } else {
     content.style.display = 'none';
     icon.style.transform = 'rotate(-90deg)';
@@ -5252,7 +6152,7 @@ function togglePresets() {
 document.getElementById('savePresetBtn')?.addEventListener('click', async () => {
   const selectEl = document.getElementById('presetSlotSelect');
   if (!selectEl) {
-    showToast('error', '❌ Preset selection error - refresh page and try again');
+    showToast('error', 'Preset dropdown not found - Please refresh the page and try again', 'UI Error');
     return;
   }
   
@@ -5264,7 +6164,7 @@ document.getElementById('savePresetBtn')?.addEventListener('click', async () => 
   console.log('Save preset - Validation: !slot=', !slot, 'isNaN(slot)=', isNaN(slot), 'slot < 1=', slot < 1, 'slot > 3=', slot > 3);
   
   if (!slot || isNaN(slot) || slot < 1 || slot > 3) {
-    showToast('error', `❌ Invalid preset slot selected (${slotValue}). Please select Preset 1, 2, or 3.`);
+    showToast('error', `Invalid preset slot "${slotValue}" - Please select a valid preset (1, 2, or 3)`, 'Invalid Selection');
     return;
   }
   
@@ -5295,7 +6195,7 @@ document.getElementById('savePresetBtn')?.addEventListener('click', async () => 
     }
     
     const data = JSON.parse(responseText);
-    showToast('success', `✅ Successfully saved ${existingName} with current thresholds`);
+    showToast('success', `${existingName} saved with current configuration (Allow: ≤${currentThresholds.allowMax.toFixed(2)}, Block: ≥${currentThresholds.blockMin.toFixed(2)})`, 'Preset Saved');
     
     // Reload presets
     await loadPresets();
@@ -5304,7 +6204,7 @@ document.getElementById('savePresetBtn')?.addEventListener('click', async () => 
     updatePresetBadge();
   } catch (e) {
     console.error('Error saving preset:', e);
-    showToast('error', `❌ Failed to save preset: ${e.message}`);
+    showToast('error', `Could not save preset configuration - ${e.message}`, 'Save Failed');
   }
 });
 
@@ -5312,7 +6212,7 @@ document.getElementById('savePresetBtn')?.addEventListener('click', async () => 
 async function loadPreset(slot) {
   const preset = presets[slot];
   if (!preset) {
-    showToast('error', `❌ Preset ${slot} is empty - please save it first`);
+    showToast('error', `Preset slot ${slot} is empty - Save current configuration to this slot first`, 'Empty Preset');
     return;
   }
   
@@ -5351,10 +6251,10 @@ async function loadPreset(slot) {
     renderPresetCards();
     updatePresetBadge();
     
-    showToast('success', `✅ Loaded "${preset.name}" - all thresholds updated`);
+    showToast('info', `"${preset.name}" selected - Click "Apply Changes" to activate these thresholds`, 'Preset Selected');
   } catch (e) {
     console.error('Error loading preset:', e);
-    showToast('error', `❌ Failed to load preset: ${e.message}`);
+    showToast('error', `Could not load preset "${preset.name}" - ${e.message}`, 'Load Failed');
   }
 }
 
@@ -5362,7 +6262,7 @@ async function loadPreset(slot) {
 async function updatePresetName(slot, newName) {
   const preset = presets[slot];
   if (!preset) {
-    showToast('error', `❌ Preset ${slot} not found`);
+    showToast('error', `Cannot rename - Preset slot ${slot} does not exist`, 'Preset Not Found');
     return;
   }
   
@@ -5387,7 +6287,7 @@ async function updatePresetName(slot, newName) {
     
     presets[slot].name = newName;
     renderPresetCards();
-    showToast('success', `✅ Renamed "${oldName}" to "${newName}"`);
+    showToast('success', `Preset renamed from "${oldName}" to "${newName}"`, 'Preset Renamed');
   } catch (e) {
     console.error('Error updating preset name:', e);
     showToast('error', `❌ Failed to rename preset: ${e.message}`);
@@ -5417,10 +6317,10 @@ async function deletePreset(slot) {
     if (activePresetSlot === slot) activePresetSlot = null;
     renderPresetCards();
     updatePresetBadge();
-    showToast('success', `✅ Deleted "${presetName}" successfully`);
+    showToast('success', `"${presetName}" has been permanently deleted`, 'Preset Deleted');
   } catch (e) {
     console.error('Error deleting preset:', e);
-    showToast('error', `❌ Failed to delete "${presetName}": ${e.message}`);
+    showToast('error', `Could not delete preset "${presetName}" - ${e.message}`, 'Delete Failed');
   }
 }
 
@@ -5524,7 +6424,7 @@ function validateThresholds() {
   }
   
   if (issues.length > 0) {
-    showToast(issues.join(' | '), 'warning');
+    showToast('warning', issues.join(' • '), 'Thresholds Auto-Corrected');
   }
   
   // Update display after validation
@@ -5585,8 +6485,9 @@ document.getElementById('resetThresholdBtn')?.addEventListener('click', () => {
   updateLivePreview();
   activePresetSlot = null;
   updatePresetBadge();
+  renderPresetCards(); // Deselect any highlighted preset
   
-  showToast('✅ Thresholds restored to defaults', 'success');
+  showToast('success', 'All thresholds reset to factory defaults - Click "Apply Changes" to activate', 'Defaults Restored');
 });
 
 // Apply threshold changes
@@ -5594,12 +6495,12 @@ document.getElementById('applyThresholdBtn')?.addEventListener('click', async ()
   // Final validation
   const sum = currentThresholds.rfWeight + currentThresholds.xgbWeight + currentThresholds.isoWeight;
   if (sum !== 100) {
-    showToast('❌ Model weights must sum to 100%', 'error');
+    showToast('error', `Model weights currently sum to ${sum}% - Please adjust so they total exactly 100%`, 'Invalid Weights');
     return;
   }
   
   if (currentThresholds.allowMax >= currentThresholds.blockMin) {
-    showToast('❌ Invalid threshold configuration', 'error');
+    showToast('error', `Allow threshold (${currentThresholds.allowMax.toFixed(2)}) must be less than Block threshold (${currentThresholds.blockMin.toFixed(2)})`, 'Invalid Configuration');
     return;
   }
   
@@ -5611,7 +6512,16 @@ document.getElementById('applyThresholdBtn')?.addEventListener('click', async ()
     });
     
     if (response.ok) {
-      showToast('✅ Thresholds applied successfully! Changes are live immediately.', 'success');
+      const presetInfo = activePresetSlot ? ` from "${presets[activePresetSlot]?.name || 'Preset ' + activePresetSlot}"` : '';
+      showToast('success', `Configuration applied${presetInfo} - All new transactions will use updated thresholds (Allow: ≤${currentThresholds.allowMax.toFixed(2)}, Block: ≥${currentThresholds.blockMin.toFixed(2)})`, 'Thresholds Updated');
+      
+      // Collapse presets section after applying changes
+      const presetsContent = document.getElementById('presetsContent');
+      const presetsIcon = document.getElementById('presetsToggleIcon');
+      if (presetsContent && presetsContent.style.display !== 'none') {
+        presetsContent.style.display = 'none';
+        if (presetsIcon) presetsIcon.style.transform = 'rotate(-90deg)';
+      }
       
       // Log this admin action
       const adminLogs = document.getElementById('admin_logs');
@@ -5629,64 +6539,151 @@ document.getElementById('applyThresholdBtn')?.addEventListener('click', async ()
       `;
       adminLogs.prepend(log);
     } else {
-      showToast('❌ Failed to apply thresholds', 'error');
+      const errorData = await response.json();
+      showToast('error', errorData.detail || 'Server rejected the threshold configuration - please check your values and try again', 'Update Failed');
     }
   } catch (error) {
     console.error('Error applying thresholds:', error);
-    showToast('❌ Error: ' + error.message, 'error');
+    showToast('error', 'Network error while updating thresholds - ' + error.message, 'Connection Error');
   }
 });
 
 // Initialize threshold panel on page load
 document.addEventListener('DOMContentLoaded', () => {
-  updateWeightSum();
-  updateLivePreview();
+  applyThresholdsToUI(SERVER_THRESHOLDS || DEFAULT_THRESHOLDS);
+  loadCurrentThresholds();
 });
 
 </script>
 
 <!-- Export Audit Trail Modal -->
 <div id="exportAuditModal" style="display: none;">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>Export Audit Trail</h2>
-      <button class="modal-close" onclick="document.getElementById('exportAuditModal').style.display='none'">&times;</button>
+  <div class="modal-content export-modal">
+    <div class="export-modal-header">
+      <div>
+        <h2 class="export-modal-title">📤 Export Audit Trail</h2>
+        <div class="export-modal-subtitle">Download admin activity logs securely</div>
+      </div>
+      <button class="export-modal-close" onclick="document.getElementById('exportAuditModal').style.display='none'">&times;</button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
+    <div class="export-modal-body">
+      <div class="export-form-group">
         <label>Time Range</label>
-        <select id="auditExportTimeRange" class="form-control">
-          <option value="24h">Last 24 Hours</option>
-          <option value="7d">Last 7 Days</option>
-          <option value="30d">Last 30 Days</option>
-          <option value="90d">Last 90 Days</option>
-          <option value="custom">Custom Date Range</option>
-        </select>
+        <div class="select-wrapper">
+          <select id="auditExportTimeRange" class="export-control">
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="custom">Custom Date Range</option>
+          </select>
+          <span class="select-arrow">▼</span>
+        </div>
       </div>
 
-      <div id="auditCustomDateRange" style="display: none;" class="form-group">
+      <div id="auditCustomDateRange" style="display: none;" class="export-form-group">
         <label>From Date</label>
-        <input type="datetime-local" id="auditExportStartDate" class="form-control">
+        <input type="datetime-local" id="auditExportStartDate" class="export-control">
         <label style="margin-top: 10px;">To Date</label>
-        <input type="datetime-local" id="auditExportEndDate" class="form-control">
+        <input type="datetime-local" id="auditExportEndDate" class="export-control">
       </div>
 
-      <div class="form-group">
+      <div class="export-form-group">
         <label>File Format</label>
-        <select id="auditExportFormat" class="form-control">
-          <option value="csv">CSV (Excel)</option>
-          <option value="json">JSON (Structured)</option>
-          <option value="txt">TXT (Delimited)</option>
-          <option value="xlsx">XLSX (Excel Workbook)</option>
-        </select>
+        <div class="select-wrapper">
+          <select id="auditExportFormat" class="export-control">
+            <option value="csv">CSV (Excel)</option>
+            <option value="json">JSON (Structured)</option>
+            <option value="txt">TXT (Delimited)</option>
+            <option value="xlsx">XLSX (Excel Workbook)</option>
+          </select>
+          <span class="select-arrow">▼</span>
+        </div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="document.getElementById('exportAuditModal').style.display='none'">Cancel</button>
-      <button class="btn-primary" onclick="performAuditExport()">Export</button>
+    <div class="export-modal-footer">
+      <button class="export-btn-secondary" onclick="document.getElementById('exportAuditModal').style.display='none'">Cancel</button>
+      <button id="auditExportSubmit" class="export-btn-primary" onclick="performAuditExport()">
+        <span class="export-btn-text">Export</span>
+        <span class="export-spinner" aria-hidden="true"></span>
+      </button>
     </div>
   </div>
 </div>
+
+  <!-- Footer -->
+  <footer style="margin-top: 60px; padding: 32px 0; border-top: 1px solid #e5e7eb; background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.02));">
+    <div class="max-w-7xl mx-auto px-6">
+      <div style="display: flex; flex-direction: column; gap: 24px; align-items: center; text-align: center;">
+        <div>
+          <h3 style="font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 12px;">Connect With Us</h3>
+          <div style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;">
+            <a href="mailto:teamfdt2@gmail.com" class="footer-social-link email" title="Email" aria-label="Email" style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; text-decoration: none; font-size: 18px; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); position: relative; overflow: hidden;">
+              📧
+            </a>
+            <a href="https://github.com/JEROLD-creator653" target="_blank" rel="noopener noreferrer" class="footer-social-link github" title="GitHub" aria-label="GitHub" style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #f3f4f6, #e5e7eb); color: #1f2937; text-decoration: none; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); position: relative; overflow: hidden;">
+              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            </a>
+            <a href="https://linkedin.com/in/jerold-christoper-g-992052327" target="_blank" rel="noopener noreferrer" class="footer-social-link linkedin" title="LinkedIn" aria-label="LinkedIn" style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; text-decoration: none; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); position: relative; overflow: hidden;">
+              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            </a>
+            <a href="https://twitter.com/yourhandle" target="_blank" rel="noopener noreferrer" class="footer-social-link twitter" title="Twitter" aria-label="Twitter" style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #dbeafe, #93c5fd); color: #1d4ed8; text-decoration: none; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); position: relative; overflow: hidden;">
+              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>
+            </a>
+            <a href="https://yourwebsite.com" target="_blank" rel="noopener noreferrer" class="footer-social-link website" title="Website" aria-label="Website" style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #e0e7ff, #c7d2fe); color: #4338ca; text-decoration: none; font-size: 18px; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); position: relative; overflow: hidden;">
+              🌐
+            </a>
+          </div>
+        </div>
+        <div style="color: #6b7280; font-size: 14px;">
+          © 2026 UPI Fraud Detection System | All rights reserved | Powered by FDT2
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <style>
+    body.dark-mode footer {
+      border-top-color: #334155 !important;
+      background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.02)) !important;
+    }
+
+    body.dark-mode footer h3 {
+      color: #e5e7eb !important;
+    }
+
+    body.dark-mode footer > div > div > div:last-child {
+      color: #9ca3af !important;
+    }
+
+    .footer-social-link::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+      transition: left 0.5s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .footer-social-link:hover::before {
+      left: 100%;
+    }
+
+    .footer-social-link:hover {
+      transform: translateY(-4px) !important;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15) !important;
+    }
+
+    body.dark-mode .footer-social-link.email { background: linear-gradient(135deg, #7f1d1d, #991b1b) !important; color: #fecaca !important; }
+    body.dark-mode .footer-social-link.github { background: linear-gradient(135deg, #1f2937, #374151) !important; color: #f3f4f6 !important; }
+    body.dark-mode .footer-social-link.linkedin { background: linear-gradient(135deg, #1e40af, #2563eb) !important; color: #dbeafe !important; }
+    body.dark-mode .footer-social-link.twitter { background: linear-gradient(135deg, #1e3a8a, #1d4ed8) !important; color: #bfdbfe !important; }
+    body.dark-mode .footer-social-link.website { background: linear-gradient(135deg, #4338ca, #6366f1) !important; color: #e0e7ff !important; }
+  </style>
 
 </body>
 </html>

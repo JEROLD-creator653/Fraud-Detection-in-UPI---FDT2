@@ -63,9 +63,31 @@ DEFAULT_CFG = {
     "thresholds": {"delay": 0.30, "block": 0.60},
     # WARNING: change secret_key before production
     "secret_key": "dev-secret-change-me-please",
-    # default admin credentials (password hash can be overridden in config)
-    "admin_username": "admin",
-    # hashed password for "StrongAdmin123!" using pbkdf2_sha256
+    # Multiple admin users support
+    "admin_users": [
+        {
+            "username": "jerold",
+            "password_hash": pbkdf2_sha256.hash("StrongAdmin123!"),
+            "role": "Super Admin"
+        },
+        {
+            "username": "aakash",
+            "password_hash": pbkdf2_sha256.hash("StrongAdmin123!"),
+            "role": "Admin"
+        },
+        {
+            "username": "abhishek",
+            "password_hash": pbkdf2_sha256.hash("StrongAdmin123!"),
+            "role": "Admin"
+        },
+        {
+            "username": "aarthi",
+            "password_hash": pbkdf2_sha256.hash("StrongAdmin123!"),
+            "role": "Admin"
+        }
+    ],
+    # Legacy single admin support (backward compatibility)
+    "admin_username": "jerold",
     "admin_password_hash": pbkdf2_sha256.hash("StrongAdmin123!")
 }
 cfg = DEFAULT_CFG.copy()
@@ -84,10 +106,92 @@ if os.path.exists(CFG_PATH):
 
 env_db_url = os.getenv("DB_URL")
 DB_URL = env_db_url or cfg.get("db_url")
-THRESHOLDS = cfg.get("thresholds", {"delay": 0.30, "block": 0.60})
+
+DEFAULT_THRESHOLDS = {
+    "allowMax": 0.30,
+    "delayMax": 0.60,
+    "blockMin": 0.60,
+    "lowConfidence": 0.40,
+    "mediumConfidence": 0.70,
+    "highConfidence": 0.85,
+    "rfWeight": 35,
+    "xgbWeight": 40,
+    "isoWeight": 25
+}
+
+def _to_float(value, fallback):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(fallback)
+
+def _to_int(value, fallback):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(fallback)
+
+def normalize_thresholds(raw):
+    merged = DEFAULT_THRESHOLDS.copy()
+    if isinstance(raw, dict):
+        for key in merged.keys():
+            if key in raw and raw[key] is not None:
+                merged[key] = raw[key]
+        if "allowMax" not in raw and "delay" in raw:
+            merged["allowMax"] = raw["delay"]
+        if "blockMin" not in raw and "block" in raw:
+            merged["blockMin"] = raw["block"]
+
+    merged["allowMax"] = _to_float(merged["allowMax"], DEFAULT_THRESHOLDS["allowMax"])
+    merged["delayMax"] = _to_float(merged["delayMax"], DEFAULT_THRESHOLDS["delayMax"])
+    merged["blockMin"] = _to_float(merged["blockMin"], DEFAULT_THRESHOLDS["blockMin"])
+    merged["lowConfidence"] = _to_float(merged["lowConfidence"], DEFAULT_THRESHOLDS["lowConfidence"])
+    merged["mediumConfidence"] = _to_float(merged["mediumConfidence"], DEFAULT_THRESHOLDS["mediumConfidence"])
+    merged["highConfidence"] = _to_float(merged["highConfidence"], DEFAULT_THRESHOLDS["highConfidence"])
+    merged["rfWeight"] = _to_int(merged["rfWeight"], DEFAULT_THRESHOLDS["rfWeight"])
+    merged["xgbWeight"] = _to_int(merged["xgbWeight"], DEFAULT_THRESHOLDS["xgbWeight"])
+    merged["isoWeight"] = _to_int(merged["isoWeight"], DEFAULT_THRESHOLDS["isoWeight"])
+
+    merged["delay"] = merged["allowMax"]
+    merged["block"] = merged["blockMin"]
+    return merged
+
+THRESHOLDS = normalize_thresholds(cfg.get("thresholds", {"delay": 0.30, "block": 0.60}))
 SECRET_KEY = cfg.get("secret_key", DEFAULT_CFG["secret_key"])
-ADMIN_USERNAME = cfg.get("admin_username", DEFAULT_CFG["admin_username"])
-ADMIN_PASSWORD_HASH = cfg.get("admin_password_hash", DEFAULT_CFG["admin_password_hash"])
+
+# Load admin users (supports both new multi-user and legacy single-user format)
+ADMIN_USERS = {}
+if "admin_users" in cfg and isinstance(cfg["admin_users"], list):
+    for admin in cfg["admin_users"]:
+        ADMIN_USERS[admin["username"]] = {
+            "password_hash": admin["password_hash"],
+            "role": admin.get("role", "Admin")
+        }
+else:
+    # Legacy single admin support
+    ADMIN_USERNAME = cfg.get("admin_username", DEFAULT_CFG["admin_username"])
+    ADMIN_PASSWORD_HASH = cfg.get("admin_password_hash", DEFAULT_CFG["admin_password_hash"])
+    ADMIN_USERS[ADMIN_USERNAME] = {
+        "password_hash": ADMIN_PASSWORD_HASH,
+        "role": "Super Admin"
+    }
+
+# Also populate from default config if not overridden
+if not cfg.get("admin_users"):
+    for admin in DEFAULT_CFG["admin_users"]:
+        if admin["username"] not in ADMIN_USERS:
+            ADMIN_USERS[admin["username"]] = {
+                "password_hash": admin["password_hash"],
+                "role": admin.get("role", "Admin")
+            }
+
+# Debug: Print loaded admin users
+print("=" * 60)
+print("Loaded Admin Users:")
+for username, data in ADMIN_USERS.items():
+    print(f"  ✓ {username:12} - {data['role']}")
+print(f"Total: {len(ADMIN_USERS)} admin users configured")
+print("=" * 60)
 
 # --- FastAPI app and templates ---
 app = FastAPI()
@@ -625,10 +729,12 @@ def is_logged_in(request: Request):
     return bool(request.session.get("admin"))
 
 def try_auth_admin(username: str, password: str):
-    if username != ADMIN_USERNAME:
+    """Authenticate admin user against multiple admin accounts"""
+    if username not in ADMIN_USERS:
         return False
     try:
-        return pbkdf2_sha256.verify(password, ADMIN_PASSWORD_HASH)
+        admin_data = ADMIN_USERS[username]
+        return pbkdf2_sha256.verify(password, admin_data["password_hash"])
     except Exception:
         return False
 
@@ -871,7 +977,10 @@ async def admin_login(request: Request, username: str = Form(...), password: str
 def admin_panel(request: Request):
     if not is_logged_in(request):
         return RedirectResponse("/admin/login")
-    return templates.TemplateResponse("admin.html", {"request": request})
+    return templates.TemplateResponse(
+        "admin.html",
+        {"request": request, "initial_thresholds": normalize_thresholds(THRESHOLDS)}
+    )
 
 @app.get("/admin/logout")
 def admin_logout(request: Request):
@@ -1306,6 +1415,20 @@ async def update_thresholds(request: Request):
     
     except Exception as e:
         print(f"Error updating thresholds: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+@app.get("/admin/get-thresholds")
+async def get_thresholds(request: Request):
+    """Return current thresholds for admin UI"""
+    if not is_logged_in(request):
+        return JSONResponse({"detail": "unauthenticated"}, status_code=401)
+
+    try:
+        global THRESHOLDS
+        THRESHOLDS = normalize_thresholds(THRESHOLDS)
+        return {"status": "ok", "thresholds": THRESHOLDS}
+    except Exception as e:
+        print(f"Error getting thresholds: {e}")
         return JSONResponse({"detail": str(e)}, status_code=500)
 
 # --- websocket endpoint for live updates ---
