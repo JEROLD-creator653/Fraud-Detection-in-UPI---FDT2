@@ -3,6 +3,7 @@ import os
 import yaml
 import json
 import asyncio
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any
 
@@ -20,6 +21,23 @@ from passlib.hash import pbkdf2_sha256
 # Load environment variables from .env file
 from dotenv import load_dotenv
 load_dotenv()
+
+# =========================================================================
+# UTILITY FUNCTIONS
+# =========================================================================
+
+def to_json_serializable(obj):
+    """Convert datetime objects to ISO format for consistent timezone handling"""
+    if isinstance(obj, dict):
+        return {k: to_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [to_json_serializable(item) for item in obj]
+    elif isinstance(obj, datetime):
+        # If no timezone, assume UTC
+        if obj.tzinfo is None:
+            obj = obj.replace(tzinfo=timezone.utc)
+        return obj.isoformat()
+    return obj
 
 # --- time range helper ---
 def parse_time_range(time_range: str):
@@ -194,18 +212,18 @@ print(f"Total: {len(ADMIN_USERS)} admin users configured")
 print("=" * 60)
 
 # --- FastAPI app and templates ---
+# Use absolute paths for templates and static files
+BASE_DIR = Path(__file__).resolve().parent.parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+STATIC_DIR = BASE_DIR / "static"
+
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
-# Get absolute paths relative to this file
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-
-templates = Jinja2Templates(directory=TEMPLATES_DIR)
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 # serve static if directory exists
-if os.path.isdir(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # --- websockets manager ---
 class WSManager:
@@ -860,9 +878,11 @@ async def recent_transactions(limit: int = 300, time_range: str = "24h"):
         # Enrich confidence_level from explainability if missing
         for r in rows:
             r["confidence_level"] = extract_confidence_level(r, "HIGH")
-        return rows
+        # Convert to JSON serializable (handles datetime objects)
+        return to_json_serializable(rows)
 
-    return {"transactions": await run_in_threadpool(query)}
+    result = await run_in_threadpool(query)
+    return {"transactions": result}
 
 @app.post("/transactions")
 async def new_transaction(request: Request):
@@ -1122,7 +1142,6 @@ def db_save_threshold_preset(admin_username: str, preset_slot: int, preset_name:
         conn.commit()
         cur.close()
         preset_id = result['id'] if result else None
-        print(f"DEBUG db_save: result={result}, preset_id={preset_id}")
         return preset_id
     except Exception as e:
         import traceback
@@ -1251,10 +1270,7 @@ async def save_threshold_preset(request: Request):
         preset_name = body.get("preset_name", f"Preset {preset_slot}")
         config = body.get("config")
         
-        print(f"DEBUG: Received preset_slot={preset_slot} (type={type(preset_slot).__name__}), preset_name={preset_name}")
-        
         if not preset_slot or preset_slot not in [1, 2, 3]:
-            print(f"ERROR: Invalid preset_slot: {preset_slot}")
             return JSONResponse({"detail": "preset_slot must be 1, 2, or 3"}, status_code=400)
         
         if not config:

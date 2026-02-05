@@ -9,9 +9,11 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255),
     password_hash VARCHAR(255) NOT NULL,
     balance DECIMAL(15, 2) DEFAULT 10000.00,
+    daily_limit DECIMAL(15, 2) DEFAULT 10000.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE
+    is_active BOOLEAN DEFAULT TRUE,
+    fingerprint_enabled BOOLEAN DEFAULT FALSE
 );
 
 -- User devices table
@@ -25,7 +27,22 @@ CREATE TABLE IF NOT EXISTS user_devices (
     is_trusted BOOLEAN DEFAULT FALSE
 );
 
--- Transactions table (enhanced)
+-- WebAuthn credentials table for biometric authentication
+CREATE TABLE IF NOT EXISTS user_credentials (
+    credential_id TEXT PRIMARY KEY,
+    user_id VARCHAR(100) REFERENCES users(user_id) ON DELETE CASCADE,
+    public_key TEXT NOT NULL,
+    counter BIGINT DEFAULT 0,
+    device_id VARCHAR(100),
+    credential_name VARCHAR(255),
+    aaguid TEXT,
+    transports TEXT[],
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Transactions table (enhanced for Send Money)
 CREATE TABLE IF NOT EXISTS transactions (
     tx_id VARCHAR(100) PRIMARY KEY,
     user_id VARCHAR(100) REFERENCES users(user_id),
@@ -40,6 +57,10 @@ CREATE TABLE IF NOT EXISTS transactions (
     db_status VARCHAR(20) DEFAULT 'pending',
     remarks TEXT,
     location VARCHAR(255),
+    receiver_user_id VARCHAR(100) REFERENCES users(user_id),  -- Links to receiving user (null if unknown UPI)
+    status_history TEXT[] DEFAULT '{}',  -- Array of status transitions with timestamps
+    amount_deducted_at TIMESTAMP,  -- When debit happened
+    amount_credited_at TIMESTAMP,  -- When credit happened (only if ALLOW/confirmed DELAY)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -80,21 +101,57 @@ CREATE TABLE IF NOT EXISTS push_tokens (
     is_active BOOLEAN DEFAULT TRUE
 );
 
+-- Transaction ledger table (audit trail for all balance operations)
+CREATE TABLE IF NOT EXISTS transaction_ledger (
+    ledger_id SERIAL PRIMARY KEY,
+    tx_id VARCHAR(100) REFERENCES transactions(tx_id),
+    operation VARCHAR(50) NOT NULL,  -- 'DEBIT', 'CREDIT', 'REFUND', 'HOLD'
+    user_id VARCHAR(100) REFERENCES users(user_id),
+    amount DECIMAL(15, 2) NOT NULL,
+    operation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    remarks TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User daily transactions table (for cumulative daily limit tracking)
+CREATE TABLE IF NOT EXISTS user_daily_transactions (
+    record_id SERIAL PRIMARY KEY,
+    user_id VARCHAR(100) REFERENCES users(user_id),
+    transaction_date DATE NOT NULL,  -- For tracking daily limit resets
+    total_amount DECIMAL(15, 2) DEFAULT 0.00,  -- Sum of all transactions on that date
+    transaction_count INTEGER DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, transaction_date)
+);
+
 -- Create indexes for performance
+-- Composite index for user transaction queries (most common query pattern)
+CREATE INDEX IF NOT EXISTS idx_transactions_user_created ON transactions(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_transactions_receiver_user_id ON transactions(receiver_user_id);
+-- Composite index for action filtering queries
+CREATE INDEX IF NOT EXISTS idx_transactions_user_action_created ON transactions(user_id, action, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_fraud_alerts_user_id ON fraud_alerts(user_id);
 CREATE INDEX IF NOT EXISTS idx_fraud_alerts_tx_id ON fraud_alerts(tx_id);
 CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_credentials_user_id ON user_credentials(user_id);
 CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON push_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_transaction_ledger_tx_id ON transaction_ledger(tx_id);
+CREATE INDEX IF NOT EXISTS idx_transaction_ledger_user_id ON transaction_ledger(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_daily_transactions_user_date ON user_daily_transactions(user_id, transaction_date);
 
 -- Insert demo users for testing
 -- Password for all users: password123
-INSERT INTO users (user_id, name, phone, email, password_hash, balance) 
+INSERT INTO users (user_id, name, phone, email, password_hash, balance, daily_limit) 
 VALUES 
-    ('user_001', 'Rajesh Kumar', '+919876543210', 'rajesh@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 25000.00),
-    ('user_002', 'Priya Sharma', '+919876543211', 'priya@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 15000.00),
-    ('user_003', 'Amit Patel', '+919876543212', 'amit@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 30000.00)
+    ('user_001', 'Rajesh Kumar', '+919876543210', 'rajesh@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 25000.00, 10000.00),
+    ('user_002', 'Priya Sharma', '+919876543211', 'priya@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 15000.00, 10000.00),
+    ('user_003', 'Amit Patel', '+919876543212', 'amit@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 30000.00, 10000.00),
+    -- New test users for Send Money feature
+    ('user_004', 'Abishek Kumar', '+919876543219', 'abishek@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 20000.00, 10000.00),
+    ('user_005', 'Jerold Smith', '+919876543218', 'jerold@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 18000.00, 10000.00),
+    ('user_006', 'Gowtham Kumar', '+919876543217', 'gowtham@example.com', '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 22000.00, 10000.00)
 ON CONFLICT (user_id) DO NOTHING;
 
 -- Insert demo devices
@@ -102,7 +159,11 @@ INSERT INTO user_devices (device_id, user_id, device_name, device_type, is_trust
 VALUES 
     ('device_001', 'user_001', 'Rajesh iPhone', 'iOS', TRUE),
     ('device_002', 'user_002', 'Priya Android', 'Android', TRUE),
-    ('device_003', 'user_003', 'Amit Samsung', 'Android', TRUE)
+    ('device_003', 'user_003', 'Amit Samsung', 'Android', TRUE),
+    -- Devices for new test users
+    ('device_004', 'user_004', 'Abishek Pixel', 'Android', TRUE),
+    ('device_005', 'user_005', 'Jerold iPhone', 'iOS', TRUE),
+    ('device_006', 'user_006', 'Gowtham Samsung', 'Android', TRUE)
 ON CONFLICT (device_id) DO NOTHING;
 
     -- Admin Logs table for tracking admin actions across devices
