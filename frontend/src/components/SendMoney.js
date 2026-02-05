@@ -153,8 +153,8 @@ const handleSubmit = async (e) => {
          remarks: formData.remarks || 'Payment'
        });
 
-       // Update user balance if transaction was successful or pending
-       if (response.status === 'success') {
+       // Update user balance only when the transaction is allowed
+       if (response.status === 'success' && response.transaction?.action === 'ALLOW') {
          const newBalance = user.balance - parseFloat(formData.amount);
          const updatedUser = { ...user, balance: newBalance };
          setUser(updatedUser);

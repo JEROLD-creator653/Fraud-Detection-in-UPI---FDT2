@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerUser } from '../api';
+import BiometricSetup from './BiometricSetup';
 
 const RegisterScreen = ({ onRegister }) => {
   const navigate = useNavigate();
@@ -15,6 +16,9 @@ const RegisterScreen = ({ onRegister }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showBiometricSetup, setShowBiometricSetup] = useState(false);
+  const [registeredUser, setRegisteredUser] = useState(null);
+  const [registeredToken, setRegisteredToken] = useState(null);
 
   const handleChange = (e) => {
     setFormData({
@@ -23,6 +27,30 @@ const RegisterScreen = ({ onRegister }) => {
     });
     setError('');
   };
+
+  const handleBiometricComplete = () => {
+    // User completed biometric setup
+    onRegister(registeredUser, registeredToken);
+    navigate('/dashboard');
+  };
+
+  const handleBiometricSkip = () => {
+    // User skipped biometric setup
+    onRegister(registeredUser, registeredToken);
+    navigate('/dashboard');
+  };
+
+  // Show biometric setup screen after registration
+  if (showBiometricSetup) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center p-4">
+        <BiometricSetup
+          onComplete={handleBiometricComplete}
+          onSkip={handleBiometricSkip}
+        />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,8 +73,10 @@ const RegisterScreen = ({ onRegister }) => {
       const response = await registerUser(userData);
       
       if (response.status === 'success') {
-        onRegister(response.user, response.token);
-        navigate('/dashboard');
+        // Store user data and show biometric setup
+        setRegisteredUser(response.user);
+        setRegisteredToken(response.token);
+        setShowBiometricSetup(true);
       }
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed. Please try again.');

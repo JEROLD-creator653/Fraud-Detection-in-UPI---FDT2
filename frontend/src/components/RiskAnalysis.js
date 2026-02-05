@@ -8,14 +8,19 @@ const RiskAnalysis = () => {
   const { addNotification } = useNotifications();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [timeRange, setTimeRange] = useState('30d');
   const [riskFilter, setRiskFilter] = useState('all');
 
   const loadRiskData = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const data = await getUserTransactions(100);
       setTransactions(data.transactions || []);
     } catch (error) {
+      console.error('RiskAnalysis load error:', error);
+      setError('Unable to load transactions. Please try again.');
       addNotification({
         type: 'error',
         title: 'Load Failed',
@@ -27,20 +32,32 @@ const RiskAnalysis = () => {
     }
   };
 
+  // Load data on component mount
   useEffect(() => {
     loadRiskData();
-  }, [timeRange, riskFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+  
+  // Reload when filters change (but not on initial mount)
+  useEffect(() => {
+    // Don't trigger on initial render
+    // Filters change but data is already loaded, so just re-filter locally
+    console.log('Filters changed, re-filtering locally');
+  }, [timeRange, riskFilter]);
 
   const getFilteredTransactions = () => {
     let filtered = transactions;
     
     if (riskFilter !== 'all') {
       if (riskFilter === 'high') {
-        filtered = transactions.filter(tx => tx.risk_score >= 0.6);
+        // High risk: BLOCKED (0.70+) or use risk_level field
+        filtered = transactions.filter(tx => tx.risk_level === 'BLOCKED' || tx.risk_score >= 0.70);
       } else if (riskFilter === 'medium') {
-        filtered = transactions.filter(tx => tx.risk_score >= 0.3 && tx.risk_score < 0.6);
+        // Medium risk: DELAYED (0.35-0.69)
+        filtered = transactions.filter(tx => tx.risk_level === 'DELAYED' || (tx.risk_score >= 0.35 && tx.risk_score < 0.70));
       } else {
-        filtered = transactions.filter(tx => tx.risk_score < 0.3);
+        // Low risk: APPROVED (<0.35)
+        filtered = transactions.filter(tx => tx.risk_level === 'APPROVED' || tx.risk_score < 0.35);
       }
     }
     
@@ -71,6 +88,26 @@ const RiskAnalysis = () => {
         <div className="text-white text-center">
           <div className="w-16 h-16 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-xl">Analyzing risk patterns...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 flex items-center justify-center">
+        <div className="bg-red-900/30 border border-red-500/50 rounded-2xl p-8 max-w-md text-center">
+          <svg className="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h2 className="text-white text-xl font-bold mb-2">Load Failed</h2>
+          <p className="text-gray-300 mb-6">{error}</p>
+          <button
+            onClick={loadRiskData}
+            className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -177,7 +214,7 @@ const RiskAnalysis = () => {
             <div className="flex items-center mb-4">
               <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mr-4">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 0018.364 5.636m-9 9a9 9 0 11-12.728 0m12.728 0a9 9 0 00-12.728 0M9 15h6m-3-3h.01M9 12h6" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
               <div>
@@ -203,8 +240,8 @@ const RiskAnalysis = () => {
           ) : (
             <div className="space-y-4">
               {filteredTransactions.map((tx) => {
-                const riskLevel = getRiskColor(tx.risk_score);
-                const riskLabel = getRiskLabel(tx.risk_score);
+                const riskLevel = getRiskColor(tx.risk_score, tx.risk_level);
+                const riskLabel = getRiskLabel(tx.risk_score, tx.risk_level);
                 
                 return (
                   <div key={tx.tx_id} className="bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-colors">
