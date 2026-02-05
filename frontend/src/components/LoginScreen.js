@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { loginUser } from '../api';
 import cacheManager from '../utils/cacheManager';
 import errorHandler from '../utils/errorHandler';
+import BiometricLogin from './BiometricLogin';
+import { hasStoredCredentials } from '../utils/webauthn';
+import FloatingLines from './FloatingLines';
 
 const LoginScreen = ({ onLogin }) => {
   const navigate = useNavigate();
@@ -13,6 +16,8 @@ const LoginScreen = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [useBiometric, setUseBiometric] = useState(hasStoredCredentials());
+  const showBiometric = hasStoredCredentials();
 
   const handleChange = (e) => {
     setFormData({
@@ -20,6 +25,16 @@ const LoginScreen = ({ onLogin }) => {
       [e.target.name]: e.target.value
     });
     setError('');
+  };
+
+  const handleBiometricSuccess = (result) => {
+    cacheManager.setCurrentUser(result.user.user_id);
+    onLogin(result.user, result.token);
+    navigate('/dashboard');
+  };
+
+  const handleFallbackToPassword = () => {
+    setUseBiometric(false);
   };
 
     const handleSubmit = async (e) => {
@@ -78,13 +93,24 @@ const LoginScreen = ({ onLogin }) => {
     };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500 rounded-full filter blur-3xl opacity-20 animate-pulse"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500 rounded-full filter blur-3xl opacity-20 animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-pink-500 rounded-full filter blur-3xl opacity-10 animate-pulse delay-500"></div>
-      </div>
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+      <FloatingLines
+        linesGradient={['#e947f5', '#5b6cff', '#7c3aed']}
+        enabledWaves={['top', 'middle', 'bottom']}
+        lineCount={[6, 7, 6]}
+        lineDistance={[6, 5, 4]}
+        topWavePosition={{ x: 10.0, y: 0.5, rotate: -0.4 }}
+        middleWavePosition={{ x: 5.0, y: 0.0, rotate: 0.2 }}
+        bottomWavePosition={{ x: 2.0, y: -0.7, rotate: 0.4 }}
+        animationSpeed={1}
+        interactive={true}
+        bendRadius={5.0}
+        bendStrength={-0.5}
+        mouseDamping={0.05}
+        parallax={true}
+        parallaxStrength={0.2}
+        mixBlendMode="screen"
+      />
       
       <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-md p-8 border border-white/20 relative z-10">
         <div className="text-center mb-8">
@@ -120,59 +146,73 @@ const LoginScreen = ({ onLogin }) => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-purple-200 mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter your password"
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white placeholder-purple-300 backdrop-blur-sm"
-                required
-                data-testid="login-password-input"
-              />
+          {/* Biometric Login Option */}
+          {showBiometric && useBiometric && (
+            <BiometricLogin
+              phone={formData.phone}
+              onSuccess={handleBiometricSuccess}
+              onFallbackToPassword={handleFallbackToPassword}
+            />
+          )}
+
+          {/* Show password field only if not using biometric */}
+          {(!showBiometric || !useBiometric) && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-purple-200 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Enter your password"
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white placeholder-purple-300 backdrop-blur-sm"
+                    required
+                    data-testid="login-password-input"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-300 hover:text-purple-100 transition"
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      // Eye icon (visible)
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      // Eye-slash icon (hidden)
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                        <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
               <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-300 hover:text-purple-100 transition"
-                title={showPassword ? "Hide password" : "Show password"}
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition duration-200 disabled:opacity-50 shadow-lg transform hover:scale-105"
+                data-testid="login-submit-button"
               >
-                {showPassword ? (
-                  // Eye icon (visible)
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                  </svg>
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Signing in...
+                  </span>
                 ) : (
-                  // Eye-slash icon (hidden)
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
-                    <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
-                  </svg>
+                  'Sign In'
                 )}
               </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition duration-200 disabled:opacity-50 shadow-lg transform hover:scale-105"
-            data-testid="login-submit-button"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                Signing in...
-              </span>
-            ) : (
-              'Sign In'
-            )}
-          </button>
+            </>
+          )}
         </form>
 
         <div className="text-center mt-6">

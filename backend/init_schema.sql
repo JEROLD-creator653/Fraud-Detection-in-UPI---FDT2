@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
     daily_limit DECIMAL(15, 2) DEFAULT 10000.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE
+    is_active BOOLEAN DEFAULT TRUE,
+    fingerprint_enabled BOOLEAN DEFAULT FALSE
 );
 
 -- User devices table
@@ -24,6 +25,21 @@ CREATE TABLE IF NOT EXISTS user_devices (
     first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_trusted BOOLEAN DEFAULT FALSE
+);
+
+-- WebAuthn credentials table for biometric authentication
+CREATE TABLE IF NOT EXISTS user_credentials (
+    credential_id TEXT PRIMARY KEY,
+    user_id VARCHAR(100) REFERENCES users(user_id) ON DELETE CASCADE,
+    public_key TEXT NOT NULL,
+    counter BIGINT DEFAULT 0,
+    device_id VARCHAR(100),
+    credential_name VARCHAR(255),
+    aaguid TEXT,
+    transports TEXT[],
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
 );
 
 -- Transactions table (enhanced for Send Money)
@@ -109,12 +125,17 @@ CREATE TABLE IF NOT EXISTS user_daily_transactions (
 );
 
 -- Create indexes for performance
+-- Composite index for user transaction queries (most common query pattern)
+CREATE INDEX IF NOT EXISTS idx_transactions_user_created ON transactions(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_transactions_receiver_user_id ON transactions(receiver_user_id);
+-- Composite index for action filtering queries
+CREATE INDEX IF NOT EXISTS idx_transactions_user_action_created ON transactions(user_id, action, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_fraud_alerts_user_id ON fraud_alerts(user_id);
 CREATE INDEX IF NOT EXISTS idx_fraud_alerts_tx_id ON fraud_alerts(tx_id);
 CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_credentials_user_id ON user_credentials(user_id);
 CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON push_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_transaction_ledger_tx_id ON transaction_ledger(tx_id);
 CREATE INDEX IF NOT EXISTS idx_transaction_ledger_user_id ON transaction_ledger(user_id);

@@ -4476,10 +4476,51 @@ async function checkSystemHealth() {
   }
 }
 
+// Format UTC timestamp to local timezone with en-IN locale (matching web app)
+// Handles timestamps from PostgreSQL TIMESTAMP type which are UTC but may lack timezone markers
+function formatTimestampUTC(dateString) {
+  if (!dateString || dateString === '' || dateString === 0 || dateString === '0') return '—';
+  
+  let normalized = String(dateString).trim();
+  if (!normalized) return '—';
+  
+  // Check if already has explicit timezone indicator
+  const hasTimezone = /[zZ]|[+-](\d{1,2}):?(\d{2})$/.test(normalized);
+  
+  // If no timezone info, assume UTC and append 'Z'
+  if (!hasTimezone) {
+    // Replace space with T if present (SQL format to ISO format)
+    normalized = normalized.replace(' ', 'T');
+    
+    // Remove any fractional seconds beyond milliseconds (PostgreSQL microseconds)
+    // e.g., "2026-02-05T16:39:30.123456" → "2026-02-05T16:39:30.123"
+    normalized = normalized.replace(/(\.\d{3})\d+/, '$1');
+    
+    // Append Z to mark as UTC
+    if (!normalized.endsWith('Z')) {
+      normalized = `${normalized}Z`;
+    }
+  }
+  
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    console.warn('[formatTimestampUTC] Failed to parse:', dateString, '→', normalized);
+    return String(dateString);
+  }
+  
+  // Convert to IST (en-IN locale) in 24-hour format
+  try {
+    return parsed.toLocaleTimeString('en-IN', { hour12: false });
+  } catch (e) {
+    console.error('[formatTimestampUTC] toLocaleTimeString failed:', e);
+    return String(dateString);
+  }
+}
+
 function updateSystemInfo() {
   // Update server time
   const now = new Date();
-  const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+  const timeStr = now.toLocaleTimeString('en-IN', { hour12: false });
   const serverTimeEl = document.getElementById('server_time');
   if (serverTimeEl) serverTimeEl.textContent = timeStr;
 
@@ -4590,7 +4631,7 @@ function renderAdminTx(tx) {
       : '#16a34a';
   const actionColor = tx.action === 'BLOCK' ? '#dc2626' : tx.action === 'DELAY' ? '#eab308' : '#16a34a';
   
-  const timestamp = new Date(tx.ts || tx.created_at || tx.timestamp || 0).toLocaleTimeString('en-US', { hour12: false });
+  const timestamp = formatTimestampUTC(tx.ts || tx.created_at || tx.timestamp || 0);
 
   tr.innerHTML = `
     <td class="tx-col tx-time">
@@ -4985,7 +5026,7 @@ async function quickAction(tx_id, action) {
     <div class="flex justify-between items-center">
       <div class="text-xs font-mono font-semibold">${tx_id}</div>
       <div class="flex items-center gap-2">
-        <span class="text-[10px] text-gray-500">${new Date().toLocaleTimeString()}</span>
+        <span class="text-[10px] text-gray-500">${formatTimestampUTC(new Date().toISOString())}</span>
         <span class="action-badge ${badgeClass}">${action}</span>
       </div>
     </div>
@@ -5401,7 +5442,7 @@ function loadAdminLogsFromStorage() {
             <div class="font-mono text-sm font-semibold">${log.tx_id}</div>
             <div class="text-xs text-gray-500 mt-1">
               User: <span class="font-semibold">${log.user_id || 'unknown'}</span>
-              • ${new Date(log.time).toLocaleTimeString()}
+              • ${formatTimestampUTC(log.time)}
             </div>
           </div>
           <span class="action-badge ${badgeClass}">${log.action}</span>
@@ -5461,7 +5502,7 @@ async function loadAdminLogsFromServer() {
           }
           const date = new Date(isoString);
           if (!isNaN(date)) {
-            tsText = date.toLocaleTimeString('en-US', { hour12: false });
+            tsText = formatTimestampUTC(isoString);
           }
         } catch (e) {
           tsText = '—';
@@ -6073,7 +6114,7 @@ function renderPresetCards() {
     
     const defaultName = `Preset ${slot}`;
     const presetName = preset ? preset.name : defaultName;
-    const updatedAt = preset && preset.updated_at ? new Date(preset.updated_at).toLocaleString() : 'Not saved';
+    const updatedAt = preset && preset.updated_at ? formatTimestampUTC(preset.updated_at) : 'Not saved';
     
     card.innerHTML = `
       <div class="preset-card-header">
@@ -6531,7 +6572,7 @@ document.getElementById('applyThresholdBtn')?.addEventListener('click', async ()
         <div class="flex justify-between items-center">
           <div class="text-xs font-mono font-semibold">THRESHOLD UPDATE</div>
           <div class="flex items-center gap-2">
-            <span class="text-[10px] text-gray-500">${new Date().toLocaleTimeString()}</span>
+            <span class="text-[10px] text-gray-500">${formatTimestampUTC(new Date().toISOString())}</span>
             <span class="action-badge" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">CONFIG</span>
           </div>
         </div>
