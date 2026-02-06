@@ -445,10 +445,19 @@ FORMATTING INSTRUCTIONS:
 When discussing amounts, use Indian Rupee (Rs.) format."""
 
             # Use Groq AI
-            messages = [
-                {"role": "system", "content": context_info},
-                {"role": "user", "content": message}
-            ]
+            messages = [{"role": "system", "content": context_info}]
+            
+            # Add conversation history if provided
+            if conversation_history:
+                for hist_msg in conversation_history:
+                    if "role" in hist_msg and "content" in hist_msg:
+                        messages.append({
+                            "role": hist_msg["role"],
+                            "content": hist_msg["content"]
+                        })
+            
+            # Add current user message
+            messages.append({"role": "user", "content": message})
             
             response = self.client.chat.completions.create(
                 model="llama-3.3-70b-versatile",

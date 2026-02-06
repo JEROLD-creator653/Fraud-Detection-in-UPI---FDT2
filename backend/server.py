@@ -7,6 +7,7 @@ import os
 import uuid
 import json
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
@@ -17,8 +18,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from argon2 import PasswordHasher
+import bcrypt
 
-# Use argon2 directly to avoid passlib bcrypt compatibility issues
+# Use argon2 for new passwords, but support bcrypt for legacy passwords
 pwd_hasher = PasswordHasher()
 import jwt
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -68,7 +70,7 @@ def _load_cfg_db_url() -> str:
         cfg = yaml.safe_load(text) or {}
         return str(cfg.get("db_url", "")).strip()
     except Exception as e:
-        print(f"⚠ Failed to load config.yaml DB URL: {e}")
+        print(f"[WARNING] Failed to load config.yaml DB URL: {e}")
         return ""
 
 env_db_url = os.getenv("DB_URL")
@@ -90,10 +92,10 @@ def init_redis():
     try:
         redis_client = redis.from_url(REDIS_URL, decode_responses=True)
         redis_client.ping()
-        print(f"✓ Redis cache connected: {REDIS_URL}")
+        print(f"[OK] Redis cache connected: {REDIS_URL}")
         return True
     except Exception as e:
-        print(f"⚠ Redis unavailable ({e}). Caching disabled, using direct DB queries.")
+        print(f"[WARNING] Redis unavailable ({e}). Caching disabled, using direct DB queries.")
         redis_client = None
         return False
 
@@ -133,53 +135,13 @@ class RateLimiter:
 
 rate_limiter = RateLimiter(max_requests=100, window_seconds=60)  # 100 requests per minute
 
-# Initialize FastAPI app and scheduler
-app = FastAPI(title="FDT API", version="1.0.0")
+# Initialize scheduler 
 scheduler = AsyncIOScheduler()
 
-# CORS Configuration - Allow localhost + devtunnel URLs for mobile testing
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.devtunnels\.ms",  # Allow any devtunnel URL
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
-    expose_headers=["*"],
-)
-
-# Rate limiting middleware
-@app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
-    """Apply rate limiting to authenticated endpoints"""
-    # Skip rate limiting for public endpoints
-    if request.url.path in ["/docs", "/openapi.json", "/api/register", "/api/login"]:
-        return await call_next(request)
-    
-    # Try to get user_id from token
-    try:
-        auth_header = request.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header.replace("Bearer ", "")
-            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-            user_id = payload.get("user_id")
-            
-            if user_id and not rate_limiter.is_allowed(user_id):
-                return JSONResponse(
-                    status_code=429,
-                    content={"detail": "Rate limit exceeded. Max 100 requests per minute."}
-                )
-    except Exception:
-        pass  # If token parsing fails, allow request (handled by auth later)
-    
-    return await call_next(request)
-
-# Startup event to initialize database schema and Redis cache
-@app.on_event("startup")
-def startup_event():
-    """Initialize database schema and Redis cache on startup"""
-    # Initialize Redis cache
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan events (startup and shutdown)"""
+    # Startup: Initialize database schema and Redis cache
     init_redis()
     
     try:
@@ -237,18 +199,14 @@ def startup_event():
         
         # Step 5: Create indexes for performance optimization
         indexes = [
-            # User queries
             ("idx_users_phone", "users", "phone"),
             ("idx_users_user_id", "users", "user_id"),
-            # Transaction queries
             ("idx_transactions_user_id", "transactions", "user_id"),
             ("idx_transactions_tx_id", "transactions", "tx_id"),
             ("idx_transactions_created_at", "transactions", "created_at"),
             ("idx_transactions_receiver_user_id", "transactions", "receiver_user_id"),
-            # Transaction ledger
             ("idx_transaction_ledger_tx_id", "transaction_ledger", "tx_id"),
             ("idx_transaction_ledger_user_id", "transaction_ledger", "user_id"),
-            # User daily transactions
             ("idx_user_daily_transactions_user_date", "user_daily_transactions", "user_id, transaction_date")
         ]
         
@@ -279,9 +237,9 @@ def startup_event():
                 print(f"User {user_data[1]} already exists or error: {e}")
         
         conn.commit()
-        print("✓ Database schema initialized successfully (including Send Money feature)")
+        print("[OK] Database schema initialized successfully (including Send Money feature)")
     except Exception as e:
-        print(f"⚠ Warning: Could not ensure database schema: {e}")
+        print(f"[WARNING] Could not ensure database schema: {e}")
     finally:
         try:
             conn.close()
@@ -292,15 +250,68 @@ def startup_event():
     try:
         scheduler.add_job(
             auto_refund_delayed_transactions,
-            trigger=IntervalTrigger(minutes=1),  # Run every 1 minute
+            trigger=IntervalTrigger(minutes=1),
             id="auto_refund_job",
             name="Auto-refund delayed transactions",
             replace_existing=True
         )
         scheduler.start()
-        print("✓ Auto-refund scheduler started")
+        print("[OK] Auto-refund scheduler started")
     except Exception as e:
-        print(f"⚠ Warning: Could not start scheduler: {e}")
+        print(f"[WARNING] Could not start scheduler: {e}")
+    
+    yield  # Application runs
+    
+    # Shutdown: Clean up resources
+    try:
+        scheduler.shutdown()
+        print("[OK] Scheduler shut down")
+    except Exception as e:
+        print(f"[WARNING] Warning during scheduler shutdown: {e}")
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(title="FDT API", version="1.0.0", lifespan=lifespan)
+
+# CORS Configuration - Allow localhost + devtunnel URLs for mobile testing
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001,http://localhost:8000,http://192.168.21.59:3001,http://192.168.21.59:8001").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"(https?://.*\.devtunnels\.ms|http://192\.168\..*|http://localhost.*)",  # Allow devtunnels, local IPs, localhost
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+    expose_headers=["*"],
+)
+
+# Rate limiting middleware
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Apply rate limiting to authenticated endpoints"""
+    # Skip rate limiting for public endpoints
+    if request.url.path in ["/docs", "/openapi.json", "/api/register", "/api/login"]:
+        return await call_next(request)
+    
+    # Try to get user_id from token
+    try:
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.replace("Bearer ", "")
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            user_id = payload.get("user_id")
+            
+            if user_id and not rate_limiter.is_allowed(user_id):
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Rate limit exceeded. Max 100 requests per minute."}
+                )
+    except Exception:
+        pass  # If token parsing fails, allow request (handled by auth later)
+    
+    return await call_next(request)
+
+# Lifespan event handler defined above (async context manager)
+# Old @app.on_event("startup") replaced with modern lifespan approach
 
 async def auto_refund_delayed_transactions():
     """Auto-refund transactions that have been delayed for more than 5 minutes"""
@@ -370,7 +381,7 @@ async def auto_refund_delayed_transactions():
             
             if expired_transactions:
                 conn.commit()
-                print(f"✓ Auto-refunded {len(expired_transactions)} delayed transactions")
+                print(f"[OK] Auto-refunded {len(expired_transactions)} delayed transactions")
             
         except Exception as e:
             print(f"Auto-refund error: {e}")
@@ -399,7 +410,7 @@ def cache_get(key: str):
         if redis_client:
             return redis_client.get(key)
     except Exception as e:
-        print(f"⚠ Cache get error: {e}")
+        print(f"[WARNING] Cache get error: {e}")
     return None
 
 def cache_set(key: str, value: str, ttl: int = 300):
@@ -408,7 +419,7 @@ def cache_set(key: str, value: str, ttl: int = 300):
         if redis_client:
             redis_client.setex(key, ttl, value)
     except Exception as e:
-        print(f"⚠ Cache set error: {e}")
+        print(f"[WARNING] Cache set error: {e}")
 
 def cache_delete(key: str):
     """Delete value from Redis cache"""
@@ -416,7 +427,7 @@ def cache_delete(key: str):
         if redis_client:
             redis_client.delete(key)
     except Exception as e:
-        print(f"⚠ Cache delete error: {e}")
+        print(f"[WARNING] Cache delete error: {e}")
 
 def dict_to_json_serializable(data):
     """Convert dict with Decimal to JSON serializable format"""
@@ -429,6 +440,33 @@ def dict_to_json_serializable(data):
     elif isinstance(data, datetime):
         return data.isoformat()
     return data
+
+def verify_password(password_hash: str, password: str) -> bool:
+    """
+    Verify password against hash, supporting both bcrypt and Argon2
+    
+    Args:
+        password_hash: The stored password hash
+        password: The plain text password to verify
+    
+    Returns:
+        True if password matches, False otherwise
+    """
+    try:
+        # Detect hash type by prefix
+        if password_hash.startswith('$2b$') or password_hash.startswith('$2a$') or password_hash.startswith('$2y$'):
+            # bcrypt hash
+            return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+        elif password_hash.startswith('$argon2'):
+            # Argon2 hash
+            pwd_hasher.verify(password_hash, password)
+            return True
+        else:
+            print(f"[WARNING] Unknown password hash format: {password_hash[:20]}...")
+            return False
+    except Exception as e:
+        print(f"[WARNING] Password verification failed: {e}")
+        return False
 
 # ============================================================================
 # PYDANTIC MODELS
@@ -590,10 +628,8 @@ async def login_user(credentials: UserLogin):
             if not user:
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
             
-            # Verify password
-            try:
-                pwd_hasher.verify(user["password_hash"], credentials.password)
-            except:
+            # Verify password (supports both bcrypt and Argon2)
+            if not verify_password(user["password_hash"], credentials.password):
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
             
             # Create token
