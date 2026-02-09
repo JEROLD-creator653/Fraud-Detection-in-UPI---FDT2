@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getUserTransactions } from '../api';
-import { formatAmount, getRiskColor, getRiskLabel } from '../utils/helpers';
+import { formatAmount, getRiskColor, getRiskLabel, formatTimestamp } from '../utils/helpers';
 import { useNotifications } from './NotificationSystem';
 
 const RiskAnalysis = () => {
@@ -253,7 +253,13 @@ const RiskAnalysis = () => {
                         }`}></div>
                         <div>
                           <p className="text-white font-semibold">{tx.recipient_vpa}</p>
-                          <p className="text-white/60 text-sm">{new Date(tx.created_at).toLocaleString()}</p>
+                          <p className="text-white/60 text-sm">{formatTimestamp(tx.created_at, 'en-IN', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</p>
                         </div>
                       </div>
                       <div className="text-right">

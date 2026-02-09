@@ -63,7 +63,7 @@ const TransactionHistory = ({ user }) => {
   useEffect(() => {
     const interval = setInterval(() => {
       loadTransactions(true);
-    }, 30000);
+    }, 10000);
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps

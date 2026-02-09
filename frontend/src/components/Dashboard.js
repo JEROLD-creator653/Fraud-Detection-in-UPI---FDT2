@@ -36,7 +36,7 @@ const Dashboard = ({ user, onLogout }) => {
   useEffect(() => {
     const interval = setInterval(() => {
       loadDashboard(true);
-    }, 30000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, []);

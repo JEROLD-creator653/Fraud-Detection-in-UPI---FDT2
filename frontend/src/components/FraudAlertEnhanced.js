@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { submitUserDecision, getTransaction, confirmTransaction, cancelTransaction } from '../api';
 import { useNotifications } from './NotificationSystem';
-import { formatAmount, getRiskColor, getRiskLabel } from '../utils/helpers';
+import { formatAmount, getRiskColor, getRiskLabel, formatTimestamp } from '../utils/helpers';
 
 const FraudAlert = () => {
   const { txId } = useParams();
@@ -177,7 +177,14 @@ const FraudAlert = () => {
             <div>
               <p className="text-white/60 text-sm mb-2">Time</p>
               <p className="text-lg text-white/80">
-                {new Date(transaction.created_at + 'Z').toLocaleString()}
+                {formatTimestamp(transaction.created_at, 'en-IN', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+                })}
               </p>
             </div>
           </div>

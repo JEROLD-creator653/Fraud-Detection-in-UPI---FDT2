@@ -382,6 +382,22 @@ function invalidateCache(cacheName, urlStartsWith = null) {
   });
 }
 
+// Force fresh data on page load and periodically clear stale cache
+function clearAllCachesAndReload() {
+  _responseCache['dashboard-data'] = {};
+  _responseCache['recent-transactions'] = {};
+  _responseCache['dashboard-analytics'] = {};
+  _responseCache['pattern-analytics'] = {};
+  txCache = [];
+  console.log('[CACHE] Cleared all caches, forcing fresh data fetch');
+}
+
+// Force refresh every 2 minutes to prevent stale cache in background
+setInterval(() => {
+  console.log('[AUTO-CLEAR] Clearing aged cache to prevent stale data');
+  clearAllCachesAndReload();
+}, 120000); // Clear every 2 minutes
+
 // Debounce helper - prevents rapid duplicate function calls
 function debounce(func, delayMs = 500) {
   let timeoutId = null;
@@ -507,7 +523,7 @@ async function loadDashboardData() {
   try {
     const url = `/dashboard-data?time_range=${currentTimeRange}`;
     console.log(`[loadDashboardData] Fetching from: ${url}`);
-    const j = await cachedFetch(url, 'dashboard-data', 15000); // 15 second cache for stats
+    const j = await cachedFetch(url, 'dashboard-data', 5000); // 5 second cache for dashboard stats
     const s = j.stats || {};
     console.log(`[loadDashboardData] Got stats:`, s);
 
@@ -642,7 +658,7 @@ async function loadRecentTransactions() {
     const limit = getLimitForRange(currentTimeRange);
     const url = `/recent-transactions?limit=${limit}&time_range=${currentTimeRange}`;
     console.log(`[loadRecentTransactions] Fetching from: ${url}`);
-    const j = await cachedFetch(url, 'recent-transactions', 20000); // 20 second cache for transactions
+    const j = await cachedFetch(url, 'recent-transactions', 2000); // 2 second cache for instant transaction updates
     txCache = Array.isArray(j.transactions) ? j.transactions : [];
     console.log(`[loadRecentTransactions] Loaded ${txCache.length} transactions`);
 
@@ -1174,6 +1190,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize data loading
   try {
+    clearAllCachesAndReload(); // Force fresh data on page load
     loadDashboardData();
     loadRecentTransactions();
     loadDashboardAnalytics(); // server aggregated timeline for full range coverage
@@ -1189,8 +1206,9 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('WebSocket setup error:', err);
   }
 
-  setInterval(loadDashboardData, 30000);
-  setInterval(loadPatternAnalytics, 30000); // Refresh patterns every 30s
+  setInterval(loadDashboardData, 5000);
+  setInterval(loadRecentTransactions, 3000); // Refresh transactions every 3s for instant updates
+  setInterval(loadPatternAnalytics, 10000); // Refresh patterns every 10s
 
   // Time range selector - optimized for instant updates
   document.getElementById('timeRange').addEventListener('change', async (e) => {

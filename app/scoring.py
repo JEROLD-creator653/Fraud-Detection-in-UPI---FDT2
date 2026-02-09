@@ -251,6 +251,22 @@ def score_with_ensemble(features_dict: dict) -> Dict[str, float]:
             scores["final_risk_score"] = scores["ensemble"]
             scores["disagreement"] = 0.0
             scores["confidence_level"] = "HIGH"
+        
+        # Apply trust-based discount for established users
+        tx_count_24h = float(features_dict.get("tx_count_24h", 0))
+        trust_discount = 1.0
+        if tx_count_24h >= 10:
+            trust_discount = 0.7  # 30% risk reduction for active users
+        elif tx_count_24h >= 5:
+            trust_discount = 0.8  # 20% risk reduction for regular users
+        elif tx_count_24h >= 2:
+            trust_discount = 0.9  # 10% risk reduction for known users
+        
+        # Apply discount to all scores
+        scores["ensemble"] = float(scores["ensemble"] * trust_discount)
+        scores["final_risk_score"] = float(scores.get("final_risk_score", 0) * trust_discount)
+        
+        return scores
     else:
         # No models available, use fallback
         scores["ensemble"] = fallback_rule_based_score(features_dict)
@@ -265,6 +281,7 @@ def fallback_rule_based_score(features: dict) -> float:
     """
     Fallback rule-based scoring when no models are available.
     Uses heuristics based on amount, velocity, and temporal patterns.
+    Applies trust discount for established users with transaction history.
     """
     amount = float(features.get("amount", 0))
     is_night = float(features.get("is_night", 0))
@@ -272,6 +289,7 @@ def fallback_rule_based_score(features: dict) -> float:
     is_new_recipient = float(features.get("is_new_recipient", 0))
     merchant_risk = float(features.get("merchant_risk_score", 0))
     tx_count_1h = float(features.get("tx_count_1h", 0))
+    tx_count_24h = float(features.get("tx_count_24h", 0))
     is_qr = float(features.get("is_qr_channel", 0))
     is_web = float(features.get("is_web_channel", 0))
     
@@ -290,10 +308,20 @@ def fallback_rule_based_score(features: dict) -> float:
         score += 0.2
     
     # Behavioral risk
+    # For new devices: reduce penalty if user is established
     if is_new_device > 0:
-        score += 0.15
+        if tx_count_24h >= 5:
+            # Known user using a device for first time is low risk
+            score += 0.05
+        else:
+            score += 0.15
+    
     if is_new_recipient > 0:
-        score += 0.1
+        # New recipient: higher risk if user is new, lower if established
+        if tx_count_24h >= 5:
+            score += 0.05  # Reduced for established users
+        else:
+            score += 0.1
     
     # Merchant risk
     score += merchant_risk * 0.15
@@ -307,6 +335,18 @@ def fallback_rule_based_score(features: dict) -> float:
     # Channel risk
     if is_qr > 0 or is_web > 0:
         score += 0.1
+    
+    # Trust-based discount for established users
+    # Users with regular transaction history get a risk reduction
+    trust_discount = 1.0
+    if tx_count_24h >= 10:
+        trust_discount = 0.7  # 30% risk reduction for active users
+    elif tx_count_24h >= 5:
+        trust_discount = 0.8  # 20% risk reduction for regular users
+    elif tx_count_24h >= 2:
+        trust_discount = 0.9  # 10% risk reduction for known users
+    
+    score = score * trust_discount
     
     return float(max(0.0, min(1.0, score)))
 

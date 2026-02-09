@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { getUserTransactions } from '../api';
+import sessionStorageManager from '../utils/sessionStorageManager';
 
 const NotificationContext = createContext();
 
@@ -51,14 +52,28 @@ export const NotificationProvider = ({ children }) => {
   // Check for delayed transactions periodically (only if user is authenticated)
   useEffect(() => {
     // Only check if user is logged in (has token)
-    const token = localStorage.getItem('fdt_token');
+    const token = sessionStorageManager.getItem('fdt_token');
     if (!token) {
       return; // Skip if not authenticated
     }
 
+    let isActive = true; // Track if component is still mounted
+
     const checkDelayedTransactions = async () => {
+      // Re-check token before making request
+      const currentToken = sessionStorageManager.getItem('fdt_token');
+      if (!currentToken) {
+        // Token was cleared (user logged out), stop polling
+        isActive = false;
+        return;
+      }
+
       try {
         const data = await getUserTransactions(20, 'DELAY');
+        
+        // Only process if component is still mounted and we still have a token
+        if (!isActive) return;
+        
         const delayedTxns = data.transactions || [];
         
         delayedTxns.forEach(tx => {
@@ -79,16 +94,35 @@ export const NotificationProvider = ({ children }) => {
           }
         });
       } catch (err) {
-        console.error('Failed to check delayed transactions:', err);
+        // If we get authentication errors, stop polling
+        if (err.response?.status === 401) {
+          console.warn('⚠ Authentication lost, stopping delayed transaction checks');
+          isActive = false;
+          return;
+        }
+        // For other errors, just log without disrupting the app
+        console.error('Failed to check delayed transactions:', err.message);
       }
     };
 
     // Check immediately and then every 30 seconds
     checkDelayedTransactions();
-    const interval = setInterval(checkDelayedTransactions, 30000);
+    const interval = setInterval(() => {
+      // Stop checking if no token
+      const currentToken = sessionStorageManager.getItem('fdt_token');
+      if (!currentToken) {
+        isActive = false;
+        return;
+      }
+      checkDelayedTransactions();
+    }, 30000);
 
-    return () => clearInterval(interval);
-  }, [notifications, addNotification]);
+    // Cleanup: stop polling when component unmounts or user logs out
+    return () => {
+      isActive = false;
+      clearInterval(interval);
+    };
+  }, []); // Empty dependency array - we check token inside the effect
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
