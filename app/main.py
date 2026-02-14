@@ -79,8 +79,8 @@ CFG_PATH = os.path.join(os.getcwd(), "config", "config.yaml")
 DEFAULT_CFG = {
     "db_url": "postgresql://fdt:fdtpass@host.docker.internal:5432/fdt_db",
     "thresholds": {"delay": 0.30, "block": 0.60},
-    # WARNING: change secret_key before production
-    "secret_key": "dev-secret-change-me-please",
+    # Use environment variable for production; default is for development only
+    "secret_key": os.getenv("SECRET_KEY", "dev-secret-change-me-in-production"),
     # Multiple admin users support
     "admin_users": [
         {

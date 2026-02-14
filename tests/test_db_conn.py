@@ -1,7 +1,9 @@
 # test_db_conn.py
 import yaml, psycopg2, sys, os
+from pathlib import Path
 print("cwd:", os.getcwd())
-raw = open("config.yaml", "rb").read()
+config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+raw = open(str(config_path), "rb").read()
 print("raw head bytes:", raw[:8])
 text = raw.decode("utf-8")
 print("raw (first 200 chars):")

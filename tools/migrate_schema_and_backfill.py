@@ -7,10 +7,11 @@ import sys
 from datetime import datetime, timezone
 
 # load config.yaml (supports either JSON or YAML structure)
-CONF_PATH = "config.yaml"
+import pathlib
+CONF_PATH = pathlib.Path(__file__).parent.parent / "config" / "config.yaml"
 
 def load_config(path=CONF_PATH):
-    with open(path, "rb") as f:
+    with open(str(path), "rb") as f:
         raw = f.read()
     # try text decode with utf-8, fallback to latin1
     try:
