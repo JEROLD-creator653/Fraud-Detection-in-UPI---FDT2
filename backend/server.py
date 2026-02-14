@@ -4,12 +4,14 @@ FastAPI server with user authentication, transaction processing, and ML-based fr
 """
 
 import os
+import sys
 import uuid
 import json
 import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
+from pathlib import Path
 
 from fastapi import FastAPI, Request, HTTPException, status, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
@@ -40,10 +42,8 @@ from webauthn.helpers.structs import (
     AuthenticatorTransport
 )
 
-# Import UPI Transaction ID generator
-import sys
-import os as os_module
-project_root = os_module.dirname(os_module.dirname(os_module.abspath(__file__)))
+# Setup project root path and import UPI Transaction ID generator
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 from app.upi_transaction_id import generate_upi_transaction_id
 

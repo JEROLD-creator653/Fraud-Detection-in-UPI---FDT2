@@ -1,7 +1,14 @@
 """Create a single test transaction with explainability."""
-import requests
+import sys
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+import requests
 from app.upi_transaction_id import generate_upi_transaction_id
 
 URL = "http://localhost:8000/transactions"
@@ -9,13 +16,13 @@ URL = "http://localhost:8000/transactions"
 # Create a test transaction
 tx = {
     "tx_id": generate_upi_transaction_id(),
-    "user_id": "test_user_123",
+    "user_id": "user_001",
     "device_id": "test_device_456",
     "amount": 5000.00,
     "recipient_vpa": "merchant@upi",
     "tx_type": "P2M",
     "channel": "app",
-    "timestamp": datetime.now(timezone.utc).isoformat()
+    "ts": datetime.now(timezone.utc).isoformat()
 }
 
 print("Sending test transaction...")
