@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS user_credentials (
 
 -- Transactions table (enhanced for Send Money)
 CREATE TABLE IF NOT EXISTS transactions (
-    tx_id VARCHAR(100) PRIMARY KEY,
+    tx_id VARCHAR(12) PRIMARY KEY,
     user_id VARCHAR(100) REFERENCES users(user_id),
     device_id VARCHAR(100),
     ts TIMESTAMP NOT NULL,

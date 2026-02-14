@@ -300,7 +300,7 @@ curl -X POST http://localhost:8001/api/transaction \
 **Response:**
 ```json
 {
-  "tx_id": "TXN123456",
+  "tx_id": "260214000001",
   "fraud_score": 0.45,
   "risk_level": "MEDIUM",
   "action": "DELAY",
@@ -314,6 +314,64 @@ curl -X POST http://localhost:8001/api/transaction \
   ]
 }
 ```
+
+---
+
+## 📝 Transaction ID Format
+
+All transactions use a standardized 12-digit UPI transaction ID in the format: **YYMMDDXXXXXX**
+
+### Format Breakdown
+- **YYMMDD** (6 digits): Date component
+  - YY: Year (2-digit, e.g., 26 for 2026)
+  - MM: Month (2-digit, 01-12)
+  - DD: Day (2-digit, 01-31)
+  - Example: `260214` = February 14, 2026
+
+- **XXXXXX** (6 digits): Sequential number (000001-999999)
+  - Increments for each transaction on a given date
+  - Resets daily
+  - Example: `000001`, `000002`, etc.
+
+### Examples
+- `260214000001` - First transaction on Feb 14, 2026
+- `260214000023` - 23rd transaction on Feb 14, 2026
+- `260215000001` - First transaction on Feb 15, 2026 (date changed, sequence resets)
+
+### Implementation
+Transaction IDs are generated automatically by the backend using the `generate_upi_transaction_id()` function in `app/upi_transaction_id.py`. Users do not specify transaction IDs; they are created server-side to ensure uniqueness and date-based tracking.
+
+---
+
+## 🔄 Database Migration (For Existing Systems)
+
+If you're upgrading from a previous version with UUID-based transaction IDs, run the migration script to update existing transactions:
+
+```bash
+# Activate conda dev environment
+source /home/aakash/miniconda3/etc/profile.d/conda.sh
+conda activate dev
+
+# Run migration
+python tools/migrate_transaction_id_format.py
+```
+
+**What the migration does:**
+1. Creates a temporary table with the new schema (tx_id VARCHAR(12))
+2. Migrates all existing transactions with UUID IDs to new 12-digit UPI format
+3. Updates all foreign key references in related tables:
+   - `fraud_alerts` table
+   - `transaction_ledger` table
+   - `admin_logs` table
+4. Recreates indexes for optimal performance
+5. Swaps old table with new table
+
+**⚠️ Important Notes:**
+- Make a database backup before running migration
+- Migration may take several minutes for large transaction volumes
+- The process maintains data integrity with transactions
+- Old transaction IDs are preserved temporarily for reference during migration
+- Database indexes are automatically recreated
 
 ---
 

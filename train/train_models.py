@@ -20,6 +20,8 @@ from sklearn.metrics import (
 )
 import xgboost as xgb
 
+from app.upi_transaction_id import generate_upi_transaction_id
+
 # Define feature names for this training pipeline
 def get_feature_names():
     """Return ordered list of feature names for model training."""
@@ -62,7 +64,7 @@ def generate_normal_transaction():
         ts = ts.replace(hour=random.randint(9, 21))
     
     return {
-        "tx_id": str(uuid.uuid4()),
+        "tx_id": generate_upi_transaction_id(),
         "user_id": f"user{user_id}",
         "device_id": f"device_{user_id}_{random.randint(1, 3)}",  # 1-3 devices per user
         "timestamp": ts.isoformat(),

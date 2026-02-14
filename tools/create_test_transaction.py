@@ -1,13 +1,14 @@
 """Create a single test transaction with explainability."""
 import requests
-import uuid
 from datetime import datetime, timezone
+
+from app.upi_transaction_id import generate_upi_transaction_id
 
 URL = "http://localhost:8000/transactions"
 
 # Create a test transaction
 tx = {
-    "tx_id": str(uuid.uuid4()),
+    "tx_id": generate_upi_transaction_id(),
     "user_id": "test_user_123",
     "device_id": "test_device_456",
     "amount": 5000.00,

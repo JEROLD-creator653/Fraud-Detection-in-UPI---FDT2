@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 import joblib
 from app.feature_engine import extract_features
+from app.upi_transaction_id import generate_upi_transaction_id
 
 # ----------------------------
 # Generate normal synthetic transactions
@@ -12,7 +13,7 @@ from app.feature_engine import extract_features
 def generate_tx():
     ts = datetime.now(timezone.utc) - timedelta(seconds=random.randint(0, 86400))
     return {
-        "tx_id": str(uuid.uuid4()),
+        "tx_id": generate_upi_transaction_id(),
         "user_id": f"user{random.randint(1, 300)}",
         "device_id": str(uuid.uuid4()),
         "timestamp": ts.isoformat(),
