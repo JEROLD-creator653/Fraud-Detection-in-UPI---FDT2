@@ -4,9 +4,8 @@ from datetime import datetime, timezone, timedelta
 import math
 import statistics
 
-# Redis connection - Use localhost explicitly (not Docker host)
-# The backend will handle env var REDIS_URL if needed
-REDIS_URL = "redis://localhost:6379/0"
+# Redis connection - Use environment variable or default to localhost
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 try:
     r = redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
     r.ping()
