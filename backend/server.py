@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from argon2 import PasswordHasher
+import bcrypt
 
 # Use argon2 directly to avoid passlib bcrypt compatibility issues
 pwd_hasher = PasswordHasher()
@@ -477,6 +478,35 @@ class TransactionCancel(BaseModel):
 # AUTHENTICATION HELPERS
 # ============================================================================
 
+def normalize_phone(phone: Optional[str]) -> str:
+    """Normalize phone number to +91XXXXXXXXXX format when possible."""
+    if not phone:
+        return ""
+
+    digits = "".join(ch for ch in str(phone) if ch.isdigit())
+    if len(digits) == 12 and digits.startswith("91"):
+        digits = digits[2:]
+    if len(digits) == 11 and digits.startswith("0"):
+        digits = digits[1:]
+
+    if len(digits) == 10:
+        return f"+91{digits}"
+
+    return str(phone).strip()
+
+def verify_password(password_hash: str, password: str) -> bool:
+    """Verify password hash, supporting both bcrypt and argon2 hashes."""
+    if not password_hash or not password:
+        return False
+
+    if password_hash.startswith("$2a$") or password_hash.startswith("$2b$") or password_hash.startswith("$2y$"):
+        return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+
+    try:
+        return pwd_hasher.verify(password_hash, password)
+    except Exception:
+        return False
+
 def create_access_token(user_id: str) -> str:
     """Create JWT access token with proper UTC timestamps"""
     now = datetime.now(timezone.utc)
@@ -528,8 +558,10 @@ async def register_user(user_data: UserRegister):
         try:
             cur = conn.cursor()
             
+            normalized_phone = normalize_phone(user_data.phone)
+
             # Check if phone already exists
-            cur.execute("SELECT user_id FROM users WHERE phone = %s", (user_data.phone,))
+            cur.execute("SELECT user_id FROM users WHERE phone = %s", (normalized_phone,))
             if cur.fetchone():
                 raise HTTPException(status_code=400, detail="Phone number already registered")
             
@@ -552,7 +584,7 @@ async def register_user(user_data: UserRegister):
                 VALUES (%s, %s, %s, %s, %s, 10000.00, NOW())
                 RETURNING user_id, name, phone, email, balance, created_at
                 """,
-                (user_id, user_data.name, user_data.phone, user_data.email, password_hash)
+                (user_id, user_data.name, normalized_phone, user_data.email, password_hash)
             )
             
             user = cur.fetchone()
@@ -580,10 +612,12 @@ async def login_user(credentials: UserLogin):
         try:
             cur = conn.cursor()
             
+            normalized_phone = normalize_phone(credentials.phone)
+
             # Get user by phone
             cur.execute(
                 "SELECT user_id, name, phone, email, password_hash, balance FROM users WHERE phone = %s AND is_active = TRUE",
-                (credentials.phone,)
+                (normalized_phone,)
             )
             user = cur.fetchone()
             
@@ -591,9 +625,7 @@ async def login_user(credentials: UserLogin):
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
             
             # Verify password
-            try:
-                pwd_hasher.verify(user["password_hash"], credentials.password)
-            except:
+            if not verify_password(user["password_hash"], credentials.password):
                 raise HTTPException(status_code=401, detail="Invalid phone or password")
             
             # Create token
@@ -722,7 +754,7 @@ async def register_credential(
 async def create_login_challenge(request: Request):
     """Generate a challenge for WebAuthn authentication"""
     data = await request.json()
-    phone = data.get('phone')
+    phone = normalize_phone(data.get('phone'))
     
     if not phone:
         raise HTTPException(status_code=400, detail="Phone number required")
