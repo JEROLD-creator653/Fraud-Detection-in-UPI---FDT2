@@ -1161,7 +1161,7 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             
             if risk_score >= block_threshold:
                 action = "BLOCK"
-                db_status = "blocked"
+                db_status = "pending"  # BLOCK transactions are pending user confirmation, same as DELAY
             elif risk_score >= delay_threshold:
                 action = "DELAY"
                 db_status = "pending"
@@ -1338,8 +1338,8 @@ async def handle_user_decision(decision_data: UserDecision, user_id: str = Depen
 
             # Update transaction based on decision
             if decision_data.decision == "confirm":
-                if transaction["action"] != "DELAY":
-                    raise HTTPException(status_code=400, detail="Only delayed transactions can be confirmed")
+                if transaction["action"] not in ["DELAY", "BLOCK"]:
+                    raise HTTPException(status_code=400, detail="Only delayed or blocked transactions can be confirmed")
 
                 new_action = "ALLOW"
                 new_status = "success"
@@ -1647,8 +1647,8 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
             if not transaction:
                 raise HTTPException(status_code=404, detail="Transaction not found or not pending")
             
-            if transaction["action"] != "DELAY":
-                raise HTTPException(status_code=400, detail="Only delayed transactions can be confirmed")
+            if transaction["action"] not in ["DELAY", "BLOCK"]:
+                raise HTTPException(status_code=400, detail="Only delayed or blocked transactions can be confirmed")
 
             receiver_balance = None
             sender_balance = None
