@@ -1057,11 +1057,11 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                 (user_id, today)
             )
             daily_stats = cur.fetchone()
-            
+             
             total_today = float(daily_stats["total_amount"]) if daily_stats else 0.0
             
-            # Generate 12-digit UPI transaction ID
-            tx_id = generate_upi_transaction_id()
+            # Generate 12-digit UPI transaction ID (pass cursor for DB-backed sequence)
+            tx_id = generate_upi_transaction_id(db_cursor=cur)
             device_id = tx_data.device_id or f"device_{uuid.uuid4().hex[:8]}"
             
             # Find receiver user if it's a registered user
@@ -1100,17 +1100,60 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                 sys.path.insert(0, project_root)
                 from app import scoring
                 
-                risk_score = scoring.score_transaction(transaction)
-                print(f"ML Risk Score for {tx_id}: {risk_score}")
+                # Get detailed scoring with reasons
+                scoring_details = scoring.score_transaction(transaction, return_details=True)
+                if isinstance(scoring_details, dict):
+                    risk_score = scoring_details.get("risk_score", 0.0)
+                    fraud_reasons_list = scoring_details.get("reasons", [])
+                else:
+                    risk_score = scoring_details
+                    fraud_reasons_list = []
+                
+                # Apply known recipient discount: drastically reduce risk for repeat recipients
+                try:
+                    import redis
+                    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+                    r_discount = redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=1)
+                    r_discount.ping()
+                    
+                    recipient_key = f"user:{user_id}:recipients"
+                    # Check if this recipient is already known (not new)
+                    is_new_recipient = scoring_details.get("features", {}).get("is_new_recipient", 1.0)
+                    
+                    if is_new_recipient == 0.0:
+                        # This is a KNOWN recipient - apply aggressive discount
+                        original_score = risk_score
+                        # Reduce risk score by 70% for known recipients
+                        risk_score = risk_score * 0.3
+                        print(f"ML Risk Score for {tx_id}: {original_score:.4f} -> {risk_score:.4f} (KNOWN RECIPIENT: 70% discount applied)")
+                        
+                        # Add note to fraud reasons
+                        if "Payment to new/unknown recipient" in fraud_reasons_list:
+                            fraud_reasons_list.remove("Payment to new/unknown recipient")
+                        if "First transaction to this recipient" in fraud_reasons_list:
+                            fraud_reasons_list.remove("First transaction to this recipient")
+                        fraud_reasons_list.insert(0, "Trusted recipient (prior transaction history)")
+                    else:
+                        print(f"ML Risk Score for {tx_id}: {risk_score:.4f} (NEW RECIPIENT)")
+                        
+                except Exception as e:
+                    print(f"Known recipient check error: {e} - using original score")
+                
+                if fraud_reasons_list:
+                    print(f"  Fraud Reasons: {fraud_reasons_list}")
             except Exception as e:
                 print(f"Scoring error: {e}")
+                fraud_reasons_list = []
                 # Fallback to simple rule-based scoring
                 if tx_data.amount > 10000:
                     risk_score = 0.7
+                    fraud_reasons_list = ["High transaction amount (>10000)"]
                 elif tx_data.amount > 5000:
                     risk_score = 0.4
+                    fraud_reasons_list = ["High transaction amount (>5000)"]
                 else:
                     risk_score = 0.1
+                    fraud_reasons_list = []
             
             # Determine action based on thresholds and daily limit
             delay_threshold = float(os.getenv("DELAY_THRESHOLD", "0.30"))
@@ -1267,7 +1310,8 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                 "requires_confirmation": action in ["DELAY", "BLOCK"],
                 "risk_level": "high" if risk_score >= block_threshold else "medium" if risk_score >= delay_threshold else "low",
                 "daily_limit_exceeded": exceeds_daily_limit,
-                "receiver_user_id": receiver_user_id
+                "receiver_user_id": receiver_user_id,
+                "fraud_reasons": fraud_reasons_list
             }
         finally:
             conn.close()
@@ -2006,4 +2050,4 @@ def app_info():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="127.0.0.1", port=8001)
