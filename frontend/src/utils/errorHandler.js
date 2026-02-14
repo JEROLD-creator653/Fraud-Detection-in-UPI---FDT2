@@ -126,7 +126,6 @@ class ErrorHandler {
     // Custom error messages
     const message = error.message || error.toString();
     if (message.includes('insufficient')) return ERROR_TYPES.INSUFFICIENT_FUNDS;
-    if (message.includes('daily limit')) return ERROR_TYPES.DAILY_LIMIT_EXCEEDED;
     if (message.includes('recipient')) return ERROR_TYPES.RECIPIENT_NOT_FOUND;
     if (message.includes('UPI') || message.includes('upi')) return ERROR_TYPES.INVALID_UPI;
     if (message.includes('validation')) return ERROR_TYPES.VALIDATION;
