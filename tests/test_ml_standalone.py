@@ -4,7 +4,13 @@ Tests the ML ensemble directly without needing the server running
 """
 
 import sys
+import os
 from datetime import datetime, timezone
+
+# Add parent directory to path so we can import app module
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app.upi_transaction_id import generate_upi_transaction_id
 
 print("="*60)
 print("STANDALONE ML MODEL TEST")
@@ -22,12 +28,15 @@ except Exception as e:
     print(f"❌ Error loading models: {e}")
     sys.exit(1)
 
+# Generate transaction IDs for test cases
+tx_ids = [generate_upi_transaction_id() for _ in range(6)]
+
 # Test transactions
 test_cases = [
     {
         "name": "Normal - Small amount, business hours",
         "tx": {
-            "tx_id": "test-001",
+            "tx_id": tx_ids[0],
             "user_id": "user123",
             "device_id": "device456",
             "timestamp": "2026-01-14T14:30:00Z",
@@ -40,7 +49,7 @@ test_cases = [
     {
         "name": "Slightly Suspicious - Higher amount",
         "tx": {
-            "tx_id": "test-002",
+            "tx_id": tx_ids[1],
             "user_id": "user123",
             "device_id": "device456",
             "timestamp": "2026-01-14T10:30:00Z",
@@ -53,7 +62,7 @@ test_cases = [
     {
         "name": "Suspicious - Night time + high amount",
         "tx": {
-            "tx_id": "test-003",
+            "tx_id": tx_ids[2],
             "user_id": "user789",
             "device_id": "device_new_123",
             "timestamp": "2026-01-14T03:15:00Z",
@@ -66,7 +75,7 @@ test_cases = [
     {
         "name": "High Risk - Large amount + suspicious merchant + night",
         "tx": {
-            "tx_id": "test-004",
+            "tx_id": tx_ids[3],
             "user_id": "user999",
             "device_id": "new_device_suspicious",
             "timestamp": "2026-01-14T02:30:00Z",
@@ -79,7 +88,7 @@ test_cases = [
     {
         "name": "Weekend Transaction",
         "tx": {
-            "tx_id": "test-005",
+            "tx_id": tx_ids[4],
             "user_id": "user555",
             "device_id": "device789",
             "timestamp": "2026-01-11T20:00:00Z",  # Saturday
@@ -92,7 +101,7 @@ test_cases = [
     {
         "name": "Round Amount (Fraud Pattern)",
         "tx": {
-            "tx_id": "test-006",
+            "tx_id": tx_ids[5],
             "user_id": "user111",
             "device_id": "device222",
             "timestamp": "2026-01-14T15:00:00Z",

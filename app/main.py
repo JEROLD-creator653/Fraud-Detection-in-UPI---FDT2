@@ -18,6 +18,9 @@ import psycopg2
 import psycopg2.extras
 from passlib.hash import pbkdf2_sha256
 
+# Import UPI Transaction ID generator
+from .upi_transaction_id import generate_upi_transaction_id
+
 # Load environment variables from .env file
 from dotenv import load_dotenv
 load_dotenv()

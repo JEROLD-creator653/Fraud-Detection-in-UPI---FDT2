@@ -40,6 +40,13 @@ from webauthn.helpers.structs import (
     AuthenticatorTransport
 )
 
+# Import UPI Transaction ID generator
+import sys
+import os as os_module
+project_root = os_module.dirname(os_module.dirname(os_module.abspath(__file__)))
+sys.path.insert(0, project_root)
+from app.upi_transaction_id import generate_upi_transaction_id
+
 # Import WebSocket manager
 try:
     from backend.ws_manager import ws_manager
@@ -1053,8 +1060,8 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             
             total_today = float(daily_stats["total_amount"]) if daily_stats else 0.0
             
-            # Generate transaction ID
-            tx_id = f"tx_{uuid.uuid4().hex[:12]}"
+            # Generate 12-digit UPI transaction ID
+            tx_id = generate_upi_transaction_id()
             device_id = tx_data.device_id or f"device_{uuid.uuid4().hex[:8]}"
             
             # Find receiver user if it's a registered user

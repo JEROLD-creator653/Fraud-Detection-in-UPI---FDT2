@@ -13,6 +13,11 @@ import argparse
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import json
+import os
+
+# Add parent directory to path for app imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from app.upi_transaction_id import generate_upi_transaction_id
 
 # Color codes for terminal output
 class Colors:
@@ -183,7 +188,7 @@ class TransactionSimulator:
         
         # Generate transaction
         tx = {
-            "tx_id": f"tx_{uuid.uuid4().hex[:12]}",
+            "tx_id": generate_upi_transaction_id(),
             "user_id": user_id,
             "device_id": device_id,
             "ts": datetime.now(timezone.utc).isoformat(),
