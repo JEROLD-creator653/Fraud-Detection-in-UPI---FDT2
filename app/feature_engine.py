@@ -1,13 +1,16 @@
-﻿import os
+import os
 import redis
 from datetime import datetime, timezone, timedelta
 import math
 import statistics
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://host.docker.internal:6379/0")
+# Redis connection - Use localhost explicitly (not Docker host)
+# The backend will handle env var REDIS_URL if needed
+REDIS_URL = "redis://localhost:6379/0"
 try:
     r = redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
     r.ping()
+    print(f"✓ Redis connected: {REDIS_URL}")
 except Exception as e:
     print(f"[WARN] Redis unavailable: {e}. Using fallback without Redis.")
     r = None

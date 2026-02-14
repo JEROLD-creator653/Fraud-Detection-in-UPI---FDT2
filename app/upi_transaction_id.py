@@ -10,23 +10,10 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
-# Global sequence counter for the current day
+# Global sequence counter for the current day (in-memory cache)
 _sequence_counter = {}
 
-def get_sequence_for_date(date_str: str) -> int:
-    """Get the current sequence number for a given date (YYMMDD format)"""
-    if date_str not in _sequence_counter:
-        _sequence_counter[date_str] = 0
-    return _sequence_counter[date_str]
-
-def increment_sequence_for_date(date_str: str) -> int:
-    """Increment and return the sequence number for a given date"""
-    if date_str not in _sequence_counter:
-        _sequence_counter[date_str] = 0
-    _sequence_counter[date_str] += 1
-    return _sequence_counter[date_str]
-
-def generate_upi_transaction_id(timestamp: Optional[datetime] = None) -> str:
+def generate_upi_transaction_id(timestamp: Optional[datetime] = None, db_cursor=None) -> str:
     """
     Generate a 12-digit UPI transaction ID.
     
@@ -36,6 +23,7 @@ def generate_upi_transaction_id(timestamp: Optional[datetime] = None) -> str:
     
     Args:
         timestamp: Optional datetime object. If None, uses current UTC time.
+        db_cursor: Optional database cursor to fetch next sequence from DB.
     
     Returns:
         12-digit transaction ID as string
@@ -53,13 +41,41 @@ def generate_upi_transaction_id(timestamp: Optional[datetime] = None) -> str:
     # Format: YYMMDD (6 digits)
     date_component = timestamp.strftime("%y%m%d")
     
-    # Get sequence number for this date (6 digits)
-    sequence = increment_sequence_for_date(date_component)
+    # Try to get sequence from database if cursor provided
+    sequence = None
+    if db_cursor is not None:
+        try:
+            # Get the max sequence for today from database (PostgreSQL syntax)
+            db_cursor.execute(
+                """
+                SELECT COALESCE(MAX(CAST(SUBSTR(tx_id, 7, 6) AS INTEGER)), 0) as max_seq
+                FROM transactions 
+                WHERE tx_id LIKE %s
+                """,
+                (f"{date_component}%",)
+            )
+            result = db_cursor.fetchone()
+            if result:
+                # Handle both dict-like cursor (RealDictCursor) and tuple cursor
+                max_seq = result.get("max_seq") if hasattr(result, "get") else result[0]
+                if max_seq:
+                    sequence = int(max_seq) + 1
+        except Exception as e:
+            # Fall back to in-memory counter if DB fails
+            import sys
+            print(f"[WARN] Failed to get sequence from DB: {e}", file=sys.stderr)
+            pass
+    
+    # Fall back to in-memory counter if no DB cursor or DB lookup failed
+    if sequence is None:
+        if date_component not in _sequence_counter:
+            _sequence_counter[date_component] = 0
+        _sequence_counter[date_component] += 1
+        sequence = _sequence_counter[date_component]
     
     # Ensure sequence wraps around at 999999
     if sequence > 999999:
         sequence = 1
-        _sequence_counter[date_component] = sequence
     
     # Format sequence with leading zeros: 000001, 000002, etc.
     sequence_component = str(sequence).zfill(6)
