@@ -202,15 +202,7 @@ def startup_event():
         conn = get_db_conn()
         cur = conn.cursor()
         
-        # Step 1: Add daily_limit column if it doesn't exist
-        cur.execute(
-            """
-            ALTER TABLE users 
-            ADD COLUMN IF NOT EXISTS daily_limit DECIMAL(15, 2) DEFAULT 10000.00
-            """
-        )
-        
-        # Step 2: Add Send Money feature columns to transactions table
+        # Step 1: Add Send Money feature columns to transactions table
         new_columns = [
             ("receiver_user_id", "VARCHAR(100) REFERENCES users(user_id)"),
             ("status_history", "TEXT[] DEFAULT '{}'"),
@@ -277,18 +269,18 @@ def startup_event():
         # Step 6: Add new test users
         new_users = [
             ('user_004', 'Abishek Kumar', '+919876543219', 'abishek@example.com', 
-             '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 20000.00, 10000.00),
+             '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 20000.00),
             ('user_005', 'Jerold Smith', '+919876543218', 'jerold@example.com', 
-             '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 18000.00, 10000.00),
+             '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 18000.00),
             ('user_006', 'Gowtham Kumar', '+919876543217', 'gowtham@example.com', 
-             '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 22000.00, 10000.00)
+             '$2b$12$sC4pqNPR0pxSK8.6E4aire4FCKHbWK988MYFODhurkjGs35TPj8i.', 22000.00)
         ]
         
         for user_data in new_users:
             try:
                 cur.execute("""
-                    INSERT INTO users (user_id, name, phone, email, password_hash, balance, daily_limit)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO users (user_id, name, phone, email, password_hash, balance)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     ON CONFLICT (user_id) DO NOTHING
                 """, user_data)
             except Exception as e:
@@ -476,9 +468,6 @@ class UserDecision(BaseModel):
 class PushToken(BaseModel):
     fcm_token: str
     device_id: Optional[str] = None
-
-class TransactionLimitUpdate(BaseModel):
-    daily_limit: float
 
 class UserSearchResult(BaseModel):
     user_id: str
@@ -1047,8 +1036,8 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
         try:
             cur = conn.cursor()
             
-            # Get user balance and daily limit (WITH ROW-LEVEL LOCK to prevent concurrent debits)
-            cur.execute("SELECT balance, daily_limit FROM users WHERE user_id = %s FOR UPDATE", (user_id,))
+            # Get user balance (WITH ROW-LEVEL LOCK to prevent concurrent debits)
+            cur.execute("SELECT balance FROM users WHERE user_id = %s FOR UPDATE", (user_id,))
             user = cur.fetchone()
             
             if not user:
@@ -1166,18 +1155,14 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                     risk_score = 0.1
                     fraud_reasons_list = []
             
-            # Determine action based on thresholds and daily limit
+            # Determine action based on fraud risk thresholds
             delay_threshold = float(os.getenv("DELAY_THRESHOLD", "0.30"))
             block_threshold = float(os.getenv("BLOCK_THRESHOLD", "0.60"))
-            
-            # Force DELAY if exceeding daily limit
-            total_with_this_tx = total_today + tx_data.amount
-            exceeds_daily_limit = total_with_this_tx > float(user["daily_limit"])
             
             if risk_score >= block_threshold:
                 action = "BLOCK"
                 db_status = "blocked"
-            elif risk_score >= delay_threshold or exceeds_daily_limit:
+            elif risk_score >= delay_threshold:
                 action = "DELAY"
                 db_status = "pending"
             else:
@@ -1209,7 +1194,7 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                     "UPDATE users SET balance = balance - %s WHERE user_id = %s",
                     (tx_data.amount, user_id)
                 )
-                
+                 
                 # Log debit in transaction_ledger
                 cur.execute(
                     """
@@ -1217,7 +1202,7 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                     VALUES (%s, 'DEBIT', %s, %s, %s)
                     """,
                     (tx_id, user_id, float(tx_data.amount), 
-                     f"Send to {tx_data.recipient_vpa}" + (" (forced DELAY: exceeds daily limit)" if exceeds_daily_limit else ""))
+                     f"Send to {tx_data.recipient_vpa}")
                 )
 
                 # Credit receiver immediately
@@ -1247,8 +1232,6 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                 reason = []
                 if tx_data.amount > 10000:
                     reason.append("High transaction amount")
-                if exceeds_daily_limit:
-                    reason.append("Exceeds daily transaction limit")
                 if risk_score >= block_threshold:
                     reason.append("ML model detected suspicious pattern")
                 
@@ -1320,7 +1303,6 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                 "transaction": dict_to_json_serializable(dict(result)),
                 "requires_confirmation": action in ["DELAY", "BLOCK"],
                 "risk_level": "high" if risk_score >= block_threshold else "medium" if risk_score >= delay_threshold else "low",
-                "daily_limit_exceeded": exceeds_daily_limit,
                 "receiver_user_id": receiver_user_id,
                 "fraud_reasons": fraud_reasons_list
             }
@@ -1597,72 +1579,6 @@ async def register_push_token(token_data: PushToken, user_id: str = Depends(get_
 # API ENDPOINTS - TRANSACTION LIMIT
 # ============================================================================
 
-@app.get("/api/user/transaction-limit")
-async def get_transaction_limit(user_id: str = Depends(get_current_user)):
-    """Get user's daily transaction limit"""
-    def _get_limit():
-        conn = get_db_conn()
-        try:
-            cur = conn.cursor()
-            
-            # Get daily limit from users table
-            cur.execute(
-                "SELECT daily_limit FROM users WHERE user_id = %s",
-                (user_id,)
-            )
-            result = cur.fetchone()
-            
-            if not result:
-                raise HTTPException(status_code=404, detail="User not found")
-            
-            return {
-                "status": "success",
-                "daily_limit": float(result['daily_limit']) if result['daily_limit'] else 10000.00
-            }
-        finally:
-            conn.close()
-    
-    return await run_in_threadpool(_get_limit)
-
-@app.post("/api/user/transaction-limit")
-async def set_transaction_limit(limit_data: TransactionLimitUpdate, user_id: str = Depends(get_current_user)):
-    """Set user's daily transaction limit"""
-    def _set_limit():
-        daily_limit = limit_data.daily_limit
-        
-        if not daily_limit or daily_limit <= 0:
-            raise HTTPException(status_code=400, detail="Daily limit must be greater than 0")
-        
-        conn = get_db_conn()
-        try:
-            cur = conn.cursor()
-            
-            # Update daily limit
-            cur.execute(
-                """
-                UPDATE users 
-                SET daily_limit = %s, updated_at = NOW()
-                WHERE user_id = %s
-                RETURNING user_id, daily_limit
-                """,
-                (float(daily_limit), user_id)
-            )
-            
-            result = cur.fetchone()
-            conn.commit()
-            
-            if not result:
-                raise HTTPException(status_code=404, detail="User not found")
-            
-            return {
-                "status": "success",
-                "message": f"Daily transaction limit updated to ₹{daily_limit}",
-                "daily_limit": float(result['daily_limit'])
-            }
-        finally:
-            conn.close()
-    
-    return await run_in_threadpool(_set_limit)
 
 # ============================================================================
 # API ENDPOINTS - SEND MONEY FEATURE
