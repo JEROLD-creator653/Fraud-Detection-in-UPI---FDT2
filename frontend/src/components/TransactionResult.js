@@ -15,7 +15,7 @@ const TransactionResult = ({ result, onBack, senderUser }) => {
       );
     }
     
-    if (result.requiresConfirmation || result.dailyLimitExceeded) {
+    if (result.requiresConfirmation) {
       return (
         <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center">
           <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -45,15 +45,6 @@ const TransactionResult = ({ result, onBack, senderUser }) => {
     }
     
     if (result.requiresConfirmation) {
-      if (result.dailyLimitExceeded) {
-        return {
-          title: 'Transaction Delayed - Daily Limit Exceeded',
-          message: `Your transaction of ₹${parseFloat(result.transaction.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} exceeds your daily limit and has been delayed for security review.`,
-          subtitle: 'Please go to your fraud detection interface to confirm this transaction.',
-          type: 'warning'
-        };
-      }
-      
       return {
         title: 'Transaction Pending Review',
         message: `Your transaction of ₹${parseFloat(result.transaction.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} has been delayed for security review.`,

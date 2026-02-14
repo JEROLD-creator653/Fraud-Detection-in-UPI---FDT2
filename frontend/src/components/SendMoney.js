@@ -161,15 +161,14 @@ const handleSubmit = async (e) => {
          localStorage.setItem('fdt_user', JSON.stringify(updatedUser));
        }
 
-       // Set transaction result
-       setTransactionResult({
-         status: response.status,
-         transaction: response.transaction,
-         requiresConfirmation: response.requires_confirmation,
-         riskLevel: response.risk_level,
-         dailyLimitExceeded: response.daily_limit_exceeded,
-         receiverUserId: response.receiver_user_id
-       });
+        // Set transaction result
+        setTransactionResult({
+          status: response.status,
+          transaction: response.transaction,
+          requiresConfirmation: response.requires_confirmation,
+          riskLevel: response.risk_level,
+          receiverUserId: response.receiver_user_id
+        });
 
        // Clear cache
        cacheManager.invalidateCategory('dashboard');
