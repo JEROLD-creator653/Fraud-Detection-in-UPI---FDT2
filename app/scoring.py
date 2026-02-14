@@ -1,4 +1,4 @@
-﻿"""
+"""
 Enhanced Scoring Module - Ensemble ML Fraud Detection
 Uses multiple trained models with proper feature extraction and ensemble voting
 """
@@ -188,7 +188,16 @@ def score_with_ensemble(features_dict: dict) -> Dict[str, float]:
         feature_vec = feature_vec.reshape(1, -1)  # Shape for prediction
     except Exception as e:
         print(f"Error converting features: {e}")
-        return {"ensemble": fallback_rule_based_score(features_dict)}
+        fallback_score = fallback_rule_based_score(features_dict)
+        return {
+            "ensemble": fallback_score,
+            "final_risk_score": fallback_score,
+            "disagreement": 0.0,
+            "confidence_level": "LOW",
+            "iforest": None,
+            "random_forest": None,
+            "xgboost": None
+        }
     
     scores = {}
     
