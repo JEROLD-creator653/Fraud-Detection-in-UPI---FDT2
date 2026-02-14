@@ -178,8 +178,16 @@ async def rate_limit_middleware(request: Request, call_next):
                     status_code=429,
                     content={"detail": "Rate limit exceeded. Max 100 requests per minute."}
                 )
-    except Exception:
-        pass  # If token parsing fails, allow request (handled by auth later)
+    except jwt.ExpiredSignatureError:
+        # Token expired, let auth handler deal with it
+        pass
+    except jwt.InvalidTokenError as e:
+        # Invalid token - log for security monitoring
+        print(f"[WARN] Invalid JWT token attempted: {e}")
+        # Still allow request - let auth middleware handle 401 response
+    except Exception as e:
+        # Unexpected error - log and allow request
+        print(f"[WARN] Token parsing error in rate limiter: {e}")
     
     return await call_next(request)
 
@@ -292,9 +300,10 @@ def startup_event():
         print(f"⚠ Warning: Could not ensure database schema: {e}")
     finally:
         try:
-            conn.close()
-        except:
-            pass
+            if conn:
+                conn.close()
+        except Exception as e:
+            print(f"[WARN] Error closing database connection: {e}")
     
     # Start the scheduler
     try:
@@ -313,8 +322,9 @@ def startup_event():
 async def auto_refund_delayed_transactions():
     """Auto-refund transactions that have been delayed for more than 5 minutes"""
     def _auto_refund():
-        conn = get_db_conn()
+        conn = None
         try:
+            conn = get_db_conn()
             cur = conn.cursor()
             
             # Find transactions older than 5 minutes with DELAY status
@@ -385,7 +395,8 @@ async def auto_refund_delayed_transactions():
             if conn:
                 conn.rollback()
         finally:
-            conn.close()
+            if conn:
+                conn.close()
     
     return await run_in_threadpool(_auto_refund)
 
@@ -1036,8 +1047,8 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
         try:
             cur = conn.cursor()
             
-            # Get user balance and daily limit
-            cur.execute("SELECT balance, daily_limit FROM users WHERE user_id = %s", (user_id,))
+            # Get user balance and daily limit (WITH ROW-LEVEL LOCK to prevent concurrent debits)
+            cur.execute("SELECT balance, daily_limit FROM users WHERE user_id = %s FOR UPDATE", (user_id,))
             user = cur.fetchone()
             
             if not user:
