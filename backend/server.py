@@ -1259,18 +1259,41 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             
             amount_deducted_at = datetime.now(timezone.utc) if action == "ALLOW" else None
 
-            # Insert transaction with new fields
+            # Build explainability JSON with ML pipeline data
+            explainability = {
+                "reasons": fraud_reasons_list,
+                "features": features,
+                "model_scores": scoring_details.get("model_scores", {}) if isinstance(scoring_details, dict) else {},
+                "trust_score": trust_score if 'trust_score' in dir() else None,
+                "graph_risk": graph_risk if 'graph_risk' in dir() else 0.0,
+                "graph_details": graph_details if 'graph_details' in dir() else {},
+                "risk_buffer": {
+                    "value": risk_buffer_value,
+                    "action": buffer_action
+                },
+                "thresholds": {
+                    "delay": delay_threshold,
+                    "block": block_threshold
+                },
+                "final_risk_score": risk_score
+            }
+            
+            # Remove None values for cleaner JSON
+            explainability = {k: v for k, v in explainability.items() if v is not None}
+
+            # Insert transaction with explainability
             cur.execute(
                 """
                 INSERT INTO transactions 
                 (tx_id, user_id, device_id, ts, amount, recipient_vpa, tx_type, channel, 
-                 risk_score, action, db_status, remarks, receiver_user_id, amount_deducted_at, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                 risk_score, action, db_status, remarks, receiver_user_id, amount_deducted_at, created_at, explainability)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)
                 RETURNING tx_id, user_id, amount, recipient_vpa, risk_score, action, db_status, created_at
                 """,
                 (tx_id, user_id, device_id, transaction["ts"], tx_data.amount, 
                  tx_data.recipient_vpa, transaction["tx_type"], "app", 
-                 risk_score, action, db_status, tx_data.remarks, receiver_user_id, amount_deducted_at)
+                 risk_score, action, db_status, tx_data.remarks, receiver_user_id, amount_deducted_at,
+                 psycopg2.extras.Json(explainability))
             )
             
             result = cur.fetchone()
