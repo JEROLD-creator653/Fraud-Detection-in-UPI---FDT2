@@ -476,18 +476,18 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
     """
     Aggregate ML Pipeline Contribution statistics from transactions.
     
-    Args:
-        time_range: Time window (1h, 24h, 7d, 30d)
-        limit: Maximum number of transactions to analyze (fallback if no time_range)
-    
-    Returns:
-        Dict with ML system trigger counts aggregated across transactions
+    Derives activity for each of the 5 ML systems from the explainability
+    features/patterns stored in each transaction:
+      - Trust Engine: new_recipient, recipient_tx_count (relationship trust)
+      - Risk Buffer: cumulative risk from velocity + repeated high scores
+      - Dynamic Thresholds: amount_deviation, model disagreement, action != ALLOW
+      - Drift Detection: feature distribution anomalies (amount_std, deviation)
+      - Graph Signals: recipient patterns, device sharing, merchant risk
     """
     conn = get_conn()
     try:
         cur = conn.cursor()
         
-        # Build query based on time_range or limit
         since = parse_time_range(time_range)
         if since:
             cur.execute("""
@@ -497,7 +497,6 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
                 ORDER BY ts DESC
             """, (since,))
         else:
-            # Fallback: use limit
             max_limit = limit if limit else 1000
             cur.execute("""
                 SELECT explainability, risk_score, action
@@ -508,7 +507,6 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
         
         rows = cur.fetchall()
         
-        # Initialize counters for 5 ML systems
         totals = {
             "trust_engine_triggers": 0,
             "risk_buffer_escalations": 0,
@@ -518,61 +516,88 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
             "transactions_analyzed": 0,
         }
         
-        # Aggregate ML system triggers
         for row in rows:
             totals["transactions_analyzed"] += 1
             
-            # Handle both tuple and dict-style row access
             try:
-                # Try dict-style access first (RealDictRow) - use .get() method
                 if hasattr(row, 'get'):
                     expl = row.get("explainability")
                     risk_score = float(row.get("risk_score", 0) or 0)
                     action = row.get("action", "")
                 else:
-                    # Fallback to tuple-style access
                     expl = row[0] if len(row) > 0 else None
                     risk_score = float(row[1]) if len(row) > 1 and row[1] else 0.0
                     action = row[2] if len(row) > 2 else ""
             except Exception:
-                # Skip this row if we can't extract data
                 continue
             
-            # Estimate which ML systems triggered based on available data
-            if expl and isinstance(expl, dict):
-                # Check for trust engine indicators
-                trust_score = expl.get("trust_score")
-                if trust_score is not None and isinstance(trust_score, (int, float)) and trust_score > 0:
+            if not expl or not isinstance(expl, dict):
+                # No explainability data - every tx still passes through all 5 systems.
+                # Infer baseline activity from action and risk_score.
+                # Trust Engine: flags when risk suggests untrusted relationship
+                if risk_score > 0.3 or action in ("DELAY", "BLOCK"):
                     totals["trust_engine_triggers"] += 1
-                
-                # Check for risk buffer indicators
-                fraud_reasons = expl.get("fraud_reasons", [])
-                if fraud_reasons and isinstance(fraud_reasons, list):
-                    for reason in fraud_reasons:
-                        if "buffer" in str(reason).lower() or "cumulative" in str(reason).lower():
-                            totals["risk_buffer_escalations"] += 1
-                            break
-                
-                # Check for dynamic threshold indicators
-                if action in ["DELAY", "BLOCK"] and risk_score > 0.3:
+                # Dynamic Thresholds: always computes personalized threshold
+                if action in ("DELAY", "BLOCK") or risk_score > 0.3:
                     totals["dynamic_threshold_adjustments"] += 1
-                
-                # Check for graph signal indicators
-                if fraud_reasons and isinstance(fraud_reasons, list):
-                    for reason in fraud_reasons:
-                        if any(keyword in str(reason).lower() for keyword in ["graph", "network", "recipient", "fraud history"]):
-                            totals["graph_signal_flags"] += 1
-                            break
-            else:
-                # Fallback: infer from risk score and action
-                if action in ["DELAY", "BLOCK"]:
-                    totals["dynamic_threshold_adjustments"] += 1
-                    if risk_score > 0.5:
-                        totals["risk_buffer_escalations"] += 1
-        
-        # Add some simulated drift alerts based on transaction volume
-        if totals["transactions_analyzed"] > 10:
-            totals["drift_alerts"] = min(3, totals["transactions_analyzed"] // 20)
+                # Risk Buffer: high score accumulates in buffer
+                if risk_score > 0.5:
+                    totals["risk_buffer_escalations"] += 1
+                # Graph Signals: recipient network always checked
+                if risk_score > 0.4 or action == "BLOCK":
+                    totals["graph_signal_flags"] += 1
+                # Drift Detection: feature distributions always monitored
+                if risk_score > 0.6:
+                    totals["drift_alerts"] += 1
+                continue
+            
+            features = expl.get("features", {}) or {}
+            patterns = expl.get("patterns", {}) or {}
+            model_scores = expl.get("model_scores", {}) or {}
+            detected = patterns.get("detected_patterns", []) or []
+            reasons = expl.get("reasons", []) or []
+            reasons_text = " ".join(str(r).lower() for r in reasons)
+            
+            # --- Trust Engine ---
+            # Triggers when dealing with new/unknown recipients or low recipient history
+            is_new_recip = float(features.get("is_new_recipient", 0) or 0)
+            recip_tx_count = float(features.get("recipient_tx_count", 0) or 0)
+            if is_new_recip > 0 or recip_tx_count < 5:
+                totals["trust_engine_triggers"] += 1
+            
+            # --- Risk Buffer (Cumulative Risk) ---
+            # Triggers on velocity anomalies, repeated high risk, or high cumulative indicators
+            tx_1min = float(features.get("tx_count_1min", 0) or 0)
+            tx_5min = float(features.get("tx_count_5min", 0) or 0)
+            tx_1h = float(features.get("tx_count_1h", 0) or 0)
+            has_velocity = any(p.get("name", "") == "Velocity Anomaly" for p in detected if isinstance(p, dict))
+            if has_velocity or tx_1min > 2 or tx_5min > 5 or (risk_score > 0.5 and tx_1h > 3):
+                totals["risk_buffer_escalations"] += 1
+            
+            # --- Dynamic Thresholds ---
+            # Triggers on amount deviations, model disagreement, or action escalation
+            amount_dev = float(features.get("amount_deviation", 0) or 0)
+            disagreement = float(model_scores.get("disagreement", 0) or expl.get("disagreement", 0) or 0)
+            has_model_disagree = any(p.get("name", "") == "Model Disagreement" for p in detected if isinstance(p, dict))
+            if amount_dev > 0.8 or has_model_disagree or disagreement > 0.25 or action in ("DELAY", "BLOCK"):
+                totals["dynamic_threshold_adjustments"] += 1
+            
+            # --- Drift Detection ---
+            # Triggers when features are outside normal ranges (statistical anomaly indicators)
+            amount_std = float(features.get("amount_std", 0) or 0)
+            is_new_device = float(features.get("is_new_device", 0) or 0)
+            confidence_level = str(model_scores.get("confidence_level", "") or expl.get("confidence_level", "")).upper()
+            has_device_anomaly = any(p.get("name", "") == "Device Anomaly" for p in detected if isinstance(p, dict))
+            if confidence_level == "LOW" or has_device_anomaly or (is_new_device > 0 and amount_dev > 0.5):
+                totals["drift_alerts"] += 1
+            
+            # --- Graph Signals ---
+            # Triggers on recipient/merchant network risk indicators
+            merchant_risk = float(features.get("merchant_risk_score", 0) or 0)
+            device_count = float(features.get("device_count", 0) or 0)
+            has_behavioural = any(p.get("name", "") == "Behavioural Anomaly" for p in detected if isinstance(p, dict))
+            if merchant_risk > 0.3 or device_count > 3 or (has_behavioural and recip_tx_count > 10):
+                totals["graph_signal_flags"] += 1
         
         return totals
     finally:

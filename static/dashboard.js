@@ -310,21 +310,20 @@ function initCharts() {
   });
 
   fraudBar = new Chart(document.getElementById('fraudBar').getContext('2d'), {
-    type: 'radar',
+    type: 'polarArea',
     data: {
       labels: ['Trust Engine', 'Risk Buffer', 'Dynamic Thresholds', 'Drift Detection', 'Graph Signals'],
       datasets: [{
-        label: 'ML Coverage %',
         data: [0, 0, 0, 0, 0],
-        backgroundColor: 'rgba(59, 130, 246, 0.15)',
-        borderColor: '#3B82F6',
-        borderWidth: 2,
-        pointBackgroundColor: ['#10B981', '#F59E0B', '#3B82F6', '#8B5CF6', '#EC4899'],
-        pointBorderColor: '#fff',
-        pointBorderWidth: 1,
-        pointRadius: 5,
-        pointHoverRadius: 7,
-        fill: true
+        backgroundColor: [
+          'rgba(16, 185, 129, 0.65)',
+          'rgba(245, 158, 11, 0.65)',
+          'rgba(59, 130, 246, 0.65)',
+          'rgba(139, 92, 246, 0.65)',
+          'rgba(236, 72, 153, 0.65)'
+        ],
+        borderColor: ['#10B981', '#F59E0B', '#3B82F6', '#8B5CF6', '#EC4899'],
+        borderWidth: 2
       }]
     },
     options: {
@@ -333,31 +332,31 @@ function initCharts() {
       scales: {
         r: {
           beginAtZero: true,
-          max: 100,
           ticks: {
-            stepSize: 25,
             color: textColor,
             backdropColor: 'transparent',
             font: { size: 9 },
             callback: v => v + '%'
           },
-          pointLabels: {
-            color: textColor,
-            font: { size: 11, weight: '600' }
-          },
-          grid: { color: gridColor },
-          angleLines: { color: gridColor }
+          grid: { color: gridColor }
         }
       },
       plugins: {
         legend: {
-          display: false
+          position: 'right',
+          labels: {
+            color: textColor,
+            font: { size: 11 },
+            padding: 12,
+            usePointStyle: true,
+            pointStyleWidth: 10
+          }
         },
         tooltip: {
           callbacks: {
             label: ctx => {
               const raw = ctx.chart._mlRawCounts ? ctx.chart._mlRawCounts[ctx.dataIndex] : 0;
-              return `${ctx.label}: ${ctx.raw.toFixed(1)}% (${raw} triggers)`;
+              return ` ${ctx.label}: ${ctx.raw.toFixed(1)}% (${raw} triggers)`;
             }
           }
         }
@@ -1381,12 +1380,11 @@ function updateChartColors(isDarkMode) {
     riskPie.update();
   }
 
-  // Update fraud radar chart
+  // Update fraud polar area chart
   if (fraudBar) {
     fraudBar.options.scales.r.ticks.color = textColor;
-    fraudBar.options.scales.r.pointLabels.color = textColor;
     fraudBar.options.scales.r.grid.color = gridColor;
-    fraudBar.options.scales.r.angleLines.color = gridColor;
+    fraudBar.options.plugins.legend.labels.color = textColor;
     fraudBar.update();
   }
 }
