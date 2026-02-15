@@ -163,7 +163,93 @@ def explain_transaction(
     return reasons
 
 
+def explain_enhanced_signals(
+    trust_details: Dict[str, Any] | None = None,
+    graph_details: Dict[str, Any] | None = None,
+    buffer_details: Dict[str, Any] | None = None,
+    threshold_details: Dict[str, Any] | None = None,
+) -> List[str]:
+    """
+    Build human-readable reasons from the enhanced ML pipeline signals.
+
+    Parameters
+    ----------
+    trust_details : dict from trust_engine.compute_trust_score()
+    graph_details : dict from graph_signals.compute_graph_signals()
+    buffer_details : dict from risk_buffer.get_risk_buffer()
+    threshold_details : dict from dynamic_thresholds.compute_dynamic_thresholds()
+
+    Returns
+    -------
+    list[str]
+        Additional human-readable reasons for the enhanced signals.
+    """
+    reasons: List[str] = []
+
+    # Trust-related reasons
+    if trust_details:
+        trust_score = trust_details.get("trust_score", 0.0)
+        tx_count = trust_details.get("tx_count", 0)
+        days_known = trust_details.get("days_known", 0.0)
+        fraud_flags = trust_details.get("fraud_flags", 0)
+
+        if fraud_flags > 0:
+            _add(f"Recipient has {fraud_flags} prior fraud flag(s) in trust history", reasons)
+        if trust_score >= 0.7:
+            _add(f"High trust: {tx_count} past transactions over {days_known:.0f} days", reasons)
+        elif trust_score >= 0.3:
+            _add(f"Moderate trust: {tx_count} past transactions", reasons)
+        elif trust_score == 0.0 and tx_count == 0:
+            _add("First-ever transaction to this recipient", reasons)
+
+    # Graph-based reasons
+    if graph_details and graph_details.get("status") != "unavailable":
+        rfr = graph_details.get("recipient_fraud_ratio", 0)
+        total_senders = graph_details.get("recipient_total_senders", 0)
+        fraud_senders = graph_details.get("recipient_fraud_senders", 0)
+        shared_device = graph_details.get("shared_device_fraud_ratio", 0)
+        user_fraud = graph_details.get("user_fraud_count", 0)
+        degree = graph_details.get("degree_centrality", 0)
+
+        if rfr > 0.3:
+            _add(f"Recipient has high fraud ratio: {fraud_senders}/{total_senders} senders flagged", reasons)
+        elif rfr > 0.1:
+            _add(f"Recipient has moderate fraud ratio: {fraud_senders}/{total_senders} senders flagged", reasons)
+
+        if degree > 50:
+            _add(f"Recipient receives from unusually many senders ({degree})", reasons)
+
+        if shared_device > 0:
+            _add("Device shared with fraud-associated accounts", reasons)
+
+        if user_fraud > 0:
+            _add(f"User has {user_fraud} historical fraud flag(s)", reasons)
+
+    # Risk buffer reasons
+    if buffer_details:
+        status = buffer_details.get("status", "normal")
+        buffer_val = buffer_details.get("buffer", 0.0)
+
+        if status == "critical":
+            _add(f"Cumulative risk is critical ({buffer_val:.2f}); pattern of suspicious activity", reasons)
+        elif status == "elevated":
+            _add(f"Cumulative risk is elevated ({buffer_val:.2f}); recent suspicious activity pattern", reasons)
+
+    # Dynamic threshold reasons
+    if threshold_details:
+        adjustments = threshold_details.get("adjustments", {})
+        if adjustments.get("amount_adj"):
+            _add("Thresholds tightened due to high transaction amount", reasons)
+        if adjustments.get("account_age_adj"):
+            _add("Thresholds tightened for newer account", reasons)
+        if adjustments.get("risk_buffer_adj"):
+            _add("Thresholds tightened due to accumulated risk history", reasons)
+
+    return reasons
+
+
 __all__ = [
     "explain_transaction",
+    "explain_enhanced_signals",
     "DEFAULT_THRESHOLDS",
 ]

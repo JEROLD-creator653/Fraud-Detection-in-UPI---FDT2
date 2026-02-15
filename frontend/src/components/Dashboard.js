@@ -47,53 +47,87 @@ const Dashboard = ({ user, onLogout }) => {
       ? new URL(process.env.REACT_APP_BACKEND_URL).host 
       : window.location.host;
     
-    // Connect to user-specific WebSocket endpoint (backend/server.py)
-    const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/user/${currentUserId}`);
+    const wsUrl = `${wsProtocol}//${wsHost}/ws/user/${currentUserId}`;
+    let ws = null;
     let pingInterval = null;
+    let reconnectTimeout = null;
+    let reconnectDelay = 1000; // Start with 1s, exponential backoff
+    const MAX_RECONNECT_DELAY = 30000;
+    let isMounted = true;
 
-    ws.onopen = () => {
-      console.log(`✓ WebSocket connected for user ${currentUserId}`);
-      // Send keep-alive pings every 30 seconds to keep connection alive
-      pingInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'ping' }));
+    const connect = () => {
+      if (!isMounted) return;
+      
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log(`WebSocket connected for user ${currentUserId}`);
+        reconnectDelay = 1000; // Reset backoff on successful connection
+        // Send keep-alive pings every 30 seconds
+        pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 30000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          // Listen for all transaction-related events from the backend
+          const refreshEvents = [
+            'transaction_created',
+            'transaction_confirmed', 
+            'transaction_cancelled',
+            'transaction_auto_refunded',
+            'transaction_credited',
+            'transaction_received',
+            'balance_updated'
+          ];
+          if (refreshEvents.includes(message.type)) {
+            console.log(`Transaction event via WebSocket: ${message.type}`);
+            // Invalidate dashboard cache and force refresh
+            loadDashboard(true);
+          } else if (message.type === 'pong') {
+            // Keep-alive acknowledged
+          }
+        } catch (err) {
+          console.error('Error parsing WebSocket message:', err);
         }
-      }, 30000);
-    };
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        // Listen for transaction-related events
-        if (message.type === 'transaction_updated' || message.type === 'tx_updated') {
-          console.log('📱 Transaction updated via WebSocket:', message.data?.tx_id);
-          // Invalidate dashboard cache and force refresh
-          loadDashboard(true);
-        } else if (message.type === 'pong') {
-          // Just acknowledge pong, no action needed
-          console.log('🔄 WebSocket keep-alive pong received');
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        if (pingInterval) {
+          clearInterval(pingInterval);
+          pingInterval = null;
         }
-      } catch (err) {
-        console.error('Error parsing WebSocket message:', err);
-      }
+        // Attempt reconnect with exponential backoff
+        if (isMounted) {
+          console.log(`WebSocket reconnecting in ${reconnectDelay / 1000}s...`);
+          reconnectTimeout = setTimeout(() => {
+            reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+            connect();
+          }, reconnectDelay);
+        }
+      };
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-      if (pingInterval) {
-        clearInterval(pingInterval);
-      }
-    };
+    connect();
 
     return () => {
+      isMounted = false;
       if (pingInterval) {
         clearInterval(pingInterval);
       }
-      if (ws.readyState === WebSocket.OPEN) {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.close();
       }
     };

@@ -53,6 +53,18 @@ try:
 except ImportError:
     from ws_manager import ws_manager
 
+def _fire_ws_event(loop, coro):
+    """Schedule a WebSocket coroutine from a sync thread context.
+    
+    asyncio.create_task() requires an active event loop in the current thread,
+    but run_in_threadpool executes in a worker thread without one. This helper
+    uses call_soon_threadsafe to schedule the coroutine back on the main event loop.
+    """
+    try:
+        loop.call_soon_threadsafe(asyncio.ensure_future, coro)
+    except Exception as e:
+        print(f"WebSocket schedule error: {e}")
+
 # Load environment variables
 from dotenv import load_dotenv
 import yaml
@@ -141,56 +153,6 @@ class RateLimiter:
 
 rate_limiter = RateLimiter(max_requests=100, window_seconds=60)  # 100 requests per minute
 
-# Redis pub/sub listener for cross-server notifications from admin backend
-def redis_pubsub_listener():
-    """Listen for Redis pub/sub messages from admin backend about transaction updates (runs in background thread)"""
-    try:
-        pubsub = redis_client.pubsub()
-        # Subscribe to all tx_updated channels (pattern: tx_updated:*)
-        pubsub.psubscribe("tx_updated:*")
-        print("✓ Subscribed to tx_updated:* channel")
-        
-        for message in pubsub.listen():
-            try:
-                if message["type"] == "pmessage" and message.get("data"):
-                    print(f"📨 Received pub/sub message on channel: {message.get('channel')}")
-                    data = json.loads(message["data"])
-                    user_id = data.get("user_id")
-                    tx_id = data.get("tx_id")
-                    
-                    print(f"  User: {user_id}, TX: {tx_id}")
-                    print(f"  Connected? {ws_manager.is_user_connected(user_id)}")
-                    
-                    if user_id and ws_manager.is_user_connected(user_id):
-                        # Send WebSocket notification to connected user
-                        # Note: This runs in a background thread, so we use asyncio.run_coroutine_threadsafe
-                        import asyncio
-                        try:
-                            loop = asyncio.new_event_loop()
-                            loop.run_until_complete(ws_manager.send_to_user(user_id, {
-                                "type": "transaction_updated",
-                                "data": {
-                                    "tx_id": data.get("tx_id"),
-                                    "action": data.get("action"),
-                                    "user_id": user_id
-                                },
-                                "timestamp": datetime.now(timezone.utc).isoformat()
-                            }))
-                            loop.close()
-                            print(f"✓ Sent WebSocket notification to user {user_id} for tx_id: {data.get('tx_id')}")
-                        except Exception as loop_err:
-                            print(f"⚠ Error sending WebSocket: {loop_err}")
-                    else:
-                        print(f"  ⚠ User {user_id} not connected or no user_id")
-            except Exception as e:
-                print(f"⚠ Error processing pub/sub message: {e}")
-                import traceback
-                traceback.print_exc()
-    except Exception as e:
-        print(f"⚠ Redis pub/sub listener error: {e}")
-        import traceback
-        traceback.print_exc()
-
 # Initialize FastAPI app and scheduler
 app = FastAPI(title="FDT API", version="1.0.0")
 scheduler = AsyncIOScheduler()
@@ -243,7 +205,7 @@ async def rate_limit_middleware(request: Request, call_next):
 
 # Startup event to initialize database schema and Redis cache
 @app.on_event("startup")
-async def startup_event():
+def startup_event():
     """Initialize database schema and Redis cache on startup"""
     # Initialize Redis cache
     init_redis()
@@ -347,7 +309,7 @@ async def startup_event():
         except Exception as e:
             print(f"[WARN] Error closing database connection: {e}")
     
-     # Start the scheduler
+    # Start the scheduler
     try:
         scheduler.add_job(
             auto_refund_delayed_transactions,
@@ -360,18 +322,10 @@ async def startup_event():
         print("✓ Auto-refund scheduler started")
     except Exception as e:
         print(f"⚠ Warning: Could not start scheduler: {e}")
-    
-    # Start Redis pub/sub listener for cross-server notifications (from admin backend)
-    try:
-        import threading
-        listener_thread = threading.Thread(target=redis_pubsub_listener, daemon=True)
-        listener_thread.start()
-        print("✓ Redis pub/sub listener started")
-    except Exception as e:
-        print(f"⚠ Warning: Could not start Redis pub/sub listener: {e}")
 
 async def auto_refund_delayed_transactions():
     """Auto-refund transactions that have been delayed for more than 5 minutes"""
+    loop = asyncio.get_running_loop()
     def _auto_refund():
         conn = None
         try:
@@ -424,7 +378,7 @@ async def auto_refund_delayed_transactions():
                 
                 # Emit WebSocket event for auto-refund
                 try:
-                    asyncio.create_task(
+                    _fire_ws_event(loop,
                         ws_manager.send_to_user(tx["user_id"], {
                             "type": "transaction_auto_refunded",
                             "tx_id": tx["tx_id"],
@@ -1038,13 +992,13 @@ async def get_user_dashboard(user_id: str = Depends(get_current_user)):
             user_dict = dict(user)
             user_dict["upi_id"] = f"{user_dict['phone'].replace('+91', '').replace('+', '')}@upi"
             
-            # Get recent transactions (last 5, ordered by most recently updated to show admin actions)
+            # Get recent transactions (last 5)
             cur.execute(
                 """
                 SELECT tx_id, amount, recipient_vpa, tx_type, action, risk_score, created_at, db_status, remarks
                 FROM transactions
                 WHERE user_id = %s
-                ORDER BY updated_at DESC NULLS LAST, created_at DESC
+                ORDER BY created_at DESC
                 LIMIT 5
                 """,
                 (user_id,)
@@ -1090,21 +1044,20 @@ async def get_user_dashboard(user_id: str = Depends(get_current_user)):
 @app.post("/api/transaction")
 async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(get_current_user)):
     """Create new transaction and perform fraud detection"""
+    loop = asyncio.get_running_loop()
     def _create_transaction():
         conn = get_db_conn()
         try:
             cur = conn.cursor()
             
-            # Get user balance (WITH ROW-LEVEL LOCK to prevent concurrent debits)
-            cur.execute("SELECT balance FROM users WHERE user_id = %s FOR UPDATE", (user_id,))
+            # Verify user exists
+            cur.execute("SELECT user_id FROM users WHERE user_id = %s", (user_id,))
             user = cur.fetchone()
             
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
             
-            # Balance check disabled for fraud detection demo
-             
-             # Check daily limit and get cumulative amount for today
+            # Check daily limit and get cumulative amount for today
             today = datetime.now(timezone.utc).date()
             cur.execute(
                 """
@@ -1150,12 +1103,15 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             
             # Perform fraud detection using ML models
             risk_score = 0.0
+            buffer_action = "NONE"
+            risk_buffer_value = 0.0
+            delay_threshold = float(os.getenv("DELAY_THRESHOLD", "0.30"))
+            block_threshold = float(os.getenv("BLOCK_THRESHOLD", "0.60"))
             try:
-                # Import scoring module from parent app directory
-                import sys
-                import os
+                # Ensure project root is on sys.path for app module imports
                 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                sys.path.insert(0, project_root)
+                if project_root not in sys.path:
+                    sys.path.insert(0, project_root)
                 from app import scoring
                 
                 # Get detailed scoring with reasons
@@ -1167,35 +1123,111 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                     risk_score = scoring_details
                     fraud_reasons_list = []
                 
-                # Apply known recipient discount: drastically reduce risk for repeat recipients
+                # ============================================================
+                # ENHANCED FRAUD DETECTION PIPELINE (v2)
+                # 1. Gradual Trust Score (replaces binary 70% discount)
+                # 2. Graph-based Fraud Signals
+                # 3. Cumulative Risk Memory (slow-burn detection)
+                # 4. Dynamic Thresholds
+                # 5. Drift Monitoring
+                # ============================================================
+                
+                features = scoring_details.get("features", {})
+                original_ml_score = risk_score
+                
+                # --- Step 1: Gradual Trust Score ---
                 try:
-                    import redis
-                    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-                    r_discount = redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=1)
-                    r_discount.ping()
+                    from app.trust_engine import compute_trust_score, apply_trust_discount
+                    trust_score, trust_details = compute_trust_score(user_id, tx_data.recipient_vpa)
+                    risk_score = apply_trust_discount(risk_score, trust_score)
                     
-                    recipient_key = f"user:{user_id}:recipients"
-                    # Check if this recipient is already known (not new)
-                    is_new_recipient = scoring_details.get("features", {}).get("is_new_recipient", 1.0)
-                    
-                    if is_new_recipient == 0.0:
-                        # This is a KNOWN recipient - apply aggressive discount
-                        original_score = risk_score
-                        # Reduce risk score by 70% for known recipients
-                        risk_score = risk_score * 0.3
-                        print(f"ML Risk Score for {tx_id}: {original_score:.4f} -> {risk_score:.4f} (KNOWN RECIPIENT: 70% discount applied)")
-                        
-                        # Add note to fraud reasons
+                    # Update fraud reasons based on trust
+                    if trust_score > 0.5:
                         if "Payment to new/unknown recipient" in fraud_reasons_list:
                             fraud_reasons_list.remove("Payment to new/unknown recipient")
                         if "First transaction to this recipient" in fraud_reasons_list:
                             fraud_reasons_list.remove("First transaction to this recipient")
-                        fraud_reasons_list.insert(0, "Trusted recipient (prior transaction history)")
-                    else:
-                        print(f"ML Risk Score for {tx_id}: {risk_score:.4f} (NEW RECIPIENT)")
-                        
+                        fraud_reasons_list.insert(0, f"Trusted recipient (trust score: {trust_score:.2f})")
+                    elif trust_score > 0.0:
+                        fraud_reasons_list.insert(0, f"Partially trusted recipient (trust score: {trust_score:.2f})")
+                    
+                    print(f"ML Risk Score for {tx_id}: {original_ml_score:.4f} -> {risk_score:.4f} (trust: {trust_score:.3f})")
                 except Exception as e:
-                    print(f"Known recipient check error: {e} - using original score")
+                    print(f"Trust engine error: {e} - using original score")
+                
+                # --- Step 2: Graph-based Fraud Signals ---
+                graph_risk = 0.0
+                try:
+                    from app.graph_signals import compute_graph_signals
+                    graph_risk, graph_details = compute_graph_signals(
+                        user_id, tx_data.recipient_vpa, device_id
+                    )
+                    
+                    if graph_risk > 0.3:
+                        # Blend graph signal into risk score (20% weight)
+                        risk_score = 0.8 * risk_score + 0.2 * graph_risk
+                        
+                        if graph_details.get("recipient_fraud_ratio", 0) > 0.2:
+                            fraud_reasons_list.append(
+                                f"Recipient has fraud history ({graph_details['recipient_fraud_senders']}/{graph_details['recipient_total_senders']} senders flagged)"
+                            )
+                        if graph_details.get("shared_device_fraud_ratio", 0) > 0:
+                            fraud_reasons_list.append("Device shared with fraud-flagged users")
+                        if graph_details.get("user_fraud_count", 0) > 0:
+                            fraud_reasons_list.append(f"User has {graph_details['user_fraud_count']} prior fraud flag(s)")
+                    
+                    print(f"  Graph risk: {graph_risk:.4f} | Final blended: {risk_score:.4f}")
+                except Exception as e:
+                    print(f"Graph signals error: {e}")
+                
+                # --- Step 3: Cumulative Risk Memory (Slow-Burn Detection) ---
+                buffer_action = "NONE"
+                try:
+                    from app.risk_buffer import update_risk_buffer
+                    risk_buffer_value, buffer_action = update_risk_buffer(user_id, risk_score)
+                    
+                    if buffer_action == "ESCALATE":
+                        fraud_reasons_list.append(f"Cumulative risk elevated (buffer: {risk_buffer_value:.2f})")
+                        print(f"  Risk buffer ESCALATE: {risk_buffer_value:.4f}")
+                    elif buffer_action == "BLOCK":
+                        fraud_reasons_list.append(f"Cumulative risk critical (buffer: {risk_buffer_value:.2f})")
+                        print(f"  Risk buffer BLOCK: {risk_buffer_value:.4f}")
+                except Exception as e:
+                    risk_buffer_value = 0.0
+                    print(f"Risk buffer error: {e}")
+                
+                # --- Step 4: Dynamic Thresholds ---
+                try:
+                    from app.dynamic_thresholds import compute_dynamic_thresholds
+                    
+                    # Get account age for threshold computation
+                    account_age_days = 365.0  # default
+                    try:
+                        cur.execute("SELECT created_at FROM users WHERE user_id = %s", (user_id,))
+                        user_row = cur.fetchone()
+                        if user_row and user_row.get("created_at"):
+                            account_age_days = (datetime.now(timezone.utc) - user_row["created_at"].replace(tzinfo=timezone.utc)).days
+                    except Exception:
+                        pass
+                    
+                    delay_threshold, block_threshold, threshold_details = compute_dynamic_thresholds(
+                        amount=float(tx_data.amount),
+                        features=features,
+                        risk_buffer_value=risk_buffer_value,
+                        account_age_days=account_age_days,
+                    )
+                    print(f"  Dynamic thresholds: delay={delay_threshold:.3f}, block={block_threshold:.3f}")
+                except Exception as e:
+                    print(f"Dynamic thresholds error: {e} - using static defaults")
+                    delay_threshold = float(os.getenv("DELAY_THRESHOLD", "0.30"))
+                    block_threshold = float(os.getenv("BLOCK_THRESHOLD", "0.60"))
+                
+                # --- Step 5: Record features for Drift Monitoring ---
+                try:
+                    from app.drift_detector import record_live_features
+                    record_live_features(features)
+                except Exception as e:
+                    print(f"Drift recording error: {e}")
                 
                 if fraud_reasons_list:
                     print(f"  Fraud Reasons: {fraud_reasons_list}")
@@ -1213,14 +1245,12 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                     risk_score = 0.1
                     fraud_reasons_list = []
             
-            # Determine action based on fraud risk thresholds
-            delay_threshold = float(os.getenv("DELAY_THRESHOLD", "0.30"))
-            block_threshold = float(os.getenv("BLOCK_THRESHOLD", "0.60"))
-            
-            if risk_score >= block_threshold:
+            # Determine action based on fraud risk thresholds (dynamic or fallback)
+            # Risk buffer can override: ESCALATE → force DELAY, BLOCK → force BLOCK
+            if buffer_action == "BLOCK" or risk_score >= block_threshold:
                 action = "BLOCK"
-                db_status = "pending"  # BLOCK transactions are pending user confirmation, same as DELAY
-            elif risk_score >= delay_threshold:
+                db_status = "blocked"
+            elif buffer_action == "ESCALATE" or risk_score >= delay_threshold:
                 action = "DELAY"
                 db_status = "pending"
             else:
@@ -1247,13 +1277,7 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             
             # Handle different actions
             if action == "ALLOW":
-                # Debit sender immediately for allowed transactions
-                cur.execute(
-                    "UPDATE users SET balance = balance - %s WHERE user_id = %s",
-                    (tx_data.amount, user_id)
-                )
-                 
-                # Log debit in transaction_ledger
+                # Log in transaction_ledger (no balance deduction - demo mode)
                 cur.execute(
                     """
                     INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
@@ -1263,7 +1287,7 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                      f"Send to {tx_data.recipient_vpa}")
                 )
 
-                # Credit receiver immediately
+                # Credit receiver if registered
                 if receiver_user_id:
                     cur.execute(
                         "UPDATE users SET balance = balance + %s WHERE user_id = %s",
@@ -1284,6 +1308,19 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                         "UPDATE transactions SET amount_credited_at = NOW() WHERE tx_id = %s",
                         (tx_id,)
                     )
+                
+                # Record successful transaction in trust engine & graph
+                try:
+                    from app.trust_engine import record_transaction as trust_record
+                    trust_record(user_id, tx_data.recipient_vpa, float(tx_data.amount), is_fraud=False)
+                except Exception as e:
+                    print(f"Trust recording error: {e}")
+                
+                try:
+                    from app.graph_signals import record_transaction_edge
+                    record_transaction_edge(user_id, tx_data.recipient_vpa, device_id)
+                except Exception as e:
+                    print(f"Graph edge recording error: {e}")
             
             # Create fraud alert if risky
             if action in ["DELAY", "BLOCK"]:
@@ -1300,6 +1337,22 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                     """,
                     (tx_id, user_id, action, risk_score, "; ".join(reason))
                 )
+                
+                # Record fraud signals in graph and trust engine
+                try:
+                    from app.graph_signals import record_fraud_edge, record_transaction_edge
+                    record_transaction_edge(user_id, tx_data.recipient_vpa, device_id)
+                    if action == "BLOCK":
+                        record_fraud_edge(user_id, tx_data.recipient_vpa, device_id)
+                except Exception as e:
+                    print(f"Graph fraud recording error: {e}")
+                
+                try:
+                    from app.trust_engine import record_fraud_flag
+                    if action == "BLOCK":
+                        record_fraud_flag(user_id, tx_data.recipient_vpa)
+                except Exception as e:
+                    print(f"Trust fraud flag error: {e}")
             
             # Update daily transactions tracking
             cur.execute(
@@ -1322,9 +1375,9 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             if receiver_user_id:
                 cache_delete(f"dashboard:{receiver_user_id}")
             
-            # Schedule WebSocket events (async but handled via create_task)
+            # Schedule WebSocket events (fire from sync thread to main loop)
             try:
-                asyncio.create_task(
+                _fire_ws_event(loop,
                     ws_manager.send_to_user(user_id, {
                         "type": "transaction_created",
                         "transaction": dict_to_json_serializable(dict(result)),
@@ -1334,18 +1387,17 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
                 )
                 
                 if action == "ALLOW":
-                    asyncio.create_task(
+                    _fire_ws_event(loop,
                         ws_manager.send_to_user(user_id, {
                             "type": "balance_updated",
                             "amount": -float(tx_data.amount),
-                            "operation": "debit",
-                            "new_balance": float(user["balance"]) - float(tx_data.amount)
+                            "operation": "debit"
                         })
                     )
                 
                 # If ALLOW and receiver is registered user, notify receiver
                 if action == "ALLOW" and receiver_user_id:
-                    asyncio.create_task(
+                    _fire_ws_event(loop,
                         ws_manager.send_to_user(receiver_user_id, {
                             "type": "transaction_received",
                             "transaction": dict_to_json_serializable(dict(result)),
@@ -1396,41 +1448,14 @@ async def handle_user_decision(decision_data: UserDecision, user_id: str = Depen
 
             # Update transaction based on decision
             if decision_data.decision == "confirm":
-                if transaction["action"] not in ["DELAY", "BLOCK"]:
-                    raise HTTPException(status_code=400, detail="Only delayed or blocked transactions can be confirmed")
+                if transaction["action"] != "DELAY":
+                    raise HTTPException(status_code=400, detail="Only delayed transactions can be confirmed")
 
                 new_action = "ALLOW"
                 new_status = "success"
-                
-                # ADD RECIPIENT TO KNOWN RECEIVERS (only on confirmation)
-                try:
-                    import redis
-                    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-                    r_known = redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=1)
-                    r_known.ping()
-                    rec_key = f"user:{user_id}:recipients"
-                    r_known.sadd(rec_key, transaction["recipient_vpa"])
-                    r_known.expire(rec_key, 86400 * 30)
-                    print(f"✓ Added {transaction['recipient_vpa']} to known recipients for user {user_id}")
-                except Exception as e:
-                    print(f"Known recipient add error: {e}")
 
-                # Debit sender only if not already deducted
+                # Log in transaction_ledger (no balance deduction - demo mode)
                 if transaction["amount_deducted_at"] is None:
-                    cur.execute(
-                        "SELECT balance FROM users WHERE user_id = %s",
-                        (user_id,)
-                    )
-                    sender = cur.fetchone()
-                    if not sender:
-                        raise HTTPException(status_code=404, detail="User not found")
-                    # Balance check disabled for fraud detection demo
-
-                    cur.execute(
-                        "UPDATE users SET balance = balance - %s, updated_at = NOW() WHERE user_id = %s",
-                        (float(transaction["amount"]), user_id)
-                    )
-
                     cur.execute(
                         """
                         INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
@@ -1700,6 +1725,7 @@ async def search_users(phone: str = "", user_id: str = Depends(get_current_user)
 @app.post("/api/transaction/confirm")
 async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = Depends(get_current_user)):
     """Confirm a delayed transaction and credit the receiver"""
+    loop = asyncio.get_running_loop()
     def _confirm():
         conn = get_db_conn()
         try:
@@ -1719,29 +1745,14 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
             if not transaction:
                 raise HTTPException(status_code=404, detail="Transaction not found or not pending")
             
-            if transaction["action"] not in ["DELAY", "BLOCK"]:
-                raise HTTPException(status_code=400, detail="Only delayed or blocked transactions can be confirmed")
+            if transaction["action"] != "DELAY":
+                raise HTTPException(status_code=400, detail="Only delayed transactions can be confirmed")
 
             receiver_balance = None
             sender_balance = None
 
-            # Debit sender only at confirmation time (for delayed transactions)
+            # Log in transaction_ledger at confirmation time (no balance deduction - demo mode)
             if transaction["amount_deducted_at"] is None:
-                cur.execute(
-                    "SELECT balance FROM users WHERE user_id = %s",
-                    (user_id,)
-                )
-                sender = cur.fetchone()
-                if not sender:
-                    raise HTTPException(status_code=404, detail="User not found")
-                # Balance check disabled for fraud detection demo
-
-                cur.execute(
-                    "UPDATE users SET balance = balance - %s, updated_at = NOW() WHERE user_id = %s RETURNING balance",
-                    (float(transaction["amount"]), user_id)
-                )
-                sender_balance = cur.fetchone()
-
                 cur.execute(
                     """
                     INSERT INTO transaction_ledger (tx_id, operation, user_id, amount, remarks)
@@ -1797,7 +1808,7 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
             # Emit WebSocket events
             try:
                 # Transaction confirmed event
-                asyncio.create_task(
+                _fire_ws_event(loop,
                     ws_manager.send_to_user(user_id, {
                         "type": "transaction_confirmed",
                         "tx_id": confirm_data.tx_id,
@@ -1807,7 +1818,7 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
                 )
 
                 if sender_balance:
-                    asyncio.create_task(
+                    _fire_ws_event(loop,
                         ws_manager.send_to_user(user_id, {
                             "type": "balance_updated",
                             "amount": -float(transaction["amount"]),
@@ -1818,7 +1829,7 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
                 
                 # If receiver is registered user, notify them
                 if receiver_balance:
-                    asyncio.create_task(
+                    _fire_ws_event(loop,
                         ws_manager.send_to_user(transaction["receiver_user_id"], {
                             "type": "transaction_credited",
                             "tx_id": confirm_data.tx_id,
@@ -1845,6 +1856,7 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
 @app.post("/api/transaction/cancel")
 async def cancel_transaction(cancel_data: TransactionCancel, user_id: str = Depends(get_current_user)):
     """Cancel a delayed transaction and refund the sender"""
+    loop = asyncio.get_running_loop()
     def _cancel():
         conn = get_db_conn()
         try:
@@ -1914,7 +1926,7 @@ async def cancel_transaction(cancel_data: TransactionCancel, user_id: str = Depe
             # Emit WebSocket events
             try:
                 # Transaction cancelled event
-                asyncio.create_task(
+                _fire_ws_event(loop,
                     ws_manager.send_to_user(user_id, {
                         "type": "transaction_cancelled",
                         "tx_id": cancel_data.tx_id,
@@ -1976,47 +1988,42 @@ async def get_transaction(tx_id: str, user_id: str = Depends(get_current_user)):
 
 @app.websocket("/ws/user/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    """WebSocket endpoint for real-time updates with keep-alive support"""
+    """WebSocket endpoint for real-time updates"""
     await ws_manager.connect(websocket, user_id)
     
     try:
         while True:
+            # Receive and handle incoming messages
+            data = await websocket.receive_text()
             try:
-                # Receive and handle incoming messages (with timeout to detect disconnects)
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=120.0)
-                try:
-                    message = json.loads(data)
+                message = json.loads(data)
+                
+                # Handle different message types
+                if message.get("type") == "ping":
+                    await ws_manager.send_personal_message(websocket, {"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+                elif message.get("type") == "confirm_transaction":
+                    # Handle confirm transaction via WebSocket
+                    tx_id = message.get("tx_id")
+                    # This would trigger the same logic as /api/transaction/confirm
+                    await ws_manager.send_personal_message(websocket, {
+                        "type": "confirm_received",
+                        "tx_id": tx_id,
+                        "status": "processing"
+                    })
+                elif message.get("type") == "cancel_transaction":
+                    # Handle cancel transaction via WebSocket
+                    tx_id = message.get("tx_id")
+                    # This would trigger the same logic as /api/transaction/cancel
+                    await ws_manager.send_personal_message(websocket, {
+                        "type": "cancel_received", 
+                        "tx_id": tx_id,
+                        "status": "processing"
+                    })
                     
-                    # Handle different message types
-                    if message.get("type") == "ping":
-                        await ws_manager.send_personal_message(websocket, {"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
-                    elif message.get("type") == "confirm_transaction":
-                        # Handle confirm transaction via WebSocket
-                        tx_id = message.get("tx_id")
-                        # This would trigger the same logic as /api/transaction/confirm
-                        await ws_manager.send_personal_message(websocket, {
-                            "type": "confirm_received",
-                            "tx_id": tx_id,
-                            "status": "processing"
-                        })
-                    elif message.get("type") == "cancel_transaction":
-                        # Handle cancel transaction via WebSocket
-                        tx_id = message.get("tx_id")
-                        # This would trigger the same logic as /api/transaction/cancel
-                        await ws_manager.send_personal_message(websocket, {
-                            "type": "cancel_received", 
-                            "tx_id": tx_id,
-                            "status": "processing"
-                        })
-                        
-                except json.JSONDecodeError:
-                    await ws_manager.send_personal_message(websocket, {"type": "error", "message": "Invalid JSON format"})
-                except Exception as e:
-                    await ws_manager.send_personal_message(websocket, {"type": "error", "message": str(e)})
-            except asyncio.TimeoutError:
-                # Timeout waiting for message - this is normal if client is just keeping connection open
-                # Continue to next iteration to check if connection is still alive
-                continue
+            except json.JSONDecodeError:
+                await ws_manager.send_personal_message(websocket, {"type": "error", "message": "Invalid JSON format"})
+            except Exception as e:
+                await ws_manager.send_personal_message(websocket, {"type": "error", "message": str(e)})
                 
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
