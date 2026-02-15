@@ -134,12 +134,12 @@ def extract_features(tx):
     # =========================================================
     
     if r is not None:
-        # New recipient detection
+        # New recipient detection (DO NOT ADD - only check if known)
         rec_key = f"user:{user}:recipients"
         new_rec = 0
         if not r.sismember(rec_key, recipient):
             new_rec = 1
-            r.sadd(rec_key, recipient)
+            # REMOVED: Do NOT add recipient here - only add when transaction is confirmed/allowed
         r.expire(rec_key, 86400 * 30)
         features["is_new_recipient"] = float(new_rec)
         

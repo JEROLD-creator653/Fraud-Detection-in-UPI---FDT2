@@ -262,7 +262,8 @@ class FraudDetectionChatbot:
         try:
             # Check if user is asking about a specific transaction ID
             import re
-            tx_id_match = re.search(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', message.lower())
+            # UPI Transaction IDs are 12-digit numeric (YYMMDDXXXXXX format)
+            tx_id_match = re.search(r'\b\d{12}\b', message)
             transaction_detail = ""
             
             if tx_id_match:

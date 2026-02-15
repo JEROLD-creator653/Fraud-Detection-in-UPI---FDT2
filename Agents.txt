@@ -1,0 +1,6 @@
+#Rules For AI
+1. Always use conda dev environment
+2. I've provided you with memory.txt and issues.txt
+3. You can use the memory.txt for anything - save resolved issues, analytics, status of issues, explanation of project, saving info for next session, etc.
+4. The issues.txt will contain the issues that you must resolve and maintain it's status as resolved, resolving, and unresolved.
+5. I will update the issues.txt

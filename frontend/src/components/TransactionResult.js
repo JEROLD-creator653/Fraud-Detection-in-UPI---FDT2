@@ -1,8 +1,27 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import favoritesManager from '../utils/favoritesManager';
 
 const TransactionResult = ({ result, onBack, senderUser }) => {
   const navigate = useNavigate();
+
+  // Auto-save recipient if transaction is ALLOW
+  useEffect(() => {
+    if (result.status === 'success' && !result.requiresConfirmation && result.transaction) {
+      try {
+        const newFavorite = {
+          name: result.transaction.recipient_vpa,
+          vpa: result.transaction.recipient_vpa,
+          amount: result.transaction.amount ? parseFloat(result.transaction.amount) : null,
+          remarks: ''
+        };
+        favoritesManager.addFavorite(newFavorite);
+        console.log(`✓ Auto-saved recipient: ${result.transaction.recipient_vpa}`);
+      } catch (error) {
+        console.error('Error auto-saving recipient:', error);
+      }
+    }
+  }, [result]);
 
   const getStatusIcon = () => {
     if (result.status === 'success' && !result.requiresConfirmation) {
@@ -34,13 +53,22 @@ const TransactionResult = ({ result, onBack, senderUser }) => {
     );
   };
 
-  const getStatusMessage = () => {
+   const getStatusMessage = () => {
     if (result.status === 'success' && !result.requiresConfirmation) {
       return {
         title: 'Payment Successful!',
         message: `₹${parseFloat(result.transaction.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} sent successfully to ${result.transaction.recipient_vpa}`,
         subtitle: 'Your payment has been completed and the recipient should receive the funds shortly.',
         type: 'success'
+      };
+    }
+    
+    if (result.transaction?.action === 'BLOCK') {
+      return {
+        title: 'Transaction Blocked',
+        message: `Your transaction of ₹${parseFloat(result.transaction.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} to ${result.transaction.recipient_vpa} has been blocked.`,
+        subtitle: 'For security reasons, this transaction cannot be processed. Please contact support for assistance.',
+        type: 'error'
       };
     }
     
@@ -165,31 +193,31 @@ const TransactionResult = ({ result, onBack, senderUser }) => {
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="mt-6 space-y-3">
-            {result.requiresConfirmation ? (
-              <button
-                onClick={handleGoToFraudInterface}
-                className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 text-white py-3 rounded-lg font-semibold hover:from-yellow-700 hover:to-orange-700 transition duration-200"
-              >
-                Review Transaction Now
-              </button>
-            ) : (
-              <button
-                onClick={handleGoToDashboard}
-                className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transition duration-200"
-              >
-                Go to Fraud Interface
-              </button>
-            )}
-            
-            <button
-              onClick={onBack}
-              className="w-full bg-white/20 text-green-200 py-3 rounded-lg font-semibold hover:bg-white/30 transition duration-200 border border border-white/20"
-            >
-              Send Another Payment
-            </button>
-          </div>
+           {/* Action buttons */}
+           <div className="mt-6 space-y-3">
+             {result.transaction?.action === 'DELAY' ? (
+               <button
+                 onClick={handleGoToFraudInterface}
+                 className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 text-white py-3 rounded-lg font-semibold hover:from-yellow-700 hover:to-orange-700 transition duration-200"
+               >
+                 Review Transaction Now
+               </button>
+             ) : result.transaction?.action === 'ALLOW' ? (
+               <button
+                 onClick={handleGoToDashboard}
+                 className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transition duration-200"
+               >
+                 Go to Dashboard
+               </button>
+             ) : null}
+             
+             <button
+               onClick={onBack}
+               className="w-full bg-white/20 text-green-200 py-3 rounded-lg font-semibold hover:bg-white/30 transition duration-200 border border border-white/20"
+             >
+               Send Another Payment
+             </button>
+           </div>
         </div>
       </div>
     </div>
