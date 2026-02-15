@@ -4669,9 +4669,7 @@ function renderAdminTx(tx) {
       <div class="quick-action-group">
         <button onclick="showExplain('${tx.tx_id}')" class="quick-action-btn explain-btn" title="Explainability">�</button>
         <button onclick="fillAndFetchTx('${tx.tx_id}')" class="quick-action-btn view-btn" title="View Details">👁️</button>
-        <button onclick="showConfirmation('${tx.tx_id}','ALLOW')" class="quick-action-btn allow-btn" title="Allow">✓</button>
-        <button onclick="showConfirmation('${tx.tx_id}','DELAY')" class="quick-action-btn delay-btn" title="Delay">⏱️</button>
-        <button onclick="showConfirmation('${tx.tx_id}','BLOCK')" class="quick-action-btn block-btn" title="Block">✕</button>
+        ${(tx.action || '').toUpperCase() === 'BLOCK' ? `<button onclick="showConfirmation('${tx.tx_id}','ALLOW')" class="quick-action-btn allow-btn" title="Unblock (Allow)">✓</button>` : ''}
       </div>
     </td>
   `;
@@ -5168,38 +5166,33 @@ let pendingAction = null;
 function showConfirmation(tx_id, action) {
   console.log('showConfirmation called:', tx_id, action);
   
-  // Check if transaction already has this action
+  // Security: Only ALLOW action is permitted (unblocking blocked transactions)
+  if (action.toUpperCase() !== 'ALLOW') {
+    showToast('error', 'Admin can only unblock (ALLOW) transactions. Other actions are not permitted for security reasons.', 'Action Not Allowed');
+    return;
+  }
+  
+  // Check if transaction is currently blocked
   const tx = adminTxCache.find(t => t.tx_id === tx_id);
   if (tx) {
     const currentAction = (tx.action || '').toUpperCase();
-    if (currentAction === action) {
-      const actionLabel = action === 'BLOCK' ? 'blocked' : action === 'DELAY' ? 'delayed' : 'allowed';
-      showToast('warning', `Transaction ${tx_id.substring(0, 12)}... is already ${actionLabel}. Choose a different action to update the status.`, 'Duplicate Action');
-      
-      // Reset Apply Action button state
-      const applyBtn = document.getElementById('qa_btn');
-      if (applyBtn) {
-        applyBtn.textContent = 'Apply Action';
-        applyBtn.disabled = false;
-      }
-      
-      // Update result text
-      document.getElementById('qa_result').textContent = `⚠️ Transaction is already ${actionLabel}. Choose a different action to apply.`;
-      
+    if (currentAction !== 'BLOCK') {
+      showToast('warning', `Transaction ${tx_id.substring(0, 12)}... is not blocked (current status: ${currentAction}). Only blocked transactions can be unblocked.`, 'Cannot Unblock');
+      return;
+    }
+    if (currentAction === 'ALLOW') {
+      showToast('info', `Transaction ${tx_id.substring(0, 12)}... is already allowed.`, 'Already Allowed');
       return;
     }
   }
   
   pendingAction = { tx_id, action };
   document.getElementById('confirm_tx_id').textContent = tx_id;
-  document.getElementById('confirm_action').textContent = action;
+  document.getElementById('confirm_action').textContent = 'UNBLOCK (ALLOW)';
   
-  // Color code the action
+  // Color code - always green for ALLOW
   const actionEl = document.getElementById('confirm_action');
-  actionEl.className = 'font-bold ' + (
-    action === 'BLOCK' ? 'text-red-600' :
-    action === 'DELAY' ? 'text-yellow-600' : 'text-green-600'
-  );
+  actionEl.className = 'font-bold text-green-600';
   
   document.getElementById('confirmModal').classList.remove('hidden');
 }
@@ -5280,14 +5273,10 @@ function setupModalButtons() {
         }
         
         console.log('Action result:', result);
-        // Show success toast and undo option
-        const actionVerb = action === 'BLOCK' ? 'Blocked' : action === 'ALLOW' ? 'Approved' : 'Delayed';
+        // Show success toast (undo removed for security - once unblocked, stays unblocked)
+        const actionVerb = action === 'ALLOW' ? 'Unblocked' : action;
         showToast('success', `Transaction ${tx_id.substring(0, 8)}... has been ${actionVerb.toLowerCase()} successfully`, `${actionVerb}`);
-        const prev = result.updated?.previous_action || result.updated?.prev_action || prevAction;
-        if (prev) {
-          showUndoToast(tx_id, action, prev);
-        }
-        document.getElementById('qa_result').textContent = '✓ Action applied successfully!';
+        document.getElementById('qa_result').textContent = '✓ Transaction unblocked successfully!';
         
         // Add to admin logs
         addAdminLog({
