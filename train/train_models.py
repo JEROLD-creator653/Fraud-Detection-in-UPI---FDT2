@@ -407,7 +407,31 @@ def main():
     joblib.dump(xgb_model, "models/xgboost.joblib")
     print("✓ Saved: models/xgboost.joblib")
     
-    # 5. Save metadata
+    # 5. Store drift detection baselines from training data
+    print("\n" + "="*60)
+    print("STORING DRIFT DETECTION BASELINES")
+    print("="*60)
+    try:
+        from app.drift_detector import store_baseline
+
+        feature_names_list = get_feature_names()
+        feature_distributions: dict[str, list[float]] = {
+            name: [] for name in feature_names_list
+        }
+
+        # Collect per-feature value lists from the full training set
+        for row in X_train:
+            for i, name in enumerate(feature_names_list):
+                feature_distributions[name].append(float(row[i]))
+
+        store_baseline(feature_distributions)
+        print(f"✓ Stored drift baselines for {len(feature_names_list)} features "
+              f"({X_train.shape[0]} samples)")
+    except Exception as e:
+        print(f"⚠ Could not store drift baselines (Redis may be unavailable): {e}")
+        print("  Drift detection will work once baselines are stored with Redis running.")
+
+    # 6. Save metadata
     metadata = {
         "training_date": datetime.now().isoformat(),
         "training_samples": int(X_train.shape[0]),
@@ -422,7 +446,7 @@ def main():
         json.dump(metadata, f, indent=2)
     print("✓ Saved: models/metadata.json")
     
-    # 6. Print summary
+    # 7. Print summary
     print("\n" + "="*60)
     print("TRAINING COMPLETE - MODEL COMPARISON")
     print("="*60)

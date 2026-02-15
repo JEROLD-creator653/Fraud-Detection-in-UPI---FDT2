@@ -487,22 +487,37 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
     try:
         cur = conn.cursor()
         
+        # Check if explainability column exists
+        has_expl = _ensure_explainability_column(conn)
+        if not has_expl:
+            return {
+                "amount_anomaly": 0,
+                "behavioural_anomaly": 0,
+                "device_anomaly": 0,
+                "velocity_anomaly": 0,
+                "model_consensus": 0,
+                "model_disagreement": 0,
+                "transactions_analyzed": 0,
+            }
+        
         # Build query based on time_range or limit
         since = parse_time_range(time_range)
         if since:
             cur.execute("""
-                SELECT tx_id, amount, risk_score, action, device_id, user_id, tx_type, channel, created_at
+                SELECT explainability
                 FROM public.transactions
-                WHERE created_at >= %s
-                ORDER BY created_at DESC
+                WHERE ts >= %s
+                  AND explainability IS NOT NULL
+                ORDER BY ts DESC
             """, (since,))
         else:
             # Fallback: use limit
             max_limit = limit if limit else 1000
             cur.execute("""
-                SELECT tx_id, amount, risk_score, action, device_id, user_id, tx_type, channel, created_at
+                SELECT explainability
                 FROM public.transactions
-                ORDER BY created_at DESC
+                WHERE explainability IS NOT NULL
+                ORDER BY ts DESC
                 LIMIT %s
             """, (max_limit,))
         
@@ -519,42 +534,40 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
             "transactions_analyzed": 0,
         }
         
-        if not rows:
-            return totals
-        
-        # Analyze patterns from transaction characteristics
+        # Aggregate pattern counts
+        # One transaction can contribute to multiple patterns
         for row in rows:
             totals["transactions_analyzed"] += 1
             
-            # Since cursor is RealDictCursor (from get_conn), use dict access
-            amount = float(row.get('amount') or 0) if isinstance(row, dict) else float(row[1] or 0)
-            risk_score = float(row.get('risk_score') or 0) if isinstance(row, dict) else float(row[2] or 0)
-            action = (row.get('action') or "") if isinstance(row, dict) else (row[3] or "")
+            expl = row.get("explainability")
+            if not expl or not isinstance(expl, dict):
+                continue
             
-            # Pattern detection logic based on transaction features
-            # Amount Anomaly: Very high or very low amounts (top 10% or bottom 10%)
-            if amount > 50000 or amount < 10:
-                totals["amount_anomaly"] += 1
-            
-            # Behavioural Anomaly: Blocked or delayed transactions
-            if action in ['BLOCK', 'DELAY']:
-                totals["behavioural_anomaly"] += 1
-            
-            # Device Anomaly: Could be detected from device patterns (we'll use high risk as proxy)
-            if risk_score >= 0.7:
-                totals["device_anomaly"] += 1
-            
-            # Velocity Anomaly: Multiple transactions in short time (we'll use medium-high risk)
-            if 0.5 <= risk_score < 0.7:
-                totals["velocity_anomaly"] += 1
-            
-            # Model Consensus: Blocked transactions (high confidence fraud detection)
-            if action == 'BLOCK' and risk_score >= 0.6:
-                totals["model_consensus"] += 1
-            
-            # Model Disagreement: Allowed transactions with medium-high risk
-            if action == 'ALLOW' and risk_score >= 0.4:
-                totals["model_disagreement"] += 1
+            # Check if pre-computed patterns exist
+            patterns = expl.get("patterns")
+            if patterns and isinstance(patterns, dict):
+                counts = patterns.get("pattern_counts", {})
+                for key in ["amount_anomaly", "behavioural_anomaly", "device_anomaly", 
+                           "velocity_anomaly", "model_consensus", "model_disagreement"]:
+                    totals[key] += counts.get(key, 0)
+            else:
+                # Fallback: compute patterns from features on-the-fly
+                try:
+                    try:
+                        from .pattern_mapper import PatternMapper
+                    except ImportError:
+                        from pattern_mapper import PatternMapper
+                    features = expl.get("features", {})
+                    model_scores = expl.get("model_scores", {})
+                    
+                    if features and model_scores:
+                        pattern_results = PatternMapper.analyze_all_patterns(features, model_scores)
+                        for key, result in pattern_results.items():
+                            if result.detected:
+                                totals[key] += 1
+                except Exception as e:
+                    print(f"Pattern computation error: {e}")
+                    continue
         
         cur.close()
         return totals
@@ -575,23 +588,23 @@ def db_update_action(tx_id, action, risk_score=None, explainability=None):
                 if explainability is not None:
                     if risk_score is None:
                         cur.execute(
-                            "UPDATE public.transactions SET action=%s, explainability=%s, updated_at=NOW() WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
+                            "UPDATE public.transactions SET action=%s, explainability=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
                             (action, expl_payload, tx_id),
                         )
                     else:
                         cur.execute(
-                            "UPDATE public.transactions SET action=%s, risk_score=%s, explainability=%s, updated_at=NOW() WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
+                            "UPDATE public.transactions SET action=%s, risk_score=%s, explainability=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
                             (action, risk_score, expl_payload, tx_id),
                         )
                 else:
                     if risk_score is None:
                         cur.execute(
-                            "UPDATE public.transactions SET action=%s, updated_at=NOW() WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
+                            "UPDATE public.transactions SET action=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
                             (action, tx_id),
                         )
                     else:
                         cur.execute(
-                            "UPDATE public.transactions SET action=%s, risk_score=%s, updated_at=NOW() WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
+                            "UPDATE public.transactions SET action=%s, risk_score=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, explainability, created_at;",
                             (action, risk_score, tx_id),
                         )
                 res = cur.fetchone()
@@ -605,12 +618,12 @@ def db_update_action(tx_id, action, risk_score=None, explainability=None):
         # Fallback without explainability
         if risk_score is None:
             cur.execute(
-                "UPDATE public.transactions SET action=%s, updated_at=NOW() WHERE tx_id=%s RETURNING tx_id, action, risk_score, created_at;",
+                "UPDATE public.transactions SET action=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, created_at;",
                 (action, tx_id),
             )
         else:
             cur.execute(
-                "UPDATE public.transactions SET action=%s, risk_score=%s, updated_at=NOW() WHERE tx_id=%s RETURNING tx_id, action, risk_score, created_at;",
+                "UPDATE public.transactions SET action=%s, risk_score=%s WHERE tx_id=%s RETURNING tx_id, action, risk_score, created_at;",
                 (action, risk_score, tx_id),
             )
         res = cur.fetchone()
@@ -1018,9 +1031,7 @@ async def admin_action(request: Request):
     # Save admin log to database for persistence across devices
     admin_username = request.session.get("admin_username", "admin")
     source_ip = request.client.host if request.client else "unknown"
-    # Use 'full' (from db_get_transaction) which includes user_id;
-    # 'updated' only has RETURNING tx_id,action,risk_score — no user_id.
-    user_id = full.get("user_id", "unknown") if full else "unknown"
+    user_id = updated.get("user_id", "unknown") if updated else "unknown"
     await run_in_threadpool(
         db_add_admin_log,
         tx_id,
@@ -1029,33 +1040,6 @@ async def admin_action(request: Request):
         admin_username,
         source_ip
     )
-    
-    # Invalidate user's dashboard cache on user backend (backend/server.py)
-    # This ensures React dashboard gets fresh data immediately
-    if user_id and user_id != "unknown":
-        try:
-            import redis
-            import json
-            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-            r = redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=2)
-            
-            # 1. Delete cached dashboard data
-            cache_key = f"dashboard:{user_id}"
-            r.delete(cache_key)
-            
-            # 2. Publish WebSocket notification via Redis pub/sub
-            # User backend subscribes to this channel and sends WebSocket message
-            notification = {
-                "type": "transaction_updated",
-                "user_id": user_id,
-                "tx_id": tx_id,
-                "action": action
-            }
-            r.publish(f"tx_updated:{user_id}", json.dumps(notification))
-            
-            print(f"✓ Invalidated cache and published notification for user {user_id}")
-        except Exception as e:
-            print(f"⚠ Failed to notify user: {e}")
     
     return {"status": "ok", "updated": full}
 
@@ -1587,4 +1571,68 @@ async def chatbot_endpoint(request: Request):
         return JSONResponse(
             {"error": f"Chatbot error: {str(e)}"}, 
             status_code=500
+        )
+
+
+# --- Drift Monitoring Endpoint ---
+@app.get("/api/drift-report")
+async def drift_report_endpoint(request: Request):
+    """Get concept drift monitoring report (PSI-based)."""
+    try:
+        from app.drift_detector import compute_drift_report, get_last_report
+        
+        # Try cached report first for performance
+        cached = await run_in_threadpool(get_last_report)
+        if cached:
+            return JSONResponse(cached)
+        
+        # Compute fresh report
+        report = await run_in_threadpool(compute_drift_report)
+        return JSONResponse(report)
+    except Exception as e:
+        print(f"Drift report error: {e}")
+        return JSONResponse(
+            {"error": f"Drift report error: {str(e)}", "overall_status": "error"},
+            status_code=500,
+        )
+
+
+# --- Risk Buffer Status Endpoint ---
+@app.get("/api/risk-buffer/{user_id}")
+async def risk_buffer_endpoint(user_id: str, request: Request):
+    """Get cumulative risk buffer status for a specific user."""
+    try:
+        from app.risk_buffer import get_risk_buffer, get_buffer_history
+        
+        buffer_value, details = await run_in_threadpool(get_risk_buffer, user_id)
+        history = await run_in_threadpool(get_buffer_history, user_id)
+        
+        return JSONResponse({
+            "user_id": user_id,
+            "buffer_value": buffer_value,
+            "details": details,
+            "history": history,
+        })
+    except Exception as e:
+        print(f"Risk buffer error: {e}")
+        return JSONResponse(
+            {"error": f"Risk buffer error: {str(e)}"},
+            status_code=500,
+        )
+
+
+# --- Graph Signal Profile Endpoint ---
+@app.get("/api/graph-profile/{recipient}")
+async def graph_profile_endpoint(recipient: str, request: Request):
+    """Get graph-based risk profile for a recipient."""
+    try:
+        from app.graph_signals import get_recipient_profile
+        
+        profile = await run_in_threadpool(get_recipient_profile, recipient)
+        return JSONResponse(profile)
+    except Exception as e:
+        print(f"Graph profile error: {e}")
+        return JSONResponse(
+            {"error": f"Graph profile error: {str(e)}"},
+            status_code=500,
         )
