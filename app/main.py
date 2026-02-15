@@ -1041,6 +1041,10 @@ def admin_logout(request: Request):
 
 @app.post("/admin/action")
 async def admin_action(request: Request):
+    """
+    Admin can only unblock (ALLOW) a transaction that was previously BLOCKED.
+    No other status changes are permitted for security reasons.
+    """
     if not is_logged_in(request):
         return JSONResponse({"detail": "unauthenticated"}, status_code=401)
     body = await request.json()
@@ -1048,6 +1052,27 @@ async def admin_action(request: Request):
     action = body.get("action")
     if not tx_id or not action:
         return JSONResponse({"detail": "tx_id and action required"}, status_code=400)
+    
+    # Only ALLOW action is permitted (unblocking a blocked transaction)
+    if action.upper() != "ALLOW":
+        return JSONResponse(
+            {"detail": "Admin can only unblock (ALLOW) transactions. Other actions are not permitted."},
+            status_code=403
+        )
+    
+    # Fetch current transaction to verify it's blocked
+    current_tx = await run_in_threadpool(db_get_transaction, tx_id)
+    if not current_tx:
+        return JSONResponse({"detail": "tx not found"}, status_code=404)
+    
+    current_action = str(current_tx.get("action", "")).upper()
+    if current_action != "BLOCK":
+        return JSONResponse(
+            {"detail": f"Cannot unblock: transaction status is '{current_action}'. Only BLOCKED transactions can be unblocked."},
+            status_code=400
+        )
+    
+    # Perform the unblock
     risk_score = body.get("risk_score")
     updated = await run_in_threadpool(db_update_action, tx_id, action, risk_score)
     if not updated:
