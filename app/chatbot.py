@@ -539,9 +539,8 @@ When discussing amounts, use Indian Rupee (₹) format."""
                 sql_query = sql_match.group(1).strip()
                 try:
                     sql_results = self.execute_query(sql_query)
-                    # Remove SQL_QUERY from response and add results
-                    response = response.replace(f"SQL_QUERY: {sql_query}", "")
-                    response += f"\n\n📊 Query Results:\n```\n{json.dumps(sql_results, indent=2, default=str)}\n```"
+                    # Remove SQL_QUERY from response (don't show raw JSON to user)
+                    response = response.replace(f"SQL_QUERY: {sql_query}", "").strip()
                 except Exception as e:
                     response = response.replace(f"SQL_QUERY: {sql_query}", f"")
                     response += f"\n\n❌ Error executing query: {str(e)}"
