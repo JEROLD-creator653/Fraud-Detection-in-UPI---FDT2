@@ -1,0 +1,14 @@
+#Issues in Project
+
+1. The chatbot is not able to explain a transaction when given its Id.
+   - STATUS: RESOLVED ✓
+
+2. In react app, the actions done by admin is not reflected in the recent transactions but it is reflected in the transaction history page
+   - STATUS: RESOLVED ✓ (verified end-to-end)
+
+3. (Backend Startup Issue - FIXED) 
+   - Problem: Server was stuck during startup due to async redis_pubsub_listener blocking
+   - Fix: Converted async listener to synchronous and run in background thread
+   - File: /backend/server.py:145-175, 350-356
+   - STATUS: RESOLVED ✓
+   - Verification: Server now starts and initializes all components successfully

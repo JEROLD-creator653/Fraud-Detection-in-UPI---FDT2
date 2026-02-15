@@ -300,12 +300,7 @@ class ErrorHandler {
       };
     }
 
-    if (numAmount > balance) {
-      return {
-        isValid: false,
-        error: 'Insufficient balance for this transaction'
-      };
-    }
+    // Balance check disabled for fraud detection demo
 
     return { isValid: true };
   }

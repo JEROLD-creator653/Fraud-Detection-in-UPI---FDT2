@@ -33,13 +33,71 @@ const Dashboard = ({ user, onLogout }) => {
     }
   };
 
+  // Set up WebSocket connection for real-time transaction updates
   useEffect(() => {
-    const interval = setInterval(() => {
-      loadDashboard(true);
-    }, 30000);
+    // Get current user ID from user prop or sessionStorage
+    const currentUserId = user?.user_id || sessionStorage.getItem('fdt_user_id');
+    if (!currentUserId) {
+      console.warn('No user ID available for WebSocket connection');
+      return;
+    }
 
-    return () => clearInterval(interval);
-  }, []);
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = process.env.REACT_APP_BACKEND_URL 
+      ? new URL(process.env.REACT_APP_BACKEND_URL).host 
+      : window.location.host;
+    
+    // Connect to user-specific WebSocket endpoint (backend/server.py)
+    const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/user/${currentUserId}`);
+    let pingInterval = null;
+
+    ws.onopen = () => {
+      console.log(`✓ WebSocket connected for user ${currentUserId}`);
+      // Send keep-alive pings every 30 seconds to keep connection alive
+      pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 30000);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        // Listen for transaction-related events
+        if (message.type === 'transaction_updated' || message.type === 'tx_updated') {
+          console.log('📱 Transaction updated via WebSocket:', message.data?.tx_id);
+          // Invalidate dashboard cache and force refresh
+          loadDashboard(true);
+        } else if (message.type === 'pong') {
+          // Just acknowledge pong, no action needed
+          console.log('🔄 WebSocket keep-alive pong received');
+        }
+      } catch (err) {
+        console.error('Error parsing WebSocket message:', err);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+      if (pingInterval) {
+        clearInterval(pingInterval);
+      }
+    };
+
+    return () => {
+      if (pingInterval) {
+        clearInterval(pingInterval);
+      }
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    };
+  }, [user?.user_id]);
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {

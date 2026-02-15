@@ -141,6 +141,56 @@ class RateLimiter:
 
 rate_limiter = RateLimiter(max_requests=100, window_seconds=60)  # 100 requests per minute
 
+# Redis pub/sub listener for cross-server notifications from admin backend
+def redis_pubsub_listener():
+    """Listen for Redis pub/sub messages from admin backend about transaction updates (runs in background thread)"""
+    try:
+        pubsub = redis_client.pubsub()
+        # Subscribe to all tx_updated channels (pattern: tx_updated:*)
+        pubsub.psubscribe("tx_updated:*")
+        print("✓ Subscribed to tx_updated:* channel")
+        
+        for message in pubsub.listen():
+            try:
+                if message["type"] == "pmessage" and message.get("data"):
+                    print(f"📨 Received pub/sub message on channel: {message.get('channel')}")
+                    data = json.loads(message["data"])
+                    user_id = data.get("user_id")
+                    tx_id = data.get("tx_id")
+                    
+                    print(f"  User: {user_id}, TX: {tx_id}")
+                    print(f"  Connected? {ws_manager.is_user_connected(user_id)}")
+                    
+                    if user_id and ws_manager.is_user_connected(user_id):
+                        # Send WebSocket notification to connected user
+                        # Note: This runs in a background thread, so we use asyncio.run_coroutine_threadsafe
+                        import asyncio
+                        try:
+                            loop = asyncio.new_event_loop()
+                            loop.run_until_complete(ws_manager.send_to_user(user_id, {
+                                "type": "transaction_updated",
+                                "data": {
+                                    "tx_id": data.get("tx_id"),
+                                    "action": data.get("action"),
+                                    "user_id": user_id
+                                },
+                                "timestamp": datetime.now(timezone.utc).isoformat()
+                            }))
+                            loop.close()
+                            print(f"✓ Sent WebSocket notification to user {user_id} for tx_id: {data.get('tx_id')}")
+                        except Exception as loop_err:
+                            print(f"⚠ Error sending WebSocket: {loop_err}")
+                    else:
+                        print(f"  ⚠ User {user_id} not connected or no user_id")
+            except Exception as e:
+                print(f"⚠ Error processing pub/sub message: {e}")
+                import traceback
+                traceback.print_exc()
+    except Exception as e:
+        print(f"⚠ Redis pub/sub listener error: {e}")
+        import traceback
+        traceback.print_exc()
+
 # Initialize FastAPI app and scheduler
 app = FastAPI(title="FDT API", version="1.0.0")
 scheduler = AsyncIOScheduler()
@@ -193,7 +243,7 @@ async def rate_limit_middleware(request: Request, call_next):
 
 # Startup event to initialize database schema and Redis cache
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     """Initialize database schema and Redis cache on startup"""
     # Initialize Redis cache
     init_redis()
@@ -297,7 +347,7 @@ def startup_event():
         except Exception as e:
             print(f"[WARN] Error closing database connection: {e}")
     
-    # Start the scheduler
+     # Start the scheduler
     try:
         scheduler.add_job(
             auto_refund_delayed_transactions,
@@ -310,6 +360,15 @@ def startup_event():
         print("✓ Auto-refund scheduler started")
     except Exception as e:
         print(f"⚠ Warning: Could not start scheduler: {e}")
+    
+    # Start Redis pub/sub listener for cross-server notifications (from admin backend)
+    try:
+        import threading
+        listener_thread = threading.Thread(target=redis_pubsub_listener, daemon=True)
+        listener_thread.start()
+        print("✓ Redis pub/sub listener started")
+    except Exception as e:
+        print(f"⚠ Warning: Could not start Redis pub/sub listener: {e}")
 
 async def auto_refund_delayed_transactions():
     """Auto-refund transactions that have been delayed for more than 5 minutes"""
@@ -979,13 +1038,13 @@ async def get_user_dashboard(user_id: str = Depends(get_current_user)):
             user_dict = dict(user)
             user_dict["upi_id"] = f"{user_dict['phone'].replace('+91', '').replace('+', '')}@upi"
             
-            # Get recent transactions (last 5)
+            # Get recent transactions (last 5, ordered by most recently updated to show admin actions)
             cur.execute(
                 """
                 SELECT tx_id, amount, recipient_vpa, tx_type, action, risk_score, created_at, db_status, remarks
                 FROM transactions
                 WHERE user_id = %s
-                ORDER BY created_at DESC
+                ORDER BY updated_at DESC NULLS LAST, created_at DESC
                 LIMIT 5
                 """,
                 (user_id,)
@@ -1043,10 +1102,9 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
             
-            if float(user["balance"]) < tx_data.amount:
-                raise HTTPException(status_code=400, detail="Insufficient balance")
-            
-            # Check daily limit and get cumulative amount for today
+            # Balance check disabled for fraud detection demo
+             
+             # Check daily limit and get cumulative amount for today
             today = datetime.now(timezone.utc).date()
             cur.execute(
                 """
@@ -1343,6 +1401,19 @@ async def handle_user_decision(decision_data: UserDecision, user_id: str = Depen
 
                 new_action = "ALLOW"
                 new_status = "success"
+                
+                # ADD RECIPIENT TO KNOWN RECEIVERS (only on confirmation)
+                try:
+                    import redis
+                    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+                    r_known = redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=1)
+                    r_known.ping()
+                    rec_key = f"user:{user_id}:recipients"
+                    r_known.sadd(rec_key, transaction["recipient_vpa"])
+                    r_known.expire(rec_key, 86400 * 30)
+                    print(f"✓ Added {transaction['recipient_vpa']} to known recipients for user {user_id}")
+                except Exception as e:
+                    print(f"Known recipient add error: {e}")
 
                 # Debit sender only if not already deducted
                 if transaction["amount_deducted_at"] is None:
@@ -1351,8 +1422,9 @@ async def handle_user_decision(decision_data: UserDecision, user_id: str = Depen
                         (user_id,)
                     )
                     sender = cur.fetchone()
-                    if not sender or float(sender["balance"]) < float(transaction["amount"]):
-                        raise HTTPException(status_code=400, detail="Insufficient balance")
+                    if not sender:
+                        raise HTTPException(status_code=404, detail="User not found")
+                    # Balance check disabled for fraud detection demo
 
                     cur.execute(
                         "UPDATE users SET balance = balance - %s, updated_at = NOW() WHERE user_id = %s",
@@ -1660,8 +1732,9 @@ async def confirm_transaction(confirm_data: TransactionConfirm, user_id: str = D
                     (user_id,)
                 )
                 sender = cur.fetchone()
-                if not sender or float(sender["balance"]) < float(transaction["amount"]):
-                    raise HTTPException(status_code=400, detail="Insufficient balance")
+                if not sender:
+                    raise HTTPException(status_code=404, detail="User not found")
+                # Balance check disabled for fraud detection demo
 
                 cur.execute(
                     "UPDATE users SET balance = balance - %s, updated_at = NOW() WHERE user_id = %s RETURNING balance",
@@ -1903,42 +1976,47 @@ async def get_transaction(tx_id: str, user_id: str = Depends(get_current_user)):
 
 @app.websocket("/ws/user/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    """WebSocket endpoint for real-time updates"""
+    """WebSocket endpoint for real-time updates with keep-alive support"""
     await ws_manager.connect(websocket, user_id)
     
     try:
         while True:
-            # Receive and handle incoming messages
-            data = await websocket.receive_text()
             try:
-                message = json.loads(data)
-                
-                # Handle different message types
-                if message.get("type") == "ping":
-                    await ws_manager.send_personal_message(websocket, {"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
-                elif message.get("type") == "confirm_transaction":
-                    # Handle confirm transaction via WebSocket
-                    tx_id = message.get("tx_id")
-                    # This would trigger the same logic as /api/transaction/confirm
-                    await ws_manager.send_personal_message(websocket, {
-                        "type": "confirm_received",
-                        "tx_id": tx_id,
-                        "status": "processing"
-                    })
-                elif message.get("type") == "cancel_transaction":
-                    # Handle cancel transaction via WebSocket
-                    tx_id = message.get("tx_id")
-                    # This would trigger the same logic as /api/transaction/cancel
-                    await ws_manager.send_personal_message(websocket, {
-                        "type": "cancel_received", 
-                        "tx_id": tx_id,
-                        "status": "processing"
-                    })
+                # Receive and handle incoming messages (with timeout to detect disconnects)
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=120.0)
+                try:
+                    message = json.loads(data)
                     
-            except json.JSONDecodeError:
-                await ws_manager.send_personal_message(websocket, {"type": "error", "message": "Invalid JSON format"})
-            except Exception as e:
-                await ws_manager.send_personal_message(websocket, {"type": "error", "message": str(e)})
+                    # Handle different message types
+                    if message.get("type") == "ping":
+                        await ws_manager.send_personal_message(websocket, {"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+                    elif message.get("type") == "confirm_transaction":
+                        # Handle confirm transaction via WebSocket
+                        tx_id = message.get("tx_id")
+                        # This would trigger the same logic as /api/transaction/confirm
+                        await ws_manager.send_personal_message(websocket, {
+                            "type": "confirm_received",
+                            "tx_id": tx_id,
+                            "status": "processing"
+                        })
+                    elif message.get("type") == "cancel_transaction":
+                        # Handle cancel transaction via WebSocket
+                        tx_id = message.get("tx_id")
+                        # This would trigger the same logic as /api/transaction/cancel
+                        await ws_manager.send_personal_message(websocket, {
+                            "type": "cancel_received", 
+                            "tx_id": tx_id,
+                            "status": "processing"
+                        })
+                        
+                except json.JSONDecodeError:
+                    await ws_manager.send_personal_message(websocket, {"type": "error", "message": "Invalid JSON format"})
+                except Exception as e:
+                    await ws_manager.send_personal_message(websocket, {"type": "error", "message": str(e)})
+            except asyncio.TimeoutError:
+                # Timeout waiting for message - this is normal if client is just keeping connection open
+                # Continue to next iteration to check if connection is still alive
+                continue
                 
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)

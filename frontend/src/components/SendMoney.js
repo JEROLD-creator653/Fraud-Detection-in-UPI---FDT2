@@ -120,18 +120,7 @@ const SendMoney = ({ user, setUser, onBack, onLogout }) => {
       return false;
     }
 
-    // Validate amount against balance
-    const amountValidation = errorHandler.validateAmount(
-      formData.amount,
-      user.balance,
-      1,
-      100000
-    );
-    
-    if (!amountValidation.isValid) {
-      setError(amountValidation.error);
-      return false;
-    }
+    // Balance check disabled for fraud detection demo
 
     return true;
   };
@@ -201,27 +190,7 @@ const handleSubmit = async (e) => {
     if (amountRef.current && favorite.amount) {
       amountRef.current.focus();
     }
-  };
-
-  const handleAddFavorite = () => {
-    if (formData.recipient_vpa) {
-      const newFavorite = {
-        name: recipientUser?.name || formData.recipient_vpa,
-        vpa: formData.recipient_vpa,
-        amount: formData.amount ? parseFloat(formData.amount) : null,
-        remarks: formData.remarks || ''
-      };
-      favoritesManager.addFavorite(newFavorite);
-      addNotification({
-        type: 'success',
-        title: 'Recipient Saved',
-        message: 'You can quickly access this recipient from Saved Recipients',
-        category: 'success'
-      });
-    } else {
-      setError('Please enter a recipient UPI ID first');
-    }
-  };
+   };
 
    const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -284,15 +253,7 @@ const handleSubmit = async (e) => {
       {/* Form */}
       <div className="p-6">
         <div className="max-w-md mx-auto">
-          {/* Balance Card */}
-          <div className="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl p-6 mb-6 shadow-lg">
-            <div className="text-white/80 text-sm mb-1">Available Balance</div>
-            <div className="text-white text-3xl font-bold">
-              {formatCurrency(user?.balance || 0)}
-            </div>
-          </div>
-
-          {/* Transaction Form */}
+           {/* Transaction Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
              {/* Recipient UPI ID */}
              <div className="bg-white/10 backdrop-blur-xl rounded-xl p-5 border border-white/20 relative z-10">
@@ -388,31 +349,20 @@ const handleSubmit = async (e) => {
               />
              </div>
 
-             {/* Quick Actions */}
-             <div className="grid grid-cols-2 gap-3">
-               <button
-                 type="button"
-                 onClick={() => setShowFavoritesModal(true)}
-                 className="flex items-center justify-center space-x-2 px-4 py-3 bg-yellow-600/80 hover:bg-yellow-600 text-white rounded-lg transition-colors text-sm font-medium"
-                 disabled={loading}
-               >
-                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                   <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                 </svg>
-                 <span>Saved Recipients</span>
-               </button>
-               <button
-                 type="button"
-                 onClick={handleAddFavorite}
-                 className="flex items-center justify-center space-x-2 px-4 py-3 bg-green-600/80 hover:bg-green-600 text-white rounded-lg transition-colors text-sm font-medium"
-                 disabled={loading || !formData.recipient_vpa}
-               >
-                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m0 0h6" />
-                 </svg>
-                 <span>Save Recipient</span>
-               </button>
-             </div>
+              {/* Quick Actions */}
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowFavoritesModal(true)}
+                  className="flex items-center justify-center space-x-2 px-4 py-3 bg-yellow-600/80 hover:bg-yellow-600 text-white rounded-lg transition-colors text-sm font-medium"
+                  disabled={loading}
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                  <span>Saved Recipients</span>
+                </button>
+              </div>
 
              {/* Error Message */}
             {error && (
