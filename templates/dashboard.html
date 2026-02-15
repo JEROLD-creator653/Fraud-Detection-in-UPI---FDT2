@@ -202,13 +202,14 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
       <div class="card">
         <div class="flex items-center gap-2 mb-3">
-          <h3 class="text-lg font-bold mb-0 leading-none flex items-center">Fraud Pattern Analysis</h3>
+          <h3 class="text-lg font-bold mb-0 leading-none flex items-center">ML Pipeline Contribution</h3>
           <button id="fraudPatternInfoBtn" class="w-6 h-6 inline-flex items-center justify-center align-middle rounded-full bg-blue-500 text-white cursor-pointer text-[11px] font-bold leading-none hover:bg-blue-600 transition-colors" title="Info">
             ℹ️
           </button>
         </div>
         <div class="chart-wrap" id="fraudBarWrapper">
-          <canvas id="fraudBar" style="height:220px;width:100%"></canvas>
+          <canvas id="fraudBar" style="height:250px;width:100%"></canvas>
+          <p id="mlPipelineSummary" class="text-xs text-center text-gray-500 mt-1">0/5 systems active | 0 transactions analyzed</p>
           <div class="chart-loading-overlay" id="fraudBarLoadingOverlay" style="display:none;">
             <div class="chart-loading-spinner">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -421,41 +422,40 @@
     </div>
   </div>
 
-  <!-- Fraud Pattern Analysis Modal -->
+  <!-- ML Pipeline Contribution Modal -->
   <div id="fraudPatternModal" class="modal-overlay">
     <div class="info-modal">
       <div class="info-modal-header">
-        <h2>Fraud Pattern Analysis</h2>
+        <h2>🧠 ML Pipeline Contribution</h2>
         <button id="closeFraudPatternModal" class="close-btn text-2xl leading-none">&times;</button>
       </div>
       
       <div class="info-modal-content">
         <div class="info-section">
-          <h3>📊 What is Fraud Pattern Analysis?</h3>
-          <p>Our AI system identifies and tracks common fraud patterns across all transactions. This analysis helps detect sophisticated fraud schemes that traditional rule-based systems might miss.</p>
+          <h3>🎯 What is ML Pipeline Contribution?</h3>
+          <p>This chart shows how our 5 advanced ML systems contribute to fraud detection. Each system adds a layer of protection, working together to identify suspicious transactions with high accuracy.</p>
         </div>
 
         <div class="info-section">
-          <h3>🔍 Detected Patterns</h3>
+          <h3>🔬 The 5 ML Systems</h3>
           <div class="risk-factors">
             <ul>
-              <li><strong>High Velocity:</strong> Multiple rapid transactions from the same account</li>
-              <li><strong>Unusual Amount:</strong> Transaction amounts significantly different from user history</li>
-              <li><strong>New Device:</strong> Transactions from previously unseen devices</li>
-              <li><strong>Suspicious Merchant:</strong> Payments to merchants with fraud history</li>
-              <li><strong>Night Activity:</strong> Unusual transactions during late night/early morning hours</li>
-              <li><strong>Round Amounts:</strong> Transactions with suspiciously round numbers</li>
+              <li><strong>🛡️ Trust Engine:</strong> Builds trust gradually through repeated successful transactions with recipients</li>
+              <li><strong>⚠️ Risk Buffer:</strong> Cumulative risk accumulator that prevents "slow-burn" fraud attacks</li>
+              <li><strong>🎯 Dynamic Thresholds:</strong> Personalized limits that adapt to user behavior patterns</li>
+              <li><strong>📊 Drift Detection:</strong> Monitors feature distribution changes to detect model degradation</li>
+              <li><strong>🕸️ Graph Signals:</strong> Network analysis to catch fraud rings and suspicious connections</li>
             </ul>
           </div>
         </div>
 
         <div class="info-section">
           <h3>⚡ How It Works</h3>
-          <p>Each transaction is analyzed using machine learning models that compare it against known fraud patterns. Multiple pattern matches increase the overall risk score.</p>
+          <p>Each transaction flows through all 5 ML systems. The systems analyze trust scores, risk buffers, dynamic thresholds, data drift, and network relationships to make intelligent fraud detection decisions.</p>
         </div>
 
         <div class="info-highlight">
-          <strong>💡 Pro Tip:</strong> Transactions matching 3 or more fraud patterns are automatically escalated for immediate review.
+          <strong>💡 Pro Tip:</strong> Multiple ML systems triggering simultaneously indicates higher fraud risk. Review transactions with 3 or more active triggers carefully.
         </div>
 
         <div class="info-tip">

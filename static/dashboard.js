@@ -310,36 +310,60 @@ function initCharts() {
   });
 
   fraudBar = new Chart(document.getElementById('fraudBar').getContext('2d'), {
-    type: 'bar',
+    type: 'radar',
     data: {
-      labels: ['Amount Anomaly', 'Behavioural Anomaly', 'Device Anomaly', 'Velocity Anomaly', 'Model Consensus', 'Model Disagreement'],
+      labels: ['Trust Engine', 'Risk Buffer', 'Dynamic Thresholds', 'Drift Detection', 'Graph Signals'],
       datasets: [{
-        label: 'Count',
-        data: [0, 0, 0, 0, 0, 0],
-        backgroundColor: ['#FF6B6B', '#FF9F40', '#FFD93D', '#6BCF7F', '#4ECDC4', '#A78BFA']
+        label: 'ML Coverage %',
+        data: [0, 0, 0, 0, 0],
+        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+        borderColor: '#3B82F6',
+        borderWidth: 2,
+        pointBackgroundColor: ['#10B981', '#F59E0B', '#3B82F6', '#8B5CF6', '#EC4899'],
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        fill: true
       }]
     },
-    options: { 
-      indexAxis: 'y', 
-      responsive: true, 
+    options: {
+      responsive: true,
       maintainAspectRatio: true,
       scales: {
-        x: {
-          ticks: { color: textColor },
-          grid: { color: gridColor }
-        },
-        y: {
-          ticks: { color: textColor },
-          grid: { color: gridColor }
+        r: {
+          beginAtZero: true,
+          max: 100,
+          ticks: {
+            stepSize: 25,
+            color: textColor,
+            backdropColor: 'transparent',
+            font: { size: 9 },
+            callback: v => v + '%'
+          },
+          pointLabels: {
+            color: textColor,
+            font: { size: 11, weight: '600' }
+          },
+          grid: { color: gridColor },
+          angleLines: { color: gridColor }
         }
       },
       plugins: {
         legend: {
-          labels: { color: textColor }
+          display: false
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const raw = ctx.chart._mlRawCounts ? ctx.chart._mlRawCounts[ctx.dataIndex] : 0;
+              return `${ctx.label}: ${ctx.raw.toFixed(1)}% (${raw} triggers)`;
+            }
+          }
         }
       },
       animation: {
-        duration: 0 // Disable animations
+        duration: 0
       }
     }
   });
@@ -569,22 +593,33 @@ async function loadPatternAnalytics() {
     const url = `/pattern-analytics?time_range=${currentTimeRange}`;
     const data = await cachedFetch(url, 'pattern-analytics', 20000);
     
-    // Update fraud pattern chart with real aggregated data from backend
+    // Update ML Pipeline radar chart with normalized percentages
     if (fraudBar) {
-      fraudBar.data.datasets[0].data = [
-        data.amount_anomaly || 0,
-        data.behavioural_anomaly || 0,
-        data.device_anomaly || 0,
-        data.velocity_anomaly || 0,
-        data.model_consensus || 0,
-        data.model_disagreement || 0
+      const txCount = data.transactions_analyzed || 1;
+      const rawCounts = [
+        data.trust_engine_triggers || 0,
+        data.risk_buffer_escalations || 0,
+        data.dynamic_threshold_adjustments || 0,
+        data.drift_alerts || 0,
+        data.graph_signal_flags || 0
       ];
+      // Normalize each system to 0-100% of transactions analyzed
+      const pctData = rawCounts.map(v => Math.min(100, (v / txCount) * 100));
+      
+      // Store raw counts for tooltips
+      fraudBar._mlRawCounts = rawCounts;
+      fraudBar.data.datasets[0].data = pctData;
       fraudBar.update('none');
       
+      // Update the summary line under the chart
+      const summaryEl = document.getElementById('mlPipelineSummary');
+      if (summaryEl) {
+        const activeCount = rawCounts.filter(v => v > 0).length;
+        summaryEl.textContent = `${activeCount}/5 systems active | ${txCount} transactions analyzed`;
+      }
+      
       // Check if chart has any data
-      const total = (data.amount_anomaly || 0) + (data.behavioural_anomaly || 0) + 
-                    (data.device_anomaly || 0) + (data.velocity_anomaly || 0) + 
-                    (data.model_consensus || 0) + (data.model_disagreement || 0);
+      const total = rawCounts.reduce((a, b) => a + b, 0);
       if (total === 0) {
         showChartNoData('fraudBar');
       } else {
@@ -1179,7 +1214,7 @@ document.addEventListener('DOMContentLoaded', () => {
       riskPie.update('none');
     }
     if (fraudBar) {
-      fraudBar.data.datasets[0].data = [0, 0, 0, 0, 0, 0];
+      fraudBar.data.datasets[0].data = [0, 0, 0, 0, 0];
       fraudBar.update('none');
     }
     
@@ -1346,13 +1381,12 @@ function updateChartColors(isDarkMode) {
     riskPie.update();
   }
 
-  // Update fraud bar chart
+  // Update fraud radar chart
   if (fraudBar) {
-    fraudBar.options.scales.x.ticks.color = textColor;
-    fraudBar.options.scales.x.grid.color = gridColor;
-    fraudBar.options.scales.y.ticks.color = textColor;
-    fraudBar.options.scales.y.grid.color = gridColor;
-    fraudBar.options.plugins.legend.labels.color = textColor;
+    fraudBar.options.scales.r.ticks.color = textColor;
+    fraudBar.options.scales.r.pointLabels.color = textColor;
+    fraudBar.options.scales.r.grid.color = gridColor;
+    fraudBar.options.scales.r.angleLines.color = gridColor;
     fraudBar.update();
   }
 }
