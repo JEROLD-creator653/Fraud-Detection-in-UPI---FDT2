@@ -23,6 +23,7 @@ class FraudDetectionChatbot:
         self.db_url = db_url
         self.groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY")
         self.ai_provider = "fallback"
+        self._schema_cache = None  # Cache for database schema
         
         # Check if Groq is available
         if GROQ_AVAILABLE and self.groq_api_key:
@@ -154,6 +155,70 @@ class FraudDetectionChatbot:
                 "trends": [dict(t) for t in trends],
                 "time_range": time_range
             }
+        finally:
+            conn.close()
+    
+    def execute_query(self, query: str, params: tuple = None) -> List[Dict[str, Any]]:
+        """Execute raw SQL query (read-only - SELECT statements only for safety)"""
+        # Security: Only allow SELECT queries
+        query_stripped = query.strip().upper()
+        if not query_stripped.startswith('SELECT'):
+            raise ValueError("Only SELECT queries are allowed for security reasons")
+        
+        conn = self.get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute(query, params)
+            results = cur.fetchall()
+            cur.close()
+            return [dict(row) for row in results]
+        finally:
+            conn.close()
+    
+    def get_database_schema(self) -> Dict[str, Any]:
+        """Get database schema information for AI context (cached)"""
+        # Return cached schema if available
+        if self._schema_cache is not None:
+            return self._schema_cache
+        
+        conn = self.get_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Get all tables
+            cur.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public'
+            """)
+            tables = cur.fetchall()
+            
+            schema_info = {}
+            for table in tables:
+                table_name = table['table_name']
+                
+                # Get columns for each table
+                cur.execute("""
+                    SELECT column_name, data_type, is_nullable
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = %s
+                    ORDER BY ordinal_position
+                """, (table_name,))
+                columns = cur.fetchall()
+                
+                schema_info[table_name] = [
+                    {
+                        'name': col['column_name'],
+                        'type': col['data_type'],
+                        'nullable': col['is_nullable']
+                    }
+                    for col in columns
+                ]
+            
+            cur.close()
+            # Cache the schema for future use
+            self._schema_cache = schema_info
+            return schema_info
         finally:
             conn.close()
     
@@ -310,6 +375,19 @@ EXPLANATION OF ACTION:
    Type: {tx.get('tx_type')} | Channel: {tx.get('channel')}
    Created: {tx.get('created_at')}"""
             
+            # Get database schema for complex queries (with error handling)
+            schema_text = ""
+            try:
+                schema_info = self.get_database_schema()
+                schema_text = "\n\nDATABASE SCHEMA:\n"
+                for table_name, columns in schema_info.items():
+                    schema_text += f"\n{table_name}:\n"
+                    for col in columns:
+                        schema_text += f"  - {col['name']} ({col['type']})\n"
+            except Exception as e:
+                print(f"Schema retrieval failed (non-critical): {e}")
+                schema_text = "\n\nDATABASE SCHEMA: Available tables - users, transactions, admin_logs"
+            
             # Prepare context information
             context_info = f"""You are an AI assistant for a UPI Fraud Detection System. 
 You have access to real-time transaction data and analytics.
@@ -335,6 +413,15 @@ TRANSACTION ANALYSIS FACTORS:
 - Transaction type and channel
 - Recipient VPA patterns
 {transaction_detail}
+{schema_text}
+
+DATABASE ACCESS:
+You have read-only access to the database. You can execute SELECT queries to answer complex questions.
+Available tables: users, transactions, admin_logs, credentials, push_tokens, passkey_credentials
+Key columns in transactions: tx_id, user_id, amount, risk_score, action, db_status, tx_type, channel, recipient_vpa, device_id, created_at, updated_at
+
+To query the database, include SQL in your response like:
+SQL_QUERY: SELECT * FROM transactions WHERE action='BLOCK' LIMIT 5
 
 Your role is to:
 1. Answer questions about fraud detection metrics and analytics
@@ -344,6 +431,7 @@ Your role is to:
 5. Help users understand the data
 6. Be concise and professional
 7. Use the provided data to give accurate, specific answers
+8. Execute SQL queries when needed for complex questions
 
 FORMATTING INSTRUCTIONS:
 - Use decorative section headers like ━━━ SECTION NAME ━━━ (or === SECTION NAME === if needed)
@@ -415,6 +503,20 @@ When discussing amounts, use Indian Rupee (₹) format."""
             print(f"Groq API error: {e}")
             return self.generate_fallback_response(message, context)
     
+    def _convert_datetime_objects(self, obj: Any) -> Any:
+        """Recursively convert datetime and Decimal objects to JSON-serializable types"""
+        from decimal import Decimal
+        
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, Decimal):
+            return float(obj)
+        elif isinstance(obj, dict):
+            return {k: self._convert_datetime_objects(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_datetime_objects(item) for item in obj]
+        return obj
+    
     def chat(self, message: str, time_range: str = "24h", 
             conversation_history: List[Dict[str, str]] = None) -> Dict[str, Any]:
         """Main chat method"""
@@ -427,6 +529,27 @@ When discussing amounts, use Indian Rupee (₹) format."""
         else:
             response = self.generate_fallback_response(message, context)
         
+        # Check if AI wants to execute a SQL query
+        sql_results = None
+        if "SQL_QUERY:" in response:
+            # Extract SQL query from response
+            import re
+            sql_match = re.search(r'SQL_QUERY:\s*(.+?)(?=\n\n|\Z)', response, re.DOTALL)
+            if sql_match:
+                sql_query = sql_match.group(1).strip()
+                try:
+                    sql_results = self.execute_query(sql_query)
+                    # Remove SQL_QUERY from response and add results
+                    response = response.replace(f"SQL_QUERY: {sql_query}", "")
+                    response += f"\n\n📊 Query Results:\n```\n{json.dumps(sql_results, indent=2, default=str)}\n```"
+                except Exception as e:
+                    response = response.replace(f"SQL_QUERY: {sql_query}", f"")
+                    response += f"\n\n❌ Error executing query: {str(e)}"
+        
+        # Convert datetime objects in sql_results to strings for JSON serialization
+        if sql_results:
+            sql_results = self._convert_datetime_objects(sql_results)
+        
         return {
             "response": response,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -434,5 +557,6 @@ When discussing amounts, use Indian Rupee (₹) format."""
                 "time_range": time_range,
                 "total_transactions": context["stats"].get("total", 0),
                 "high_risk_count": len(context.get("high_risk_transactions", []))
-            }
+            },
+            "sql_results": sql_results
         }
