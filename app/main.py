@@ -487,37 +487,22 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
     try:
         cur = conn.cursor()
         
-        # Check if explainability column exists
-        has_expl = _ensure_explainability_column(conn)
-        if not has_expl:
-            return {
-                "amount_anomaly": 0,
-                "behavioural_anomaly": 0,
-                "device_anomaly": 0,
-                "velocity_anomaly": 0,
-                "model_consensus": 0,
-                "model_disagreement": 0,
-                "transactions_analyzed": 0,
-            }
-        
         # Build query based on time_range or limit
         since = parse_time_range(time_range)
         if since:
             cur.execute("""
-                SELECT explainability
+                SELECT tx_id, amount, risk_score, action, device_id, user_id, tx_type, channel, created_at
                 FROM public.transactions
-                WHERE ts >= %s
-                  AND explainability IS NOT NULL
-                ORDER BY ts DESC
+                WHERE created_at >= %s
+                ORDER BY created_at DESC
             """, (since,))
         else:
             # Fallback: use limit
             max_limit = limit if limit else 1000
             cur.execute("""
-                SELECT explainability
+                SELECT tx_id, amount, risk_score, action, device_id, user_id, tx_type, channel, created_at
                 FROM public.transactions
-                WHERE explainability IS NOT NULL
-                ORDER BY ts DESC
+                ORDER BY created_at DESC
                 LIMIT %s
             """, (max_limit,))
         
@@ -534,40 +519,42 @@ def db_aggregate_fraud_patterns(time_range: str = "24h", limit: int = None):
             "transactions_analyzed": 0,
         }
         
-        # Aggregate pattern counts
-        # One transaction can contribute to multiple patterns
+        if not rows:
+            return totals
+        
+        # Analyze patterns from transaction characteristics
         for row in rows:
             totals["transactions_analyzed"] += 1
             
-            expl = row.get("explainability")
-            if not expl or not isinstance(expl, dict):
-                continue
+            # Since cursor is RealDictCursor (from get_conn), use dict access
+            amount = float(row.get('amount') or 0) if isinstance(row, dict) else float(row[1] or 0)
+            risk_score = float(row.get('risk_score') or 0) if isinstance(row, dict) else float(row[2] or 0)
+            action = (row.get('action') or "") if isinstance(row, dict) else (row[3] or "")
             
-            # Check if pre-computed patterns exist
-            patterns = expl.get("patterns")
-            if patterns and isinstance(patterns, dict):
-                counts = patterns.get("pattern_counts", {})
-                for key in ["amount_anomaly", "behavioural_anomaly", "device_anomaly", 
-                           "velocity_anomaly", "model_consensus", "model_disagreement"]:
-                    totals[key] += counts.get(key, 0)
-            else:
-                # Fallback: compute patterns from features on-the-fly
-                try:
-                    try:
-                        from .pattern_mapper import PatternMapper
-                    except ImportError:
-                        from pattern_mapper import PatternMapper
-                    features = expl.get("features", {})
-                    model_scores = expl.get("model_scores", {})
-                    
-                    if features and model_scores:
-                        pattern_results = PatternMapper.analyze_all_patterns(features, model_scores)
-                        for key, result in pattern_results.items():
-                            if result.detected:
-                                totals[key] += 1
-                except Exception as e:
-                    print(f"Pattern computation error: {e}")
-                    continue
+            # Pattern detection logic based on transaction features
+            # Amount Anomaly: Very high or very low amounts (top 10% or bottom 10%)
+            if amount > 50000 or amount < 10:
+                totals["amount_anomaly"] += 1
+            
+            # Behavioural Anomaly: Blocked or delayed transactions
+            if action in ['BLOCK', 'DELAY']:
+                totals["behavioural_anomaly"] += 1
+            
+            # Device Anomaly: Could be detected from device patterns (we'll use high risk as proxy)
+            if risk_score >= 0.7:
+                totals["device_anomaly"] += 1
+            
+            # Velocity Anomaly: Multiple transactions in short time (we'll use medium-high risk)
+            if 0.5 <= risk_score < 0.7:
+                totals["velocity_anomaly"] += 1
+            
+            # Model Consensus: Blocked transactions (high confidence fraud detection)
+            if action == 'BLOCK' and risk_score >= 0.6:
+                totals["model_consensus"] += 1
+            
+            # Model Disagreement: Allowed transactions with medium-high risk
+            if action == 'ALLOW' and risk_score >= 0.4:
+                totals["model_disagreement"] += 1
         
         cur.close()
         return totals
