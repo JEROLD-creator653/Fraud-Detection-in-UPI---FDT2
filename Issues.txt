@@ -12,3 +12,14 @@
    - File: /backend/server.py:145-175, 350-356
    - STATUS: RESOLVED ✓
    - Verification: Server now starts and initializes all components successfully
+
+4. Chatbot returns "Sorry, I encountered an error" when asking about database data
+   - Problem: Query results contained datetime and Decimal objects that couldn't be JSON serialized
+   - Error: "Object of type datetime is not JSON serializable" → then "Object of type Decimal is not JSON serializable"
+   - Fix: Added _convert_datetime_objects() helper method in FraudDetectionChatbot class
+     - Recursively converts datetime objects to ISO format strings
+     - Converts Decimal objects to floats
+     - Applied conversion to sql_results before returning from chat() method
+   - File: /app/chatbot.py:506-557
+   - STATUS: RESOLVED ✓
+   - Verification: Tested with queries like "Show me blocked transactions", "How many transactions total?", "What is average risk score?" - all working
