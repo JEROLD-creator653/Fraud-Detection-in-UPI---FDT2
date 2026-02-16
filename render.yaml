@@ -1,0 +1,136 @@
+# Render Blueprint for FDT - Fraud Detection System
+# Deploy all services with: render blueprint upload
+# Or connect your GitHub repo at https://dashboard.render.com
+
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: fdt-postgres
+    runtime: docker
+    dockerfilePath: ./docker/postgres.Dockerfile
+    envVars:
+      - key: POSTGRES_DB
+        value: fdt_db
+      - key: POSTGRES_USER
+        value: fdt
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+      - key: POSTGRES_HOST_AUTH_METHOD
+        value: trust
+    disk:
+      name: postgres-data
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 1
+
+  # Redis Cache
+  - type: pserv
+    name: fdt-redis
+    runtime: docker
+    dockerfilePath: ./docker/redis.Dockerfile
+    disk:
+      name: redis-data
+      mountPath: /data
+      sizeGB: 1
+
+  # User Backend API
+  - type: web
+    name: fdt-user-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.backend
+    envVars:
+      - key: DB_URL
+        fromService:
+          name: fdt-postgres
+          type: pserv
+          property: hostport
+        # Will be: postgresql://fdt:password@fdt-postgres:5432/fdt_db
+      - key: REDIS_URL
+        fromService:
+          name: fdt-redis
+          type: pserv
+          property: hostport
+        # Will be: redis://fdt-redis:6379/0
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD_HASH
+        value: $pbkdf2-sha256$29000$UEoppdTa.3/PWUsphZCSkg$FNKn6Lz3vXsjx6GGl5AKsz7Rf0gyLAm2ZqlOOau3bBg
+      - key: ALLOWED_ORIGINS
+        value: https://fdt2-secureupi.tech,https://www.fdt2-secureupi.tech,https://your-frontend-service-url.onrender.com
+      - key: DELAY_THRESHOLD
+        value: "0.35"
+      - key: BLOCK_THRESHOLD
+        value: "0.70"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PORT
+        value: "8001"
+    healthCheckPath: /health
+    plan: free
+
+  # Admin Backend API
+  - type: web
+    name: fdt-admin-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.admin
+    envVars:
+      - key: DB_URL
+        fromService:
+          name: fdt-postgres
+          type: pserv
+          property: hostport
+      - key: REDIS_URL
+        fromService:
+          name: fdt-redis
+          type: pserv
+          property: hostport
+      - key: JWT_SECRET_KEY
+        fromService:
+          name: fdt-user-api
+          type: web
+          envVarKey: JWT_SECRET_KEY
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD_HASH
+        value: $pbkdf2-sha256$29000$UEoppdTa.3/PWUsphZCSkg$FNKn6Lz3vXsjx6GGl5AKsz7Rf0gyLAm2ZqlOOau3bBg
+      - key: ALLOWED_ORIGINS
+        value: https://fdt2-secureupi.tech,https://your-admin-service-url.onrender.com
+      - key: DELAY_THRESHOLD
+        value: "0.35"
+      - key: BLOCK_THRESHOLD
+        value: "0.70"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PORT
+        value: "8000"
+    healthCheckPath: /health
+    plan: free
+
+  # Frontend Static Site
+  - type: static
+    name: fdt-frontend
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    publishPath: ./frontend/build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: /api
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://your-user-api-url.onrender.com/api/*
+      - type: rewrite
+        source: /admin/*
+        destination: https://your-admin-api-url.onrender.com/admin/*
+    plan: free
+
+# Environment variables that need to be set manually in Render dashboard:
+# 1. GROQ_API_KEY - Your Groq API key
+# 2. DB_URL and REDIS_URL - Will be auto-populated after first deploy, then update manually
+
+# Custom Domain Setup:
+# 1. After deployment, go to each service dashboard
+# 2. Click "Settings" → "Custom Domains"
+# 3. Add your domain: fdt2-secureupi.tech
+# 4. Follow DNS instructions to point domain to Render
