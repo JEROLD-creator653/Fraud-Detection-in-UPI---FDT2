@@ -17,9 +17,20 @@ from fastapi.concurrency import run_in_threadpool
 import psycopg2
 import psycopg2.extras
 from passlib.hash import pbkdf2_sha256
+import redis
 
 # Import UPI Transaction ID generator
 from .upi_transaction_id import generate_upi_transaction_id
+
+# Initialize Redis client for cache invalidation
+redis_client = None
+try:
+    redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"), decode_responses=True)
+    redis_client.ping()
+    print("✓ Admin backend connected to Redis")
+except Exception as e:
+    print(f"⚠ Admin backend Redis unavailable: {e}")
+    redis_client = None
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -1094,6 +1105,14 @@ async def admin_action(request: Request):
         admin_username,
         source_ip
     )
+    
+    # Clear dashboard cache for the user so they see the updated transaction
+    if user_id and redis_client:
+        try:
+            redis_client.delete(f"dashboard:{user_id}")
+            print(f"✓ Cleared dashboard cache for user: {user_id}")
+        except Exception as e:
+            print(f"⚠ Failed to clear dashboard cache: {e}")
     
     return {"status": "ok", "updated": full}
 
