@@ -25,8 +25,8 @@ _redis_client: Optional[redis.Redis] = None
 
 # Configuration
 DECAY_FACTOR = float(os.getenv("RISK_BUFFER_DECAY", "0.85"))
-ESCALATE_THRESHOLD = float(os.getenv("RISK_BUFFER_ESCALATE", "1.5"))
-BLOCK_THRESHOLD = float(os.getenv("RISK_BUFFER_BLOCK", "2.5"))
+ESCALATE_THRESHOLD = float(os.getenv("RISK_BUFFER_ESCALATE", "2.5"))
+BLOCK_THRESHOLD = float(os.getenv("RISK_BUFFER_BLOCK", "4.0"))
 BUFFER_TTL = 86400 * 7  # 7-day retention
 
 

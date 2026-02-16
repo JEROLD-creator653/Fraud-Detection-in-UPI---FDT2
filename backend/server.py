@@ -1225,15 +1225,18 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             except Exception as e:
                 print(f"Scoring error: {e}")
                 fraud_reasons_list = []
-                # Fallback to simple rule-based scoring
-                if tx_data.amount > 10000:
-                    risk_score = 0.7
-                    fraud_reasons_list = ["High transaction amount (>10000)"]
-                elif tx_data.amount > 5000:
-                    risk_score = 0.4
-                    fraud_reasons_list = ["High transaction amount (>5000)"]
+                # Fallback to simple rule-based scoring (softened for leniency)
+                if tx_data.amount > 50000:
+                    risk_score = 0.5
+                    fraud_reasons_list = ["Very high transaction amount (>50000)"]
+                elif tx_data.amount > 25000:
+                    risk_score = 0.3
+                    fraud_reasons_list = ["High transaction amount (>25000)"]
+                elif tx_data.amount > 10000:
+                    risk_score = 0.15
+                    fraud_reasons_list = ["Moderate transaction amount (>10000)"]
                 else:
-                    risk_score = 0.1
+                    risk_score = 0.05
                     fraud_reasons_list = []
             
             # Determine action based on fraud risk thresholds (dynamic or fallback)
@@ -1291,6 +1294,13 @@ async def create_transaction(tx_data: TransactionCreate, user_id: str = Depends(
             
             # Handle different actions
             if action == "ALLOW":
+                # Track recipient relationship in Redis for future transaction analysis
+                if redis_client:
+                    rec_key = f"user:{user_id}:recipients"
+                    redis_client.sadd(rec_key, tx_data.recipient_vpa)
+                    redis_client.expire(rec_key, 86400 * 30)  # 30 day TTL
+                    print(f"✓ Tracked recipient {tx_data.recipient_vpa} for user {user_id}")
+                
                 # Log in transaction_ledger (no balance deduction - demo mode)
                 cur.execute(
                     """

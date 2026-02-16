@@ -16,11 +16,11 @@ admin_users:
 db_url: postgresql://fdt:fdtpass@127.0.0.1:5432/fdt_db
 secret_key: qdqBymrlHc4wrM_E2TfifjUjnEsjxh-9NGKCQaecrQw
 thresholds:
-  allowMax: 0.3
-  block: 0.6
-  blockMin: 0.6
-  delay: 0.3
-  delayMax: 0.6
+  allowMax: 0.45
+  block: 0.75
+  blockMin: 0.5
+  delay: 0.45
+  delayMax: 0.55
   highConfidence: 0.85
   isoWeight: 25
   lowConfidence: 0.4

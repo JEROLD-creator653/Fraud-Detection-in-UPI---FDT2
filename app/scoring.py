@@ -274,10 +274,10 @@ def fallback_rule_based_score(features: dict) -> float:
     """
     Fallback rule-based scoring when no models are available.
     Uses heuristics based on amount, velocity, and temporal patterns.
+    Made lenient to avoid false positives.
     """
     amount = float(features.get("amount", 0))
     is_night = float(features.get("is_night", 0))
-    is_new_device = float(features.get("is_new_device", 0))
     is_new_recipient = float(features.get("is_new_recipient", 0))
     merchant_risk = float(features.get("merchant_risk_score", 0))
     tx_count_1h = float(features.get("tx_count_1h", 0))
@@ -286,36 +286,36 @@ def fallback_rule_based_score(features: dict) -> float:
     
     score = 0.0
     
-    # Amount-based risk
-    if amount > 10000:
-        score += 0.4
-    elif amount > 5000:
-        score += 0.25
-    elif amount > 2000:
-        score += 0.15
-    
-    # Temporal risk
-    if is_night > 0:
-        score += 0.2
-    
-    # Behavioral risk
-    if is_new_device > 0:
-        score += 0.15
-    if is_new_recipient > 0:
-        score += 0.1
-    
-    # Merchant risk
-    score += merchant_risk * 0.15
-    
-    # Velocity risk
-    if tx_count_1h > 10:
+    # Amount-based risk (lenient - raised thresholds)
+    if amount > 50000:
         score += 0.3
-    elif tx_count_1h > 5:
+    elif amount > 25000:
         score += 0.15
+    elif amount > 10000:
+        score += 0.08
     
-    # Channel risk
-    if is_qr > 0 or is_web > 0:
+    # Temporal risk (reduced)
+    if is_night > 0:
         score += 0.1
+    
+    # Device checking removed
+    
+    # New recipient - minimal impact
+    if is_new_recipient > 0:
+        score += 0.03
+    
+    # Merchant risk (reduced)
+    score += merchant_risk * 0.1
+    
+    # Velocity risk (kept but reduced)
+    if tx_count_1h > 10:
+        score += 0.2
+    elif tx_count_1h > 5:
+        score += 0.1
+    
+    # Channel risk (reduced)
+    if is_qr > 0 or is_web > 0:
+        score += 0.05
     
     return float(max(0.0, min(1.0, score)))
 

@@ -149,21 +149,15 @@ def extract_features(tx):
         # Recipient transaction count
         features["recipient_tx_count"] = float(r.scard(rec_key))
         
-        # Device change detection
-        dev_key = f"user:{user}:devices"
-        device_change = 0
-        if not r.sismember(dev_key, device):
-            device_change = 1
-            r.sadd(dev_key, device)
-        r.expire(dev_key, 86400 * 60)
-        features["is_new_device"] = float(device_change)
-        features["device_count"] = float(r.scard(dev_key))
+        # Device checking disabled - same device used for testing
+        features["is_new_device"] = 0.0
+        features["device_count"] = 1.0
     else:
         # Redis unavailable: use probabilistic defaults
         features["is_new_recipient"] = 0.3  # 30% chance
         features["recipient_tx_count"] = 5.0
-        features["is_new_device"] = 0.2  # 20% chance
-        features["device_count"] = 2.0
+        features["is_new_device"] = 0.0  # Device checking disabled
+        features["device_count"] = 1.0
     
     # Transaction type encoding
     features["is_p2m"] = 1.0 if tx_type == "P2M" else 0.0

@@ -18,17 +18,17 @@ import math
 import os
 from typing import Dict, Tuple
 
-# Base thresholds (fallback / starting point)
-BASE_DELAY_THRESHOLD = float(os.getenv("DELAY_THRESHOLD", "0.30"))
-BASE_BLOCK_THRESHOLD = float(os.getenv("BLOCK_THRESHOLD", "0.60"))
+# Base thresholds (fallback / starting point) - lenient for better UX
+BASE_DELAY_THRESHOLD = float(os.getenv("DELAY_THRESHOLD", "0.45"))
+BASE_BLOCK_THRESHOLD = float(os.getenv("BLOCK_THRESHOLD", "0.75"))
 
 # Minimum thresholds (never go below these)
-MIN_DELAY_THRESHOLD = 0.15
-MIN_BLOCK_THRESHOLD = 0.35
+MIN_DELAY_THRESHOLD = 0.25
+MIN_BLOCK_THRESHOLD = 0.50
 
 # Maximum thresholds (never go above these)
-MAX_DELAY_THRESHOLD = 0.45
-MAX_BLOCK_THRESHOLD = 0.75
+MAX_DELAY_THRESHOLD = 0.55
+MAX_BLOCK_THRESHOLD = 0.85
 
 
 def compute_dynamic_thresholds(
@@ -60,10 +60,10 @@ def compute_dynamic_thresholds(
     block_adj = 0.0
     adjustments = {}
 
-    # 1. Amount-based adjustment: high amounts → lower thresholds (stricter)
-    # log(amount) / 100 gives ~0.05 for 1000, ~0.09 for 10000, ~0.11 for 50000
+    # 1. Amount-based adjustment: high amounts → slightly lower thresholds (lenient)
+    # Reduced factor: log(amount) / 200 gives ~0.025 for 1000, ~0.045 for 10000, ~0.055 for 50000
     if amount > 0:
-        amount_factor = math.log1p(amount) / 100.0
+        amount_factor = math.log1p(amount) / 200.0
         delay_adj -= amount_factor
         block_adj -= amount_factor
         adjustments["amount_adj"] = round(-amount_factor, 4)
@@ -83,12 +83,8 @@ def compute_dynamic_thresholds(
         block_adj -= buffer_factor
         adjustments["risk_buffer_adj"] = round(-buffer_factor, 4)
 
-    # 4. Device novelty: new device → slightly stricter
-    is_new_device = features.get("is_new_device", 0.0)
-    if is_new_device > 0:
-        delay_adj -= 0.03
-        block_adj -= 0.03
-        adjustments["new_device_adj"] = -0.03
+    # 4. Device novelty: DISABLED - same device used for testing
+    # is_new_device check removed
 
     # 5. Night-time adjustment: night transactions → stricter
     is_night = features.get("is_night", 0.0)
@@ -97,12 +93,8 @@ def compute_dynamic_thresholds(
         block_adj -= 0.03
         adjustments["night_adj"] = -0.03
 
-    # 6. New recipient: slightly stricter for unknown recipients
-    is_new_recipient = features.get("is_new_recipient", 0.0)
-    if is_new_recipient > 0:
-        delay_adj -= 0.02
-        block_adj -= 0.02
-        adjustments["new_recipient_adj"] = -0.02
+    # 6. New recipient: no penalty - allow user's avg amount transactions to new users
+    # Removed stricter thresholds for new recipients
 
     # 7. High velocity: many transactions recently → stricter
     tx_count_1h = features.get("tx_count_1h", 0.0)

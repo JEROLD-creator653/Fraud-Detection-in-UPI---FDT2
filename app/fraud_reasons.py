@@ -108,66 +108,44 @@ def generate_fraud_reasons(
     amount_std = float(features.get("amount_std", 0))
     amount_max = float(features.get("amount_max", amount))
     
-    # High transaction amount (absolute)
-    if amount > 50000:
+    # High transaction amount (absolute) - lenient thresholds
+    if amount > 100000:
         reasons.append(FraudReason(
-            "Very high transaction amount (50000+)",
+            "Very high transaction amount (100000+)",
             "critical",
             "amount",
             amount
         ))
-    elif amount > 20000:
+    elif amount > 50000:
         reasons.append(FraudReason(
-            "High transaction amount (20000+)",
+            "High transaction amount (50000+)",
             "high",
             "amount",
             amount
         ))
-    elif amount > 10000:
+    elif amount > 25000:
         reasons.append(FraudReason(
-            "Transaction amount exceeds 10000",
+            "Transaction amount exceeds 25000",
             "medium",
             "amount",
             amount
         ))
     
-    # Amount deviation from user's pattern
+    # Amount deviation from user's pattern - disabled to avoid blocking normal transactions
+    # Only flag extreme deviations (>5x) as informational, not blocking
     amount_deviation = float(features.get("amount_deviation", 0))
-    if amount_deviation > 3.0 and amount_std > 0:
+    if amount_deviation > 5.0 and amount_std > 0:
         reasons.append(FraudReason(
             f"Amount is {amount_deviation:.1f}x above user's normal pattern",
-            "high",
-            "amount_deviation",
-            amount_deviation
-        ))
-    elif amount_deviation > 2.0 and amount_std > 0:
-        reasons.append(FraudReason(
-            "Transaction amount significantly higher than user's typical transactions",
-            "medium",
-            "amount_deviation",
-            amount_deviation
-        ))
-    
-    # =========================================================================
-    # 3. NEW / UNSEEN DEVICE
-    # =========================================================================
-    is_new_device = float(features.get("is_new_device", 0))
-    device_count = float(features.get("device_count", 1))
-    
-    if is_new_device > 0:
-        reasons.append(FraudReason(
-            "Transaction from new/unseen device",
-            "high",
-            "is_new_device",
-            is_new_device
-        ))
-    elif device_count == 1:
-        reasons.append(FraudReason(
-            "First transaction from this device",
             "low",
-            "device_count",
-            device_count
+            "amount_deviation",
+            amount_deviation
         ))
+    
+    # =========================================================================
+    # 3. DEVICE CHECK - DISABLED (same device used for testing)
+    # =========================================================================
+    # Device checking removed - no device-based fraud reasons generated
     
     # =========================================================================
     # 4. NEW RECIPIENT / BENEFICIARY
@@ -177,8 +155,8 @@ def generate_fraud_reasons(
     
     if is_new_recipient > 0:
         reasons.append(FraudReason(
-            "Payment to new/unknown recipient",
-            "medium",
+            "Payment to new recipient",
+            "low",
             "is_new_recipient",
             is_new_recipient
         ))
@@ -359,12 +337,12 @@ def calculate_composite_risk_score(reasons: List[FraudReason], ml_score: float) 
     if not reasons:
         return ml_score
     
-    # Weight by severity
+    # Weight by severity (lenient - reduced weights)
     severity_weights = {
-        "critical": 0.35,
-        "high": 0.25,
-        "medium": 0.15,
-        "low": 0.05
+        "critical": 0.25,
+        "high": 0.15,
+        "medium": 0.08,
+        "low": 0.03
     }
     
     # Check if normal pattern
