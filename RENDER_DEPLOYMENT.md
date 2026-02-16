@@ -15,7 +15,12 @@
 2. Connect your GitHub repo: `Fraud-Detection-in-UPI---FDT2`
 3. Select branch: `production`
 4. Click "Apply"
-5. Render will automatically create all 5 services!
+5. Render will automatically create **4 services**:
+   - ✅ PostgreSQL Database
+   - ✅ Redis Cache
+   - ✅ User Backend API
+   - ✅ Admin Backend API
+6. **Then manually create the Frontend** (see Step 3 below)
 
 **Option B: Manual**
 Create each service individually (see below)
@@ -70,24 +75,67 @@ Create each service individually (see below)
 6. Plan: **Free**
 7. Click "Create Web Service"
 
-### 5. Create Frontend
+### 5. Create Frontend (Static Site)
+**⚠️ IMPORTANT: Static sites CANNOT be created via Blueprint - must be manual!**
+
 1. Dashboard → "New" → "Static Site"
 2. Name: `fdt-frontend`
 3. Select your repo and `production` branch
 4. Build Command: `cd frontend && npm install && npm run build`
 5. Publish Directory: `frontend/build`
 6. Environment Variables:
-   - `REACT_APP_API_URL`: (your user API URL)
+   - `REACT_APP_API_URL`: `https://fdt-user-api-xxx.onrender.com/api` (get from your User API URL)
 7. Plan: **Free**
 8. Click "Create Static Site"
 
 ---
 
-## Step 3: Custom Domain Setup
+## Step 3: Connect Frontend to Backends
+
+After all services are deployed, you need to connect them:
+
+### Get Your Service URLs:
+1. Go to each service dashboard
+2. Copy the URL from the top (e.g., `https://fdt-user-api-xxx.onrender.com`)
+3. Note down:
+   - User API URL: `https://fdt-user-api-xxx.onrender.com`
+   - Admin API URL: `https://fdt-admin-api-xxx.onrender.com`
+   - Frontend URL: `https://fdt-frontend-xxx.onrender.com`
+
+### Update User Backend CORS:
+1. Go to `fdt-user-api` service → "Environment" tab
+2. Update `ALLOWED_ORIGINS`:
+   ```
+   https://fdt2-secureupi.tech,https://www.fdt2-secureupi.tech,https://fdt-frontend-xxx.onrender.com
+   ```
+3. Click "Save Changes"
+
+### Update Admin Backend CORS:
+1. Go to `fdt-admin-api` service → "Environment" tab
+2. Update `ALLOWED_ORIGINS`:
+   ```
+   https://fdt2-secureupi.tech
+   ```
+3. Click "Save Changes"
+
+### Update Frontend API URL:
+1. Go to `fdt-frontend` service → "Environment" tab
+2. Set `REACT_APP_API_URL`:
+   ```
+   https://fdt-user-api-xxx.onrender.com/api
+   ```
+3. Click "Save Changes"
+
+### Redeploy All Services:
+Click "Manual Deploy" → "Deploy latest commit" for each service to apply changes.
+
+---
+
+## Step 4: Custom Domain Setup
 
 ### Point Your Domain to Render
 
-After all services are deployed:
+After all services are connected:
 
 1. Go to your **Frontend** service dashboard
 2. Click "Settings" → "Custom Domains"
@@ -117,7 +165,7 @@ Option 2: Set up subdomains:
 
 ---
 
-## Step 4: Verify Deployment
+## Step 5: Verify Deployment
 
 ### Test Your URLs:
 ```bash

@@ -107,24 +107,6 @@ services:
     healthCheckPath: /health
     plan: free
 
-  # Frontend Static Site
-  - type: static
-    name: fdt-frontend
-    runtime: static
-    buildCommand: cd frontend && npm install && npm run build
-    publishPath: ./frontend/build
-    envVars:
-      - key: REACT_APP_API_URL
-        value: /api
-    routes:
-      - type: rewrite
-        source: /api/*
-        destination: https://your-user-api-url.onrender.com/api/*
-      - type: rewrite
-        source: /admin/*
-        destination: https://your-admin-api-url.onrender.com/admin/*
-    plan: free
-
 # Environment variables that need to be set manually in Render dashboard:
 # 1. GROQ_API_KEY - Your Groq API key
 # 2. DB_URL and REDIS_URL - Will be auto-populated after first deploy, then update manually
