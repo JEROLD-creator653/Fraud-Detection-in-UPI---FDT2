@@ -1,0 +1,118 @@
+# Digital Ocean App Platform Configuration
+# Save this as .do/app.yaml in your repository
+
+name: fdt-secureupi
+region: nyc  # or blr for Bangalore (closer to India)
+
+services:
+  # Frontend - User Web Application
+  - name: frontend
+    source_dir: /frontend
+    github:
+      repo: your-github-username/Fraud-Detection-in-UPI---FDT2
+      branch: production
+      deploy_on_push: true
+    build_command: npm install && npm run build
+    output_dir: build
+    http_port: 3000
+    routes:
+      - path: /
+    instance_size_slug: basic-xxs
+    instance_count: 1
+
+  # User Backend API
+  - name: user-backend
+    source_dir: /
+    github:
+      repo: your-github-username/Fraud-Detection-in-UPI---FDT2
+      branch: production
+      deploy_on_push: true
+    build_command: pip install -r requirements.txt
+    run_command: python backend/server.py
+    http_port: 8001
+    routes:
+      - path: /api
+    envs:
+      - key: DB_URL
+        value: "${db.DATABASE_URL}"
+        type: SECRET
+      - key: REDIS_URL
+        value: "${redis.REDIS_URL}"
+        type: SECRET
+      - key: JWT_SECRET_KEY
+        value: "Aetu7iZiwW7ooeDsmWO1qNPoMg4MNlSNpYQXKizSzpo"
+        type: SECRET
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD_HASH
+        value: "$pbkdf2-sha256$29000$UEoppdTa.3/PWUsphZCSkg$FNKn6Lz3vXsjx6GGl5AKsz7Rf0gyLAm2ZqlOOau3bBg"
+        type: SECRET
+      - key: ALLOWED_ORIGINS
+        value: "https://fdt2-secureupi.tech,https://www.fdt2-secureupi.tech"
+      - key: DELAY_THRESHOLD
+        value: "0.35"
+      - key: BLOCK_THRESHOLD
+        value: "0.70"
+      - key: GROQ_API_KEY
+        value: ""
+        type: SECRET
+      - key: PYTHONPATH
+        value: "/workspace"
+    instance_size_slug: basic-xs
+    instance_count: 1
+
+  # Admin Dashboard Backend
+  - name: admin-backend
+    source_dir: /
+    github:
+      repo: your-github-username/Fraud-Detection-in-UPI---FDT2
+      branch: production
+      deploy_on_push: true
+    build_command: pip install -r requirements.txt
+    run_command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    http_port: 8000
+    routes:
+      - path: /admin
+    envs:
+      - key: DB_URL
+        value: "${db.DATABASE_URL}"
+        type: SECRET
+      - key: REDIS_URL
+        value: "${redis.REDIS_URL}"
+        type: SECRET
+      - key: JWT_SECRET_KEY
+        value: "Aetu7iZiwW7ooeDsmWO1qNPoMg4MNlSNpYQXKizSzpo"
+        type: SECRET
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD_HASH
+        value: "$pbkdf2-sha256$29000$UEoppdTa.3/PWUsphZCSkg$FNKn6Lz3vXsjx6GGl5AKsz7Rf0gyLAm2ZqlOOau3bBg"
+        type: SECRET
+      - key: ALLOWED_ORIGINS
+        value: "https://fdt2-secureupi.tech"
+      - key: DELAY_THRESHOLD
+        value: "0.35"
+      - key: BLOCK_THRESHOLD
+        value: "0.70"
+      - key: GROQ_API_KEY
+        value: ""
+        type: SECRET
+      - key: PYTHONPATH
+        value: "/workspace"
+    instance_size_slug: basic-xs
+    instance_count: 1
+
+databases:
+  - name: db
+    engine: PG
+    version: "14"
+    size: db-s-dev-database
+    num_nodes: 1
+    cluster_name: fdt-postgres
+
+  - name: redis
+    engine: REDIS
+    version: "6"
+    size: db-s-dev-database
+    num_nodes: 1
+    cluster_name: fdt-redis
