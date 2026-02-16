@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin Login</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     
@@ -13,7 +14,7 @@
     }
     
     body {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      background: #0f172a;
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -23,35 +24,17 @@
       overflow: hidden;
     }
     
-    body::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      right: -50%;
+    #floating-lines-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
-      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-      animation: float 20s infinite ease-in-out;
-    }
-    
-    body::after {
-      content: '';
-      position: absolute;
-      bottom: -50%;
-      left: -50%;
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
-      animation: float 25s infinite ease-in-out reverse;
-    }
-    
-    @keyframes float {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      50% { transform: translate(30px, 30px) rotate(180deg); }
+      z-index: 0;
     }
     
     .login-container {
-      background: white;
+      background: rgba(255, 255, 255, 0.95);
       border-radius: 24px;
       box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25), 0 0 100px rgba(102, 126, 234, 0.2);
       padding: 48px 40px;
@@ -262,6 +245,7 @@
   </style>
 </head>
 <body>
+  <canvas id="floating-lines-canvas"></canvas>
   <div class="login-container">
     <div class="login-header">
       <h2 class="login-title">Admin Login</h2>
@@ -340,6 +324,165 @@
     togglePassword.addEventListener('mouseleave', function() {
       this.style.color = '#6b7280';
     });
+
+    // Floating Lines Background Animation (same as React login)
+    (function() {
+      try {
+        var canvas = document.getElementById('floating-lines-canvas');
+        if (!canvas || typeof THREE === 'undefined') {
+          console.warn('Three.js or canvas not available');
+          return;
+        }
+        
+        var scene = new THREE.Scene();
+        var camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+        camera.position.z = 1;
+
+        var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        var vertexShader = `
+          precision highp float;
+          void main() {
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `;
+
+        var fragmentShader = `
+          precision highp float;
+          uniform float iTime;
+          uniform vec2 iResolution;
+          uniform vec2 iMouse;
+          uniform bool interactive;
+          
+          mat2 rotate(float r) {
+            return mat2(cos(r), sin(r), -sin(r), cos(r));
+          }
+          
+          float wave(vec2 uv, float offset, vec2 screenUv, vec2 mouseUv) {
+            float time = iTime * 1.0;
+            float amp = sin(offset + time * 0.2) * 0.3;
+            float y = sin(uv.x + offset + time * 0.1) * amp;
+            float m = uv.y - y;
+            return 0.015 / max(abs(m) + 0.01, 1e-3) + 0.01;
+          }
+          
+          void main() {
+            vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
+            uv.y *= -1.0;
+            
+            vec3 col = vec3(0.0);
+            
+            vec3 PINK = vec3(233.0, 71.0, 245.0) / 255.0;
+            vec3 BLUE = vec3(91.0, 108.0, 255.0) / 255.0;
+            vec3 PURPLE = vec3(124.0, 58.0, 237.0) / 255.0;
+            
+            vec2 mouseUv = vec2(0.0);
+            if (interactive) {
+              mouseUv = (2.0 * iMouse - iResolution.xy) / iResolution.y;
+              mouseUv.y *= -1.0;
+            }
+            
+            // Bottom waves
+            for(int i = 0; i < 6; i++) {
+              float fi = float(i);
+              float t = fi / 5.0;
+              
+              float angle = 0.4 * log(length(uv) + 1.0);
+              vec2 ruv = uv * rotate(angle);
+              vec2 waveUv = ruv + vec2(0.04 * fi + 2.0, -0.7);
+              
+              vec3 lineCol = mix(BLUE, PURPLE, t);
+              lineCol = mix(lineCol, PINK, sin(iTime * 0.5 + fi) * 0.5 + 0.5);
+              
+              col += lineCol * wave(waveUv, 1.5 + 0.2 * fi, uv, mouseUv) * 0.15;
+            }
+            
+            // Middle waves
+            for(int i = 0; i < 7; i++) {
+              float fi = float(i);
+              float t = fi / 6.0;
+              
+              float angle = 0.2 * log(length(uv) + 1.0);
+              vec2 ruv = uv * rotate(angle);
+              vec2 waveUv = ruv + vec2(0.05 * fi + 5.0, 0.0);
+              
+              vec3 lineCol = mix(PINK, BLUE, t);
+              lineCol = mix(lineCol, PURPLE, sin(iTime * 0.7 + fi * 1.3) * 0.5 + 0.5);
+              
+              col += lineCol * wave(waveUv, 2.0 + 0.15 * fi, uv, mouseUv) * 0.18;
+            }
+            
+            // Top waves
+            for(int i = 0; i < 6; i++) {
+              float fi = float(i);
+              float t = fi / 5.0;
+              
+              float angle = -0.4 * log(length(uv) + 1.0);
+              vec2 ruv = uv * rotate(angle);
+              vec2 waveUv = ruv + vec2(0.06 * fi + 10.0, 0.5);
+              
+              vec3 lineCol = mix(PURPLE, PINK, t);
+              lineCol = mix(lineCol, BLUE, sin(iTime * 0.3 + fi * 0.8) * 0.5 + 0.5);
+              
+              col += lineCol * wave(waveUv, 1.8 + 0.25 * fi, uv, mouseUv) * 0.15;
+            }
+            
+            // Background gradient
+            vec3 bgTop = vec3(0.06, 0.05, 0.12);
+            vec3 bgBottom = vec3(0.02, 0.02, 0.05);
+            vec3 bg = mix(bgBottom, bgTop, uv.y * 0.5 + 0.5);
+            col += bg;
+            
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `;
+
+        var uniforms = {
+          iTime: { value: 0 },
+          iResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+          iMouse: { value: new THREE.Vector2(window.innerWidth/2, window.innerHeight/2) },
+          interactive: { value: true }
+        };
+
+        var material = new THREE.ShaderMaterial({
+          uniforms: uniforms,
+          vertexShader: vertexShader,
+          fragmentShader: fragmentShader
+        });
+
+        var geometry = new THREE.PlaneGeometry(2, 2);
+        var mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        var resizeTimeout;
+        window.addEventListener('resize', function() {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(function() {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            uniforms.iResolution.value.set(window.innerWidth, window.innerHeight);
+          }, 100);
+        });
+
+        var mouseX = window.innerWidth / 2;
+        var mouseY = window.innerHeight / 2;
+        document.addEventListener('mousemove', function(e) {
+          mouseX = e.clientX;
+          mouseY = e.clientY;
+          uniforms.iMouse.value.set(mouseX, mouseY);
+        });
+
+        function animate() {
+          requestAnimationFrame(animate);
+          uniforms.iTime.value += 0.016;
+          renderer.render(scene, camera);
+        }
+        animate();
+      } catch(e) {
+        console.error('Floating lines error:', e);
+      }
+    })();
   </script>
 </body>
 </html>

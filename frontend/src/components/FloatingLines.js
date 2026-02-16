@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, memo } from 'react';
 import {
   Scene,
   OrthographicCamera,
@@ -229,7 +229,7 @@ function hexToVec3(hex) {
   return new Vector3(r / 255, g / 255, b / 255);
 }
 
-export default function FloatingLines({
+function FloatingLines({
   linesGradient,
   enabledWaves = ['top', 'middle', 'bottom'],
   lineCount = [6],
@@ -382,7 +382,12 @@ export default function FloatingLines({
 
     setSize();
 
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(setSize) : null;
+    let resizeTimeout;
+    const debouncedSetSize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(setSize, 100);
+    };
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(debouncedSetSize) : null;
 
     if (ro && containerRef.current) {
       ro.observe(containerRef.current);
@@ -440,6 +445,7 @@ export default function FloatingLines({
     const container = containerRef.current;
     return () => {
       cancelAnimationFrame(raf);
+      clearTimeout(resizeTimeout);
       if (ro && container) {
         ro.disconnect();
       }
@@ -483,3 +489,5 @@ export default function FloatingLines({
     />
   );
 }
+
+export default memo(FloatingLines);
