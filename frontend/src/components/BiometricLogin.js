@@ -51,16 +51,19 @@ const BiometricLogin = ({ phone, onSuccess, onFallbackToPassword }) => {
     }
   }, [phone, onSuccess]);
 
-  // Auto-trigger biometric if credentials exist and phone is entered
+  // Auto-trigger biometric if credentials exist and phone is entered (only once when conditions first met)
+  const [hasTriggeredAutoLogin, setHasTriggeredAutoLogin] = useState(false);
+  
   useEffect(() => {
-    if (isSupported && hasCredentials && phone && !isAuthenticating && !error) {
-      // Small delay to avoid immediate trigger
+    const phoneLength = phone.replace(/\D/g, '').length;
+    if (isSupported && hasCredentials && phoneLength >= 10 && !isAuthenticating && !error && !hasTriggeredAutoLogin) {
+      setHasTriggeredAutoLogin(true);
       const timer = setTimeout(() => {
         handleBiometricLogin();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [phone, isSupported, hasCredentials, isAuthenticating, error, handleBiometricLogin]);
+  }, [phone, isSupported, hasCredentials, isAuthenticating, error, handleBiometricLogin, hasTriggeredAutoLogin]);
 
   if (!isSupported) {
     return null; // Don't show anything if not supported
