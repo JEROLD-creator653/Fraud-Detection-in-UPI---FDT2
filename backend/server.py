@@ -966,13 +966,7 @@ async def revoke_credential(credential_id: str, user_id: str = Depends(get_curre
 
 @app.get("/api/user/dashboard")
 async def get_user_dashboard(user_id: str = Depends(get_current_user)):
-    """Get user dashboard data (cached for 3 minutes)"""
-    # Try to get from cache first
-    cache_key = f"dashboard:{user_id}"
-    cached_data = cache_get(cache_key)
-    if cached_data:
-        return json.loads(cached_data)
-    
+    """Get user dashboard data (queries PostgreSQL directly for real-time updates)"""
     def _get_dashboard():
         conn = get_db_conn()
         try:
@@ -992,7 +986,7 @@ async def get_user_dashboard(user_id: str = Depends(get_current_user)):
             user_dict = dict(user)
             user_dict["upi_id"] = f"{user_dict['phone'].replace('+91', '').replace('+', '')}@upi"
             
-            # Get recent transactions (last 5)
+            # Get recent transactions (last 5) - no caching for real-time updates
             cur.execute(
                 """
                 SELECT tx_id, amount, recipient_vpa, tx_type, action, risk_score, created_at, db_status, remarks
@@ -1027,9 +1021,6 @@ async def get_user_dashboard(user_id: str = Depends(get_current_user)):
                 "recent_transactions": dict_to_json_serializable([dict(t) for t in recent_transactions]),
                 "stats": dict_to_json_serializable(dict(stats))
             }
-            
-            # Cache the result for 3 minutes
-            cache_set(cache_key, json.dumps(result), CACHE_TTL_HISTORY)
             
             return result
         finally:
