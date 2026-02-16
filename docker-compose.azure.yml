@@ -1,0 +1,140 @@
+# Production Docker Compose for Azure VM
+# Optimized for deployment on Azure B1s VM
+
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14-alpine
+    container_name: fdt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fdt
+      POSTGRES_PASSWORD: fdtpass
+      POSTGRES_DB: fdt_db
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init_schema.sql:/docker-entrypoint-initdb.d/init_schema.sql
+    ports:
+      - "127.0.0.1:5432:5432"  # Only accessible locally
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fdt"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fdt-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  redis:
+    image: redis:6-alpine
+    container_name: fdt-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"  # Only accessible locally
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fdt-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  user-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: fdt-user-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DB_URL=postgresql://fdt:fdtpass@db:5432/fdt_db
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "127.0.0.1:8001:8001"  # Only accessible via Nginx
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - fdt-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  admin-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: fdt-admin-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DB_URL=postgresql://fdt:fdtpass@db:5432/fdt_db
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "127.0.0.1:8000:8000"  # Only accessible via Nginx
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - fdt-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fdt-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"  # Only accessible via Nginx
+    depends_on:
+      - user-backend
+      - admin-backend
+    networks:
+      - fdt-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  fdt-network:
+    driver: bridge
