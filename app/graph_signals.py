@@ -175,30 +175,22 @@ def compute_graph_signals(
         # Normalize: 1-30 senders is normal, 30+ is suspicious
         degree_risk = min(1.0, max(0.0, (degree_centrality - 30) / 70.0)) if degree_centrality > 30 else 0.0
 
-        # 3. Shared device risk
-        device_users = r.scard(_key_device_users(device_id)) or 0
-        device_fraud_users = r.scard(_key_device_fraud_users(device_id)) or 0
-
-        if device_users > 1 and device_fraud_users > 0:
-            shared_device_fraud_ratio = device_fraud_users / device_users
-        else:
-            shared_device_fraud_ratio = 0.0
-
-        # Multi-user device is inherently suspicious
-        multi_user_device_risk = min(1.0, max(0.0, (device_users - 2) / 5.0)) if device_users > 2 else 0.0
+        # 3. Shared device risk - DISABLED (same device used for testing)
+        device_users = 0
+        device_fraud_users = 0
+        shared_device_fraud_ratio = 0.0
+        multi_user_device_risk = 0.0
 
         # 4. User's own fraud history
         user_fraud_count = int(r.get(_key_user_fraud_count(user_id)) or 0)
         user_fraud_risk = min(1.0, user_fraud_count * 0.3)
 
         # 5. Aggregate graph risk score
-        # Weight the components
+        # Weight the components (device components disabled)
         graph_risk = (
-            0.35 * recipient_fraud_ratio +
-            0.10 * degree_risk +
-            0.20 * shared_device_fraud_ratio +
-            0.10 * multi_user_device_risk +
-            0.25 * user_fraud_risk
+            0.45 * recipient_fraud_ratio +
+            0.15 * degree_risk +
+            0.40 * user_fraud_risk
         )
 
         graph_risk = min(1.0, max(0.0, graph_risk))

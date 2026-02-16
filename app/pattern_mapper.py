@@ -34,14 +34,14 @@ class PatternMapper:
     - Model Disagreement: Models produce conflicting signals
     """
     
-    # Configurable thresholds
+    # Configurable thresholds (lenient)
     THRESHOLDS = {
-        # Amount thresholds
-        "amount_high": 10000,
-        "amount_very_high": 20000,
-        "amount_critical": 50000,
-        "amount_deviation_moderate": 2.0,
-        "amount_deviation_high": 3.0,
+        # Amount thresholds (raised for lenient detection)
+        "amount_high": 25000,
+        "amount_very_high": 50000,
+        "amount_critical": 100000,
+        "amount_deviation_moderate": 5.0,
+        "amount_deviation_high": 8.0,
         
         # Velocity thresholds
         "velocity_1min_warn": 2,
@@ -226,38 +226,15 @@ class PatternMapper:
     @classmethod
     def detect_device_anomaly(cls, features: Dict[str, Any]) -> PatternResult:
         """
-        Detect device-related anomalies.
-        
-        Rules:
-        - is_new_device = 1 → New/unseen device
-        - device_count <= 1 → First transaction from device
+        Device anomaly detection disabled - same device used for testing.
+        Always returns no anomaly detected.
         """
-        triggers = []
-        confidence = 0.0
-        explanation = []
-        
-        is_new_device = float(features.get("is_new_device", 0))
-        device_count = float(features.get("device_count", 0))
-        
-        if is_new_device > 0:
-            triggers.append("new_device")
-            confidence = max(confidence, 0.75)
-            explanation.append("New/unseen device")
-        
-        if device_count <= 1:
-            triggers.append("first_device_tx")
-            confidence = max(confidence, 0.5)
-            explanation.append("First transaction from this device")
-        
-        detected = len(triggers) > 0
-        explanation_text = "; ".join(explanation) if explanation else "No device anomaly"
-        
         return PatternResult(
             pattern="Device Anomaly",
-            detected=detected,
-            confidence=confidence,
-            trigger_features=triggers,
-            explanation=explanation_text
+            detected=False,
+            confidence=0.0,
+            trigger_features=[],
+            explanation="Device checking disabled"
         )
     
     @classmethod

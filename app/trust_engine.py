@@ -71,6 +71,9 @@ TTL_SECONDS = 86400 * 90  # 90-day retention
 def compute_trust_score(user_id: str, recipient: str) -> Tuple[float, Dict[str, float]]:
     """
     Compute a gradual trust score for the (user, recipient) pair.
+    
+    New recipients get a baseline trust of 0.3 so that users can send
+    their average transaction amounts without being flagged.
 
     Returns
     -------
@@ -80,7 +83,8 @@ def compute_trust_score(user_id: str, recipient: str) -> Tuple[float, Dict[str, 
     """
     r = _get_redis()
     if r is None:
-        return 0.0, {"tx_count": 0, "total_amount": 0.0, "days_known": 0.0, "fraud_flags": 0}
+        # Even without Redis, give a baseline trust for new recipients
+        return 0.3, {"tx_count": 0, "total_amount": 0.0, "days_known": 0.0, "fraud_flags": 0, "baseline_trust": True}
 
     try:
         tx_count = int(r.get(_key_tx_count(user_id, recipient)) or 0)
@@ -88,7 +92,7 @@ def compute_trust_score(user_id: str, recipient: str) -> Tuple[float, Dict[str, 
         first_ts = r.get(_key_first_ts(user_id, recipient))
         fraud_flags = int(r.get(_key_fraud_flags(user_id, recipient)) or 0)
     except Exception:
-        return 0.0, {"tx_count": 0, "total_amount": 0.0, "days_known": 0.0, "fraud_flags": 0}
+        return 0.3, {"tx_count": 0, "total_amount": 0.0, "days_known": 0.0, "fraud_flags": 0, "baseline_trust": True}
 
     # Days since first transaction
     if first_ts is not None:
@@ -115,6 +119,13 @@ def compute_trust_score(user_id: str, recipient: str) -> Tuple[float, Dict[str, 
     # Apply fraud penalty
     trust_score = max(0.0, raw_trust - fraud_penalty)
 
+    # Baseline trust for new recipients: ensure at least 0.3 trust
+    # so that normal-amount transactions to new people aren't flagged
+    baseline_applied = False
+    if tx_count == 0 and fraud_flags == 0:
+        trust_score = max(trust_score, 0.3)
+        baseline_applied = True
+
     # Clamp
     trust_score = min(1.0, max(0.0, trust_score))
 
@@ -128,6 +139,7 @@ def compute_trust_score(user_id: str, recipient: str) -> Tuple[float, Dict[str, 
         "lon_score": round(lon_score, 3),
         "fraud_penalty": round(fraud_penalty, 3),
         "trust_score": round(trust_score, 4),
+        "baseline_trust": baseline_applied,
     }
 
     return trust_score, details

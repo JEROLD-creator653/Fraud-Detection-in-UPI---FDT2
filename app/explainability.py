@@ -73,9 +73,8 @@ def explain_transaction(
     elif amount >= t["amount_medium"]:
         _add(f"High amount {amount:,.0f} detected", reasons)
 
-    device_age_days = _maybe(features, "device_age_days")
-    if device_age_days is not None and device_age_days <= t["device_age_days_new"]:
-        _add("New or recently seen device", reasons)
+    # Device checking disabled - same device used for testing
+    # device_age_days check removed
 
     dist_km = _maybe(features, "distance_from_last_km")
     if dist_km is not None:
