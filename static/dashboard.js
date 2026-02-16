@@ -286,26 +286,111 @@ function initCharts() {
   });
 
   riskPie = new Chart(document.getElementById('riskPie').getContext('2d'), {
-    type: 'pie',
+    type: 'polarArea',
     data: {
       labels: ['Low', 'Medium', 'High', 'Critical'],
       datasets: [{
-        // Data populated live from txCache to keep the chart data-driven
         data: [0, 0, 0, 0],
-        backgroundColor: ['#6BCF7F', '#FFD93D', '#FF9F40', '#FF6B6B']
+        backgroundColor: [
+          'rgba(34, 197, 94, 0.7)',
+          'rgba(250, 204, 21, 0.7)',
+          'rgba(251, 146, 60, 0.7)',
+          'rgba(239, 68, 68, 0.7)'
+        ],
+        borderColor: [
+          '#22c55e',
+          '#facc15',
+          '#fb923c',
+          '#ef4444'
+        ],
+        borderWidth: 2,
+        hoverBackgroundColor: [
+          'rgba(34, 197, 94, 0.9)',
+          'rgba(250, 204, 21, 0.9)',
+          'rgba(251, 146, 60, 0.9)',
+          'rgba(239, 68, 68, 0.9)'
+        ],
+        hoverBorderWidth: 3
       }]
     },
     options: { 
       responsive: true, 
       maintainAspectRatio: true,
+      animation: {
+        duration: 1200,
+        easing: 'easeOutQuart'
+      },
       plugins: {
         legend: {
-          labels: { color: textColor }
+          position: 'top',
+          labels: { 
+            color: textColor,
+            padding: 15,
+            font: { size: 12, weight: 'bold' },
+            usePointStyle: true,
+            pointStyle: 'circle'
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(17, 24, 39, 0.95)',
+          titleColor: '#fff',
+          bodyColor: '#e5e7eb',
+          borderColor: 'rgba(75, 85, 99, 0.5)',
+          borderWidth: 1,
+          cornerRadius: 8,
+          padding: 12,
+          titleFont: { size: 14, weight: 'bold' },
+          bodyFont: { size: 13 },
+          displayColors: true,
+          callbacks: {
+            title: function(context) {
+              return context[0].label;
+            },
+            label: function(context) {
+              const value = context.raw;
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+              return `  Count: ${value} (${percentage}%)`;
+            },
+            afterBody: function(context) {
+              const total = context[0].dataset.data.reduce((a, b) => a + b, 0);
+              return total > 0 ? '' : '\nNo transactions';
+            }
+          }
         }
       },
-      animation: {
-        duration: 0 // Disable animations
-      }
+      scales: {
+        r: {
+          beginAtZero: true,
+          min: 0,
+          max: 5,
+          ticks: {
+            display: false,
+            stepSize: 1
+          },
+          grid: { 
+            color: 'rgba(75, 85, 99, 0.15)',
+            lineWidth: 1,
+            circular: true
+          },
+          angleLines: {
+            color: 'rgba(75, 85, 99, 0.1)',
+            display: true
+          },
+          pointLabels: {
+            color: textColor,
+            font: { size: 11, weight: 'bold' }
+          }
+        }
+      },
+      elements: {
+        arc: {
+          borderAlign: 'inner',
+          spacing: 0.05
+        }
+      },
+      hoverOffset: 15,
+      hoverRadius: 12
     }
   });
 
@@ -827,7 +912,15 @@ function updateRiskDistributionFromCache() {
 
   riskPie.data.labels = ['Low', 'Medium', 'High', 'Critical'];
   riskPie.data.datasets[0].data = [low, medium, high, critical];
-  riskPie.update('none');
+  
+  // Calculate appropriate max to keep grid lines at 5-6
+  const maxValue = Math.max(low, medium, high, critical);
+  // Round up to nearest multiple of 5, minimum 5
+  const chartMax = Math.max(5, Math.ceil(maxValue / 5) * 5);
+  riskPie.options.scales.r.max = chartMax;
+  riskPie.options.scales.r.ticks.stepSize = chartMax / 5;
+  
+  riskPie.update();
   
   // Hide loading/no-data overlay since we have data
   console.log('[updateRiskDistributionFromCache] Data loaded - hiding overlays');
