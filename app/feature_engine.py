@@ -18,11 +18,14 @@ except Exception as e:
 # HELPER FUNCTIONS
 # ---------------------------------------------
 def safe_ts(timestamp_str):
-    """Convert timestamp to UTC datetime."""
+    """Convert timestamp to IST datetime (UTC+5:30)."""
     try:
-        return datetime.fromisoformat(timestamp_str.replace("Z", "+00:00")).astimezone(timezone.utc)
+        dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00")).astimezone(timezone.utc)
+        # Convert to IST (UTC+5:30)
+        ist_offset = timedelta(hours=5, minutes=30)
+        return dt.astimezone(timezone(ist_offset))
     except:
-        return datetime.now(timezone.utc)
+        return datetime.now(timezone(timedelta(hours=5, minutes=30)))
 
 def zcount_last_seconds(key, now_ts, seconds):
     """Count events in a ZSET in the last X seconds."""
